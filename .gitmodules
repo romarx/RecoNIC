@@ -6,3 +6,6 @@
 	path = drivers/onic-driver
 	url = https://github.com/Hyunok-Kim/onic-driver.git
 	branch = main
+[submodule "shell/roce_stack/fpga-network-stack"]
+	path = shell/roce_stack/fpga-network-stack
+	url = git@github.com:romarx/fpga-network-stack.git
