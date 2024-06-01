@@ -1,4 +1,10 @@
 build/*
+__pycache__/*
+scripts/xsim.dir/*
+scripts/.Xil/*
 *.txt
 *.jou
 *.log
+*.wdb
+*.str
+*.pb
