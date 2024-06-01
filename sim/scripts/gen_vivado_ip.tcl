@@ -40,6 +40,7 @@ set board_part xilinx.com:au250:part0:1.3
 
 set root_dir [file normalize ../..]
 set ip_src_dir $root_dir/shell/plugs/rdma_onic_plugin
+set roce_dir $root_dir/shell/roce_stack
 set sim_dir $root_dir/sim
 set build_dir $sim_dir/build
 set ip_build_dir $build_dir/ip
@@ -53,19 +54,33 @@ file mkdir $build_managed_ip_dir
 puts "INFO: Building required IPs"
 create_project -force managed_ip_project $build_managed_ip_dir -part $part
 set_property BOARD_PART $board_part [current_project]
-
 set ip_dict [dict create]
-source ${ip_src_dir}/vivado_ip/sim_vivado_ip.tcl
+
+source ${roce_dir}/vivado_ip/sim_vivado_ip.tcl
 foreach ip $ips {
   set xci_file ${ip_build_dir}/$ip/$ip.xci
-  source ${ip_src_dir}/vivado_ip/${ip}.tcl
-
+  source ${roce_dir}/vivado_ip/${ip}.tcl
   generate_target all [get_files  $xci_file]
   create_ip_run [get_files -of_objects [get_fileset sources_1] $xci_file]
   launch_runs ${ip}_synth_1 -jobs 8
   wait_on_run ${ip}_synth_1
   puts "INFO: $ip is generated"
 }
+
+puts "INFO: ROCE IPs generated"
+
+source ${ip_src_dir}/vivado_ip/sim_vivado_ip.tcl
+foreach ip $ips {
+  set xci_file ${ip_build_dir}/$ip/$ip.xci
+  source ${ip_src_dir}/vivado_ip/${ip}.tcl
+  generate_target all [get_files  $xci_file]
+  create_ip_run [get_files -of_objects [get_fileset sources_1] $xci_file]
+  launch_runs ${ip}_synth_1 -jobs 8
+  wait_on_run ${ip}_synth_1
+  puts "INFO: $ip is generated"
+}
+
+
 
 puts "INFO: All IPs required for simulation are generated"
 

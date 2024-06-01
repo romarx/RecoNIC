@@ -21,6 +21,8 @@ IMPL       ?= 1
 
 GEN_HLS    ?= 0
 
+GEN_ROCEV2 ?= 1
+
 PYTHON_EXE ?= python
 
 # Check Vivado version
@@ -29,6 +31,9 @@ VIVADO_VERSION := $(shell vivado -version | grep ^Vivado |  sed -n 's/.*\(v[0-9]
 # Module directories
 ## RecoNIC top module
 RN_TOP            := $(SHELL_DIR)/top
+
+ROCE_DIR		  := $(SHELL_DIR)/roce_stack
+
 ## Packet Classification module
 PC                := packet_classification
 PKT_CLASSI_DIR    := $(SHELL_DIR)/$(PC)
@@ -97,6 +102,14 @@ ifeq (,$(wildcard $(LOOKASIDE_COMP_DIR)/kernel/mmult.v))
 else
 	@echo "Use old files in $(LOOKASIDE_COMP_DIR)/kernel"
 endif
+endif
+
+ifeq ($(GEN_ROCEV2), 1)
+	mkdir -p $(ROCE_DIR)/build
+	cd $(ROCE_DIR)/build; \
+		cmake ../fpga-network-stack -DVIVADO_HLS_ROOT_DIR=/opt/Xilinx/Vitis_HLS
+	cd $(ROCE_DIR)/build; \
+		make ip
 endif
 
 clean_build:

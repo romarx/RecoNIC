@@ -85,6 +85,24 @@ xvlog $xvlog_opts -sv -L xpm -L ernic_v3_1_1 -L axi_bram_ctrl_v4_1_6 -d DEBUG -w
 "../../shell/plugs/rdma_onic_plugin/box_250mhz.sv" \
 "../../shell/plugs/rdma_onic_plugin/rdma_onic_plugin.sv" \
 
+xvlog $xvlog_opts -work reco -sv -L rocev2_ip --include "../build/ip/rocev2_ip/hdl/verilog" \
+"../../shell/roce_stack/rocev2_src/interfaces/lynx_pkg.sv" \
+"../../shell/roce_stack/rocev2_src/interfaces/axi_intf.sv" \
+"../../shell/roce_stack/rocev2_src/interfaces/lynx_intf.sv" \
+"../../shell/roce_stack/rocev2_src/buffer_fifo.sv" \
+"../../shell/roce_stack/rocev2_src/fifo.sv" \
+"../../shell/roce_stack/rocev2_src/icrc.sv" \
+"../../shell/roce_stack/rocev2_src/queue_meta.sv" \
+"../../shell/roce_stack/rocev2_src/rdma_flow.sv" \
+"../../shell/roce_stack/rocev2_src/roce_stack.sv" \
+"../../shell/roce_stack/rocev2_src/sp_ram_nc.sv" \
+"../../shell/roce_stack/wrapper_src/roce_stack_request_handler.sv" \
+"../../shell/roce_stack/wrapper_src/roce_stack_axis_to_aximm.sv" \
+"../../shell/roce_stack/wrapper_src/roce_stack_wq_manager.sv" \
+"../../shell/roce_stack/wrapper_src/roce_stack_csr.sv" \
+"../../shell/roce_stack/wrapper_src/roce_stack_wrapper.sv" \
+
+
 xvlog $xvlog_opts -sv -d DEBUG -L axi_bram_ctrl_v4_1_6 -L xpm -work reco \
 "../src/axi_read_verify.sv" \
 "../src/axil_reg_stimulus.sv" \
@@ -92,6 +110,7 @@ xvlog $xvlog_opts -sv -d DEBUG -L axi_bram_ctrl_v4_1_6 -L xpm -work reco \
 "../src/axil_3to1_crossbar_wrapper.sv" \
 "../src/init_mem.sv" \
 "../src/rdma_rn_wrapper.sv" \
+"../src/rdma_rn_roce_wrapper.sv" \
 "../src/rn_tb_pkg.sv" \
 "../src/rn_tb_generator.sv" \
 "../src/rn_tb_driver.sv" \
@@ -99,6 +118,7 @@ xvlog $xvlog_opts -sv -d DEBUG -L axi_bram_ctrl_v4_1_6 -L xpm -work reco \
 "../src/rn_tb_top.sv" \
 "../src/cl_tb_top.sv" \
 "../src/rn_tb_2rdma_top.sv" \
+"../src/rn_tb_2rdma_roce_top.sv" \
 "../src/axi_3to1_interconnect_to_dev_mem.sv" \
 "../src/axi_5to2_interconnect_to_sys_mem.sv" \
 
