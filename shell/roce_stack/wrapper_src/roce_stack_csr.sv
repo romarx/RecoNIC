@@ -65,7 +65,7 @@ module roce_stack_csr # (
   output logic [63:0]                     RQWPTRDBADDi_o,
   output logic [63:0]                     CQDBADDi_o,
   output logic [31:0]                     SQPIi_o,
-  input  logic [31:0]                     CQHEADi_i,
+  //input  logic [31:0]                     CQHEADi_i,
   output logic [31:0]                     CQHEADi_o,
   output logic [31:0]                     QDEPTHi_o,
   output logic [23:0]                     SQPSNi_o,
@@ -89,7 +89,7 @@ module roce_stack_csr # (
   input  logic                            wr_resp_addr_ready_i,
   output logic  [115 : 0]                 wr_resp_addr_data_o,
 
-  input  logic  [7:0]                     wr_ptr_i,
+  //input  logic  [7:0]                     wr_ptr_i,
 
 
   input logic                             axis_aclk_i,
@@ -1727,7 +1727,7 @@ assign DESTQPCONFi_o = DESTQPCONFi_q[QPidx_q][23:0];
 assign MACDESADDi_o = {MACDESADDMSBi_q[QPidx_q], MACDESADDLSBi_q[QPidx_q]};
 assign IPDESADDR1i_o = IPDESADDR1i_q[QPidx_q];
 
-
+/*
 //read inputs from logic, async atm
 //TODO: maybe needs cdc or dc fifo + handshake
 always_comb begin
@@ -1739,6 +1739,7 @@ always_comb begin
     CQHEADi_d[QPidx_q] = CQHEADi_i;
   end
 end
+*/
 
 //find PD associated to current QP, reeally have to simulate that!
 //TODO: this needs some kind of start signal

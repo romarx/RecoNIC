@@ -136,7 +136,7 @@ roce_stack_request_handler #(
 );
 
 
-roce_stack_axi_data_mover roce_stack_axi_data_mover_inst (
+roce_stack_axi_datamover roce_stack_axi_datamover_inst (
   .s_axis_mm2s_cmd_tdata(rd_mm2s_cmd_data), 
   .s_axis_mm2s_cmd_tready(rd_mm2s_cmd_ready),
   .s_axis_mm2s_cmd_tvalid(rd_mm2s_cmd_valid),

@@ -250,6 +250,8 @@ roce_stack_csr #(
   .s_axil_rdata_o(s_axil_rdata_o),
   .s_axil_rresp_o(s_axil_rresp_o),
   .s_axil_rready_i(s_axil_rready_i),
+  
+  /*.VIRTADDR_o(VIRTADDRi),
 
   .IPv4ADD_o(IPv4ADD),
   .QPidx_o(QPidx),
@@ -268,9 +270,23 @@ roce_stack_csr #(
   .LSTRQREQi_o(LSTRQREQi),
   .DESTQPCONFi_o(DESTQPCONFi),
   .MACDESADDi_o(),
-  .IPDESADDR1i_o(IPDESADDR1i),
+  .IPDESADDR1i_o(IPDESADDR1i),*/
 
-  .VIRTADDR_o(VIRTADDRi),
+  .rd_req_addr_valid_i(rd_req_addr_valid),
+  .rd_req_addr_ready_o(rd_req_addr_ready),
+  .rd_req_addr_vaddr_i(rd_req_addr_vaddr),
+  .rd_resp_addr_valid_o(rd_resp_addr_valid),
+  .rd_resp_addr_ready_i(rd_resp_addr_ready),
+  .rd_resp_addr_data_o(rd_resp_addr_data),
+
+  .wr_req_addr_valid_i(wr_req_addr_valid),
+  .wr_req_addr_ready_o(wr_req_addr_ready),
+  .wr_req_addr_vaddr_i(wr_req_addr_vaddr),
+  .wr_resp_addr_valid_o(wr_resp_addr_valid),
+  .wr_resp_addr_ready_i(wr_resp_addr_ready),
+  .wr_resp_addr_data_o(wr_resp_addr_data),
+
+
 
 
   .axis_aclk_i(axis_aclk_i),
@@ -278,6 +294,7 @@ roce_stack_csr #(
   .rstn_i(mod_rstn_i)
 );
 
+/*
 //TODO: finish this!
 roce_stack_wq_manager inst_roce_stack_wq_manager(
     .QPidx_i(QPidx),
@@ -303,9 +320,9 @@ roce_stack_wq_manager inst_roce_stack_wq_manager(
     .m_rdma_qp_interface_ready_i(rdma_qp_interface.ready),
     .m_rdma_qp_interface_data_o(rdma_qp_interface.data),
     
-    .m_rdma_sq_interface_valid_o(rdma_sq_interface.valid),
-    .m_rdma_sq_interface_ready_i(rdma_sq_interface.ready),
-    .m_rdma_sq_interface_data_o(rdma_sq_interface_data),
+    .m_rdma_sq_interface_valid_o(rdma_sq.valid),
+    .m_rdma_sq_interface_ready_i(rdma_sq.ready),
+    .m_rdma_sq_interface_data_o(rdma_sq.data),
 
     .m_axi_qp_get_wqe_awid_o(m_axi_qp_get_wqe_awid_o),
     .m_axi_qp_get_wqe_awaddr_o(m_axi_qp_get_wqe_awaddr_o),
@@ -347,20 +364,20 @@ roce_stack_wq_manager inst_roce_stack_wq_manager(
     .axis_aclk_i(axis_aclk_i),
     .rstn_i(mod_rstn_i)
 );
-
+*/
 
 roce_stack_axis_to_aximm #(
   .AXI4_DATA_WIDTH(AXI4S_DATA_WIDTH)
 ) inst_roce_stack_axis_to_aximm (
   .s_rdma_rd_req_valid_i(rdma_rd_req.valid),
   .s_rdma_rd_req_ready_o(rdma_rd_req.ready),
-  .s_rdma_rd_req_vaddr_i(rdma_rd_req.data.vadrr),
+  .s_rdma_rd_req_vaddr_i(rdma_rd_req.data.vaddr),
   .s_rdma_rd_req_len_i(rdma_rd_req.data.len),
   .s_rdma_rd_req_ctl_i(rdma_rd_req.data.ctl),
 
   .s_rdma_wr_req_valid_i(rdma_wr_req.valid),
   .s_rdma_wr_req_ready_o(rdma_wr_req.ready),
-  .s_rdma_wr_req_vaddr_i(rdma_wr_req.data.vadrr),
+  .s_rdma_wr_req_vaddr_i(rdma_wr_req.data.vaddr),
   .s_rdma_wr_req_len_i(rdma_wr_req.data.len),
   .s_rdma_wr_req_ctl_i(rdma_wr_req.data.ctl),
 
@@ -430,7 +447,6 @@ roce_stack_axis_to_aximm #(
   .aresetn_i(mod_rstn_i)
 
 );
-
 
 
 

@@ -95,6 +95,7 @@ logic new_qp_ready;
 logic [183:0] conn_reg_d, conn_reg_q;
 logic [199:0] qp_reg_d, qp_reg_q;
 logic [255:0] sq_reg_d, sq_reg_q;
+logic [31:0] localidx_init_d, localidx_init_q;
 logic [31:0] localidx_d, localidx_q; 
 logic [31:0] mtu_d, mtu_q;
 
@@ -137,8 +138,7 @@ end
 always_comb begin
   qp_fifo_rd_en = 1'b0;
   fifo_rd_d = fifo_rd_q;
-  localidx_d = localidx_q;
-  
+  localidx_init_d = localidx_init_q;
   case(fifo_rd_q)
     IDLE: begin
       if(qp_done && !qp_fifo_empty && !qp_fifo_rd_rst_busy) begin
@@ -151,7 +151,7 @@ always_comb begin
       if(qp_fifo_rd_valid) begin
         // only proceed if qp is enabled and mtu conf is valid
         if(!qp_fifo_out.src_qp_conf[0] && qp_fifo_out.src_qp_conf[10:8] <= 3'b100) begin
-          localidx_d = qp_fifo_out.cq_head_idx;
+          localidx_init_d = qp_fifo_out.cq_head_idx;
           mtu_d = 'd256 << qp_fifo_out.src_qp_conf[10:8];
           new_qp_ready = 1'b1;
         end else begin
@@ -163,7 +163,7 @@ always_comb begin
   endcase
 end
 
-roce_stack_cdc_qp_wq inst_roce_stack_cdc_qp_wq (
+roce_stack_cdc_fifo_qp_wq inst_roce_stack_cdc_fifo_qp_wq (
 .full(qp_fifo_full),
 .din(qp_fifo_input_q),
 .wr_en(qp_fifo_wr_en),
@@ -195,7 +195,7 @@ always_comb begin
       //Current WQE changed, potentially also QP, send new conn configuration 
       if(m_rdma_conn_interface_ready_i && new_wqe_fetched && !qp_done) begin
         new_wqe_fetched = 1'b0;
-        conn_reg_d = {16'd0, qp_fifo_out.dest_ip_addr, qp_fifo_out.dest_ip_addr, qp_fifo_out.dest_ip_addr, qp_fifo_out.dest_ip_addr, 16'd0, qp_fifo_out.dest_qp_conf};
+        conn_reg_d = {16'd0, qp_fifo_out.dest_ip_addr, qp_fifo_out.dest_ip_addr, qp_fifo_out.dest_ip_addr, qp_fifo_out.dest_ip_addr, 16'd0, qp_fifo_out.dest_qp};
         //only reconnect if configuration changed
         if(conn_reg_d != conn_reg_q) begin
           conn_state_d = CONN_VALID;
@@ -335,7 +335,6 @@ always_comb begin
       if(m_rdma_sq_interface_ready_i) begin
         if(last_q) begin
           first_d = 1'b1;
-          localidx_d = localidx_q + 1;
           sq_state_d = SQ_IDLE;
         end else if(WQEReg_q[135:128] == 8'h00) begin
           sq_state_d = SQ_WRITE;
@@ -372,13 +371,17 @@ always_comb begin
   m_axi_qp_get_wqe_arvalid_o = 1'b0;
   AddrReg_d = AddrReg_q;
   AddrRd_State_d = AddrRd_State_q;
+  localidx_d = localidx_q;
 
   case(AddrRd_State_q)
     AR_IDLE: begin
       //new elements in work queue
       if (new_qp_ready && !rd_busy) begin
+        localidx_d = localidx_init_q;
         AddrRd_State_d = AR_CALC_ADDR; //TODO: state might be unnecessary
       end
+    end
+    AR_MID: begin
     end
     AR_CALC_ADDR: begin
       //64 byte aligned 
@@ -392,9 +395,13 @@ always_comb begin
       end
     end
     AR_READY: begin
-      localidx_d = localidx_q + 'd1; //TODO: this state might be unnecessary, also can maybe read everything in a max 4kb burst (max len = 63)
+      //TODO: this state might be unnecessary, also can maybe read everything in a max 4kb burst (max len = 63)
       rd_ready = 1'b1;
-      AddrRd_State_d = AR_IDLE;
+      if(localidx_q < qp_fifo_out.sq_prod_idx) begin
+        
+      end else begin
+        AddrRd_State_d = AR_IDLE;
+      end
     end
   endcase
 end
@@ -489,6 +496,7 @@ always_ff @(posedge axis_aclk_i, negedge rstn_i) begin
     sq_reg_q = 'd0;
     AddrRd_State_q <= AR_IDLE;
     AddrReg_q <= 'd0;
+    localidx_init_q <= 'd0;
     localidx_q <= 'd0;
     Read_State_q <= RD_IDLE;
     WQEReg_q <= 'd0;
@@ -505,6 +513,7 @@ always_ff @(posedge axis_aclk_i, negedge rstn_i) begin
     sq_reg_q = sq_reg_d;
     AddrRd_State_q <= AddrRd_State_d;
     AddrReg_q <= AddrReg_d;
+    localidx_init_q <= localidx_init_d;
     localidx_q <= localidx_d;
     Read_State_q <= Read_State_d;
     WQEReg_q <= WQEReg_d;

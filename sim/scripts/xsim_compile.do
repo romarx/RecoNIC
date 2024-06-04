@@ -85,10 +85,142 @@ xvlog $xvlog_opts -sv -L xpm -L ernic_v3_1_1 -L axi_bram_ctrl_v4_1_6 -d DEBUG -w
 "../../shell/plugs/rdma_onic_plugin/box_250mhz.sv" \
 "../../shell/plugs/rdma_onic_plugin/rdma_onic_plugin.sv" \
 
-xvlog $xvlog_opts -work reco -sv -L rocev2_ip --include "../build/ip/rocev2_ip/hdl/verilog" \
+xvlog $xvlog_opts -work reco -L rocev2_ip --include "../build/ip/rocev2_ip/hdl/verilog" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_append_payload_512_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_Block_split49_proc.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_conn_table_0_s_conn_table_remote_ip_address_V_RAM_AUTO_1R1W.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_conn_table_0_s_conn_table_remote_qpn_V_RAM_AUTO_1R1W.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_conn_table_0_s_conn_table_remote_udp_port_V_RAM_AUTO_1R1W.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_conn_table_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_convert_axis_to_net_axis_512_1.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_convert_axis_to_net_axis_512_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_convert_net_axis_to_axis_512_1.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_convert_net_axis_to_axis_512_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_drop_ooo_ibh_512_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_entry_proc.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_extract_icrc_512_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w1_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w2_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w3_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w4_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w16_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w16_d4_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w16_d2000_A.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w23_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w24_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w32_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w41_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w45_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w48_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w49_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w50_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w50_d32_A.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w56_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w64_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w64_d128_A.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w75_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w96_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w97_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w113_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w119_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w123_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w128_d3_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w128_d16_A.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w138_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w145_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w145_d8_A.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w150_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w150_d512_A.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w153_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w178_d4_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w178_d512_A.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w192_d8_A.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w256_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w256_d8_A.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w256_d32_A.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w320_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w320_d8_A.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w384_d8_A.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w448_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w1024_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w1024_d4_A.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w1024_d8_A.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w1024_d32_A.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_freelist_handler_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_generate_exh_512_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_generate_ibh_512_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_generate_udp_512_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_handle_read_requests_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_detection_unit.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_idx0_monitor.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_idx6_monitor.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_insert_icrc_512_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_ipUdpMetaHandler_512_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_ipv4_drop_optional_ip_header_512_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_ipv4_generate_ipv4_512_3.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_ipv4_lshiftWordByOctet_512_2_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_local_req_handler_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_lshiftWordByOctet_512_11_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_lshiftWordByOctet_512_12_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_lshiftWordByOctet_512_13_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_mem_cmd_merger_512_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_merge_retrans_request.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_merge_rx_meta.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_merge_rx_pkgs_512_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_meta_merger_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_msn_table_0_s_msn_table_dma_length_V_RAM_2P_BRAM_1R1W.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_msn_table_0_s_msn_table_lst_V_RAM_2P_BRAM_1R1W.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_msn_table_0_s_msn_table_vaddr_V_RAM_2P_BRAM_1R1W.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_msn_table_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_prepend_ibh_header_512_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_process_ipv4_512_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_process_retransmissions_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_process_udp_512_4.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_qp_interface_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_regslice_both.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_retrans_meta_table_0_s_meta_table_localAddr_V_RAM_T2P_BRAM_1R1W.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_retrans_meta_table_0_s_meta_table_lst_V_RAM_T2P_BRAM_1R1W.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_retrans_meta_table_0_s_meta_table_next_V_RAM_T2P_BRAM_1R1W.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_retrans_meta_table_0_s_meta_table_offs_V_RAM_T2P_BRAM_1R1W.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_retrans_meta_table_0_s_meta_table_opCode_RAM_T2P_BRAM_1R1W.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_retrans_meta_table_0_s_meta_table_psn_V_RAM_T2P_BRAM_1R1W.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_retrans_meta_table_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_retrans_pointer_table_0_s_ptr_table_head_V_RAM_T2P_BRAM_1R1W.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_retrans_pointer_table_0_s_ptr_table_valid_RAM_T2P_BRAM_1R1W.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_retrans_pointer_table_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_rshiftWordByOctet_net_axis_512_512_11_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_rshiftWordByOctet_net_axis_512_512_12_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_rshiftWordByOctet_net_axis_512_512_13_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_rx_exh_fsm_512_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_rx_exh_payload_512_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_rx_ibh_fsm_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_rx_process_exh_512_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_rx_process_ibh_512_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_split_tx_meta.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_state_table_0_s_state_table_req_old_unack_V_RAM_2P_BRAM_1R1W.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_state_table_0_s_state_table_retryCounter_V_RAM_2P_BRAM_1R1W.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_state_table_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_stream_merger_ackEvent_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_transport_timer_0_s_transportTimerTable_RAM_T2P_BRAM_1R1W.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_transport_timer_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_tx_ipUdpMetaMerger_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_tx_pkg_arbiter_512_0_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_udp_lshiftWordByOctet_512_1_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_udp_rshiftWordByOctet_net_axis_512_512_2_s.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top.v" \
+"../build/ip/rocev2_ip/sim/rocev2_ip.v"
+
+xvhdl $xvhdl_opts -work reco -L rocev2_ip \
+"../build/ip/roce_stack_axi_datamover/sim/roce_stack_axi_datamover.vhd"
+
+xvlog $xvlog_opts -work reco -L axis_interconnect_v1_1_19 -L fifo_generator_v13_2_6 --include "../build/ip/roce_stack_tx_axis_interconnect/hdl" \
+"../build/ip/roce_stack_tx_axis_interconnect/hdl/axis_interconnect_v1_1_vl_rfs.v" \
+"../build/ip/roce_stack_tx_axis_interconnect/sim/roce_stack_tx_axis_interconnect.v"
+
+xvlog $xvlog_opts -work reco -sv -L rocev2_ip -L axis_interconnect_v1_1_19 \
 "../../shell/roce_stack/rocev2_src/interfaces/lynx_pkg.sv" \
-"../../shell/roce_stack/rocev2_src/interfaces/axi_intf.sv" \
 "../../shell/roce_stack/rocev2_src/interfaces/lynx_intf.sv" \
+"../../shell/roce_stack/rocev2_src/interfaces/axi_intf.sv" \
 "../../shell/roce_stack/rocev2_src/buffer_fifo.sv" \
 "../../shell/roce_stack/rocev2_src/fifo.sv" \
 "../../shell/roce_stack/rocev2_src/icrc.sv" \
@@ -98,9 +230,9 @@ xvlog $xvlog_opts -work reco -sv -L rocev2_ip --include "../build/ip/rocev2_ip/h
 "../../shell/roce_stack/rocev2_src/sp_ram_nc.sv" \
 "../../shell/roce_stack/wrapper_src/roce_stack_request_handler.sv" \
 "../../shell/roce_stack/wrapper_src/roce_stack_axis_to_aximm.sv" \
-"../../shell/roce_stack/wrapper_src/roce_stack_wq_manager.sv" \
 "../../shell/roce_stack/wrapper_src/roce_stack_csr.sv" \
 "../../shell/roce_stack/wrapper_src/roce_stack_wrapper.sv" \
+#"../../shell/roce_stack/wrapper_src/roce_stack_wq_manager.sv" \
 
 
 xvlog $xvlog_opts -sv -d DEBUG -L axi_bram_ctrl_v4_1_6 -L xpm -work reco \
@@ -127,6 +259,9 @@ xvlog $xvlog_opts -work reco -sv -L fifo_generator_v13_2_6 \
 
 xvlog $xvlog_opts -work reco -sv -L fifo_generator_v13_2_6 \
 "../build/ip/sys_mem_5to2_axi_crossbar/synth/sys_mem_5to2_axi_crossbar.v"
+
+xvlog $xvlog_opts -work reco -L fifo_generator_v13_2_6 \
+"../build/ip/roce_stack_cdc_fifo_qp_wq/sim/roce_stack_cdc_fifo_qp_wq.v"
 
 xvlog $xvlog_opts -work reco \
 "$VIVADO_DATA_DIR/verilog/src/glbl.v"

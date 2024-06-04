@@ -110,7 +110,6 @@ ifeq ($(GEN_ROCEV2), 1)
 		cmake ../fpga-network-stack -DVIVADO_HLS_ROOT_DIR=/opt/Xilinx/Vitis_HLS
 	cd $(ROCE_DIR)/build; \
 		make ip
-endif
 
 clean_build:
 	rm -rf $(BUILD_DIR)/*

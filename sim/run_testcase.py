@@ -64,7 +64,7 @@ def dir_walk(t_path):
   return dirs
 
 class testcaseClass:
-  def __init__(self, sim_tool, test_rootpath, is_roce, is_debug, skip_pktgen, skip_sim, gui, t_testcase=''):
+  def __init__(self, sim_tool, test_rootpath, is_roce, is_debug, skip_pktgen, skip_sim, gui, rocev2, t_testcase=''):
     self.sim_tool = sim_tool
     self.test_rootpath = test_rootpath
     self.is_roce     = is_roce
@@ -72,6 +72,7 @@ class testcaseClass:
     self.skip_pktgen = skip_pktgen
     self.skip_sim    = skip_sim
     self.gui         = gui
+    self.rocev2      = rocev2
     self.line_rate   = 40 # default value in Gbps
     if (t_testcase != ''):
       # Run testcases specified
@@ -232,7 +233,7 @@ class testcaseClass:
       
     # Start simulation
     if (self.skip_sim == 0):
-      self.start_simulation(tc_name, self.sim_tool, sim_path, top_module, self.gui)
+      self.start_simulation(tc_name, self.sim_tool, sim_path, top_module, self.gui, self.rocev2)
     else:
       # self.skip_sim == 1
       pass
@@ -285,7 +286,7 @@ class testcaseClass:
     with open(pkt_fname, 'w') as f:
       f.write(pkt_str)
 
-  def start_simulation(self, tc_name, sim_tool, sim_path, top_module, gui):
+  def start_simulation(self, tc_name, sim_tool, sim_path, top_module, gui, rocev2):
     """Compile libraries and perform functional simulation
     Args:
       tc_name     (str) : testcase name
@@ -299,7 +300,7 @@ class testcaseClass:
     logger.info(f'Simulating {top_module} with the {sim_tool} simulator')
     cur_dir = os.getcwd()
     os.chdir(sim_path)
-    os.system(f'./simulate.sh -top {top_module} -g {gui} -t {tc_name} -s {sim_tool}')
+    os.system(f'./simulate.sh -top {top_module} -g {gui} -t {tc_name} -s {sim_tool} -rv2 {rocev2}')
     os.chdir(cur_dir)
     logger.info(f'Finished simulation for {tc_name}')
 
@@ -385,6 +386,7 @@ def print_help():
   logger.info('  -no_pktgen : Run testcases without re-generating packets')
   logger.info('  -no_sim    : Only run analysis on the previous simulation results')
   logger.info('  -gui       : Use gui mode with the simulator')
+  logger.info('  -rv2    : Use open source rocev2 IP instead of ERNIC')
 
 if __name__ == "__main__":
   argv_len = len(sys.argv)
@@ -403,6 +405,7 @@ if __name__ == "__main__":
   idx_reg       = find_elem_in_lst('regression', sys.argv)
   idx_simtool   = find_elem_in_lst('-questasim', sys.argv)
   idx_gui       = find_elem_in_lst('-gui', sys.argv)
+  idx_rocev2    = find_elem_in_lst('-rv2', sys.argv)
 
   is_debug = 0
 
@@ -435,13 +438,18 @@ if __name__ == "__main__":
   else:
     gui = 'off'
 
+  if(idx_rocev2 != -1):
+    rocev2 = 'on'
+  else:
+    rocev2 = 'off'
+
   tc_dir = pjoin(testcase_rootpath, sys.argv[idx_tc+1])
   logger.debug('Testing directory: %s' % (tc_dir))
 
   if(idx_reg != -1):
-    regre_test = testcaseClass(sim_tool, testcase_rootpath, is_roce, is_debug, skip_pktgen, skip_sim, gui)
+    regre_test = testcaseClass(sim_tool, testcase_rootpath, is_roce, is_debug, skip_pktgen, skip_sim, gui, rocev2)
   elif(idx_tc != -1):
-    test = testcaseClass(sim_tool, testcase_rootpath, is_roce, is_debug, skip_pktgen, skip_sim, gui, sys.argv[idx_tc+1])
+    test = testcaseClass(sim_tool, testcase_rootpath, is_roce, is_debug, skip_pktgen, skip_sim, gui, rocev2, sys.argv[idx_tc+1])
   else:
     logger.error('Wrong arguments')
     print_help()
