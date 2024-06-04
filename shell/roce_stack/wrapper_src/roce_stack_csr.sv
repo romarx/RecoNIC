@@ -2,7 +2,7 @@
 
 //TODO: set actual width for certain registers (by masking at write).
 //TODO: some individual bits are read only, these registers need special treatment.
-//TODO: check if some debug outputs od RoCE stack can be used
+//TODO: check if some debug outputs of RoCE stack can be used
 module roce_stack_csr # (
   parameter int NUM_QP = 8, // Max 256
   parameter int NUM_PD = 256,
@@ -65,7 +65,7 @@ module roce_stack_csr # (
   output logic [63:0]                     RQWPTRDBADDi_o,
   output logic [63:0]                     CQDBADDi_o,
   output logic [31:0]                     SQPIi_o,
-  //input  logic [31:0]                     CQHEADi_i,
+  input  logic [31:0]                     CQHEADi_i,
   output logic [31:0]                     CQHEADi_o,
   output logic [31:0]                     QDEPTHi_o,
   output logic [23:0]                     SQPSNi_o,
@@ -435,7 +435,7 @@ always_comb begin
   reading = 1'b0;
   RAddrReg_d = RAddrReg_q;
   RDataReg_d = RDataReg_q;
-  RRespReg_d = 2'b0; //OKAY
+  RRespReg_d = RRespReg_q; //OKAY
   r_state_d = r_state_q;
 
   case(r_state_q)
@@ -448,6 +448,7 @@ always_comb begin
     end
 
     R_GETDATA: begin 
+      RRespReg_d = 2'b0; //OKAY
       reading = 1'b1;
       //protection domain range
       if(!RAddrReg_q[17]) begin
@@ -853,7 +854,6 @@ always_comb begin
     R_VALID: begin
       reading = 1'b1;
       s_axil_rvalid_o = 1'b1;
-      RRespReg_d = RRespReg_q;
       if(s_axil_rready_i) begin
         r_state_d = R_IDLE;
       end
@@ -1372,6 +1372,19 @@ always_comb begin
   endcase
 end
 
+//find PD associated to current QP, reeally have to simulate that!
+//TODO: this needs some kind of start signal
+
+always_comb begin
+  PDidx_d = PDidx_q;
+  if(QPidx_q != QPidx_d || SQPIi_d[QPidx_q] != SQPIi_q[QPidx_q]) begin
+    for(int i=0; i < NUM_PD; i++) begin
+      if(PDPDNUM_q[i][24:0] == {1'b1, PDNUMi_q[QPidx_q][23:0]}) begin
+        PDidx_d = i;
+      end
+    end
+  end
+end
 
 
 
@@ -1684,6 +1697,10 @@ end
 //          //
 //////////////
 
+assign s_axil_rdata_o = RDataReg_q;
+assign s_axil_rresp_o = RRespReg_q;
+assign s_axil_bresp_o = WRespReg_q;
+
 assign CONF_o = CONF_q;
 assign ADCONF_o = ADCONF_q;
 assign MACADD_o = {MACADDMSB_q, MACADDLSB_q};
@@ -1700,7 +1717,6 @@ assign RESPERRSZ_o = {RESPERRSZMSB_q, RESPERRSZ_q};
 
 assign QPidx_o = QPidx_q;
 
-//TODO: maybe here the logic has to be different, we can just output one PD and QP at a time with idx input by the logic
 
 assign PDPDNUM_o = PDPDNUM_q[PDidx_q][23:0]; //TODO: is this the correct syntax?
 assign VIRTADDR_o = {VIRTADDRMSB_q[PDidx_q], VIRTADDRLSB_q[PDidx_q]};
@@ -1741,19 +1757,7 @@ always_comb begin
 end
 */
 
-//find PD associated to current QP, reeally have to simulate that!
-//TODO: this needs some kind of start signal
 
-always_comb begin
-  PDidx_d = PDidx_q;
-  if(!writing && !reading) begin
-    for(int i=0; i < NUM_PD; i++) begin
-      if(PDPDNUM_q[i][24:0] == {1'b1, PDNUMi_q[QPidx_q][23:0]}) begin
-        PDidx_d = i;
-      end
-    end
-  end
-end
 
 
 ////////////////////////////
