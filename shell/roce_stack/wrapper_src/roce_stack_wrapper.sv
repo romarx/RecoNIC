@@ -251,7 +251,7 @@ roce_stack_csr #(
   .s_axil_rresp_o(s_axil_rresp_o),
   .s_axil_rready_i(s_axil_rready_i),
   
-  /*.VIRTADDR_o(VIRTADDRi),
+  .VIRTADDR_o(VIRTADDRi),
 
   .IPv4ADD_o(IPv4ADD),
   .QPidx_o(QPidx),
@@ -266,11 +266,11 @@ roce_stack_csr #(
   .CQHEADi_i(CQHEADi_wtc),
   .CQHEADi_o(CQHEADi_ctw),
   .QDEPTHi_o(),
-  .SQPSNi_o(),
+  .SQPSNi_o(SQPSNi),
   .LSTRQREQi_o(LSTRQREQi),
   .DESTQPCONFi_o(DESTQPCONFi),
   .MACDESADDi_o(),
-  .IPDESADDR1i_o(IPDESADDR1i),*/
+  .IPDESADDR1i_o(IPDESADDR1i),
 
   .rd_req_addr_valid_i(rd_req_addr_valid),
   .rd_req_addr_ready_o(rd_req_addr_ready),
@@ -294,7 +294,7 @@ roce_stack_csr #(
   .rstn_i(mod_rstn_i)
 );
 
-/*
+
 //TODO: finish this!
 roce_stack_wq_manager inst_roce_stack_wq_manager(
     .QPidx_i(QPidx),
@@ -364,7 +364,7 @@ roce_stack_wq_manager inst_roce_stack_wq_manager(
     .axis_aclk_i(axis_aclk_i),
     .rstn_i(mod_rstn_i)
 );
-*/
+
 
 roce_stack_axis_to_aximm #(
   .AXI4_DATA_WIDTH(AXI4S_DATA_WIDTH)

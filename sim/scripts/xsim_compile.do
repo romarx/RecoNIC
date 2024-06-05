@@ -232,7 +232,7 @@ xvlog $xvlog_opts -work reco -sv -L rocev2_ip -L axis_interconnect_v1_1_19 \
 "../../shell/roce_stack/wrapper_src/roce_stack_axis_to_aximm.sv" \
 "../../shell/roce_stack/wrapper_src/roce_stack_csr.sv" \
 "../../shell/roce_stack/wrapper_src/roce_stack_wrapper.sv" \
-#"../../shell/roce_stack/wrapper_src/roce_stack_wq_manager.sv" \
+"../../shell/roce_stack/wrapper_src/roce_stack_wq_manager.sv" \
 
 
 xvlog $xvlog_opts -sv -d DEBUG -L axi_bram_ctrl_v4_1_6 -L xpm -work reco \

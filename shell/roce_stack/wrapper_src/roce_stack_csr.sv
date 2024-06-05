@@ -1003,7 +1003,7 @@ always_comb begin
     RQWPTRDBADDMSBi_d[i] = RQWPTRDBADDMSBi_q[i];
     CQDBADDi_d[i] = CQDBADDi_q[i];
     CQDBADDMSBi_d[i] = CQDBADDMSBi_q[i];
-    
+    CQHEADi_d[i] = CQHEADi_q[i];
     RQCIi_d[i] =  RQCIi_q[i];
     SQPIi_d[i] = SQPIi_q[i];
     QDEPTHi_d[i] = QDEPTHi_q[i];
@@ -1372,9 +1372,7 @@ always_comb begin
   endcase
 end
 
-//find PD associated to current QP, reeally have to simulate that!
-//TODO: this needs some kind of start signal
-
+//find PD associated to current QP
 always_comb begin
   PDidx_d = PDidx_q;
   if(QPidx_q != QPidx_d || SQPIi_d[QPidx_q] != SQPIi_q[QPidx_q]) begin
@@ -1718,7 +1716,7 @@ assign RESPERRSZ_o = {RESPERRSZMSB_q, RESPERRSZ_q};
 assign QPidx_o = QPidx_q;
 
 
-assign PDPDNUM_o = PDPDNUM_q[PDidx_q][23:0]; //TODO: is this the correct syntax?
+assign PDPDNUM_o = PDPDNUM_q[PDidx_q][23:0];
 assign VIRTADDR_o = {VIRTADDRMSB_q[PDidx_q], VIRTADDRLSB_q[PDidx_q]};
 assign BUFBASEADDR_o = {BUFBASEADDRMSB_q[PDidx_q], BUFBASEADDRLSB_q[PDidx_q]};
 assign BUFRKEY_o = BUFRKEY_q[PDidx_q];
