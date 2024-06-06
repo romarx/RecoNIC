@@ -1679,7 +1679,7 @@ axi_interconnect_to_dev_mem axi_2to1_for_get_rdma_payload_from_sys_mem(
 );
 
 axi_5to2_interconnect_to_sys_mem axi_interconnect_to_sys_mem_inst(
-  /*.s_axi_rdma_get_wqe_awid              (axi_rdma1_get_wqe_awid),//{2'd0,axi_rdma_get_wqe_awid}
+  .s_axi_rdma_get_wqe_awid              (axi_rdma1_get_wqe_awid),//{2'd0,axi_rdma_get_wqe_awid}
   .s_axi_rdma_get_wqe_awaddr            (axi_rdma1_get_wqe_awaddr),
   .s_axi_rdma_get_wqe_awqos             (axi_rdma1_get_wqe_awqos),
   .s_axi_rdma_get_wqe_awlen             (axi_rdma1_get_wqe_awlen),
@@ -1716,7 +1716,7 @@ axi_5to2_interconnect_to_sys_mem axi_interconnect_to_sys_mem_inst(
   .s_axi_rdma_get_wqe_rready            (axi_rdma1_get_wqe_rready),
   .s_axi_rdma_get_wqe_arlock            (axi_rdma1_get_wqe_arlock),
   .s_axi_rdma_get_wqe_arqos             (axi_rdma1_get_wqe_arqos),
-  */
+  /*
   .s_axi_rdma_get_wqe_awid    (1'b0),
   .s_axi_rdma_get_wqe_awaddr  (64'd0),
   .s_axi_rdma_get_wqe_awqos   (4'd0),
@@ -1754,7 +1754,7 @@ axi_5to2_interconnect_to_sys_mem axi_interconnect_to_sys_mem_inst(
   .s_axi_rdma_get_wqe_rready  (1'b1),
   .s_axi_rdma_get_wqe_arlock  (1'b0),
   .s_axi_rdma_get_wqe_arqos   (4'd0),
-
+  */
 
   .s_axi_rdma_get_payload_awid          (axi_rdma_data_bus_awid),//{1'b0,axi_rdma_get_payload_awid}
   .s_axi_rdma_get_payload_awaddr        (axi_rdma_data_bus_awaddr),

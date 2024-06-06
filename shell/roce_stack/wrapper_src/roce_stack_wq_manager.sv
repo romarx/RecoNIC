@@ -89,8 +89,7 @@ fifo_state fifo_wr_d, fifo_wr_q, fifo_rd_d, fifo_rd_q;
 
 logic qp_fifo_full, qp_fifo_wr_en, qp_fifo_wr_ack, qp_fifo_wr_rst_busy;
 logic qp_fifo_empty, qp_fifo_rd_en, qp_fifo_rd_valid, qp_fifo_rd_rst_busy;
-logic qp_done;
-logic new_qp_ready;
+
 
 logic [183:0] conn_reg_d, conn_reg_q;
 logic [199:0] qp_reg_d, qp_reg_q;
@@ -99,7 +98,11 @@ logic [31:0] localidx_init_d, localidx_init_q;
 logic [31:0] localidx_d, localidx_q; 
 logic [31:0] mtu_d, mtu_q;
 
+logic [511:0] WQEReg_d, WQEReg_q;
 
+
+logic qp_done;
+logic new_qp_ready;
 logic new_wqe_fetched;
 logic conn_done;
 logic qp_intf_done;
@@ -143,6 +146,7 @@ always_comb begin
 
   case(fifo_rd_q)
     IDLE: begin
+      new_qp_ready = 1'b0;
       if(!qp_fifo_empty && qp_done && !qp_fifo_rd_rst_busy) begin
         qp_done = 1'b0;
         qp_fifo_rd_en = 1'b1;
@@ -185,7 +189,7 @@ roce_stack_cdc_fifo_qp_wq inst_roce_stack_cdc_fifo_qp_wq (
 .rd_rst_busy(qp_fifo_rd_rst_busy)
 );
 
-/*
+
 typedef enum {CONN_IDLE, CONN_VALID, CONN_DONE} conn_state;
 conn_state conn_state_d, conn_state_q;
 
@@ -196,9 +200,9 @@ always_comb begin
 
   case (conn_state_q)
     CONN_IDLE: begin
+      conn_done = 1'b0;
       //Current WQE changed, potentially also QP, send new conn configuration 
       if(m_rdma_conn_interface_ready_i && new_wqe_fetched && !qp_done) begin
-        new_wqe_fetched = 1'b0;
         conn_reg_d = {16'd0, qp_fifo_output.dest_ip_addr, qp_fifo_output.dest_ip_addr, qp_fifo_output.dest_ip_addr, qp_fifo_output.dest_ip_addr, 16'd0, qp_fifo_output.dest_qp};
         //only reconnect if configuration changed
         if(conn_reg_d != conn_reg_q) begin
@@ -212,7 +216,7 @@ always_comb begin
       m_rdma_conn_interface_valid_o = 1'b1;
       if(m_rdma_conn_interface_ready_i) begin
         conn_done = 1'b1;
-        conn_state_d = CONN_IDLE;
+        conn_state_d = CONN_DONE;
       end
     end
     CONN_DONE: begin
@@ -222,9 +226,10 @@ always_comb begin
   endcase
 end
 
+
 typedef enum {QP_IDLE, QP_VALID, QP_DONE} qp_state;
 qp_state qp_state_d, qp_state_q;
-logic[511:0] WQEReg_d, WQEReg_q;
+
 //QP interface logic (SQ also maybe...)
 always_comb begin
   qp_reg_d = qp_reg_q;
@@ -233,10 +238,10 @@ always_comb begin
 
   case(qp_state_q)
     QP_IDLE: begin
+      qp_intf_done = 1'b0;
       //we have a new work queue element
       if(m_rdma_qp_interface_ready_i && conn_done && !qp_done) begin
-        conn_done = 1'b0;
-        qp_reg_d = {WQEReg_q[223:160], WQEReg_q[159:136], qp_fifo_output.dest_sq_psn, qp_fifo_output.sq_psn, 55'b0}; //TODO: finish with qp num and state or just 0?
+        qp_reg_d = {WQEReg_q[255:224], WQEReg_q[223:160], qp_fifo_output.dest_sq_psn, qp_fifo_output.sq_psn, 55'b0}; //TODO: finish with qp num and state or just 0?
         //only reconnect if new state differs from old state
         if(qp_reg_d != qp_reg_q) begin
           qp_state_d = QP_VALID;
@@ -247,8 +252,9 @@ always_comb begin
     end
     QP_VALID: begin
       m_rdma_qp_interface_valid_o = 1'b1;
-      qp_intf_done = 1'b1;
+      
       if(m_rdma_qp_interface_ready_i) begin
+        qp_intf_done = 1'b1;
         qp_state_d = QP_IDLE;
       end
     end
@@ -264,7 +270,7 @@ typedef enum {SQ_IDLE, SQ_VALID, SQ_WRITE, SQ_SEND, SQ_READ} sq_state;
 sq_state sq_state_d, sq_state_q;
 logic cmplt, last, mode, host;
 
-
+/*
 //TODO: wait for ack or check if first sqe
 //TODO: probably need to split it up for each packet, send last signal
 logic last_d, last_q;
@@ -358,12 +364,11 @@ end
 //            //
 ////////////////
 */
-typedef enum {AR_IDLE, AR_CALC_ADDR, AR_VALID, AR_READY} ar_state;
+typedef enum {AR_IDLE, AR_MID, AR_CALC_ADDR, AR_VALID, AR_READY} ar_state;
 ar_state AddrRd_State_d, AddrRd_State_q;
 logic [63:0] AddrReg_d, AddrReg_q;
-logic [63:0] read_addr_d, read_addr_q;
 
-typedef enum {RD_IDLE, RD_READING} rd_state;
+typedef enum {RD_IDLE, RD_READING, RD_DONE} rd_state;
 rd_state Read_State_d, Read_State_q;
 logic rd_busy, rd_done;
 logic rd_ready;
@@ -380,12 +385,15 @@ always_comb begin
   case(AddrRd_State_q)
     AR_IDLE: begin
       //new elements in work queue
-      if (new_qp_ready && !rd_busy) begin
+      if (new_qp_ready & !rd_busy) begin
         localidx_d = localidx_init_q;
         AddrRd_State_d = AR_CALC_ADDR; //TODO: state might be unnecessary
       end
     end
     AR_MID: begin
+      if(!new_wqe_fetched) begin
+        AddrRd_State_d = AR_CALC_ADDR;
+      end
     end
     AR_CALC_ADDR: begin
       //64 byte aligned 
@@ -395,6 +403,8 @@ always_comb begin
     AR_VALID: begin
       m_axi_qp_get_wqe_arvalid_o = 1'b1;
       if(m_axi_qp_get_wqe_arready_i) begin
+        rd_ready = 1'b1;
+        localidx_d = localidx_q + 1;
         AddrRd_State_d = AR_READY;
       end
     end
@@ -402,7 +412,7 @@ always_comb begin
       //TODO: this state might be unnecessary, also can maybe read everything in a max 4kb burst (max len = 63)
       rd_ready = 1'b1;
       if(localidx_q < qp_fifo_output.sq_prod_idx) begin
-        
+        AddrRd_State_d = AR_MID;
       end else begin
         AddrRd_State_d = AR_IDLE;
       end
@@ -416,10 +426,12 @@ end
 always_comb begin
   m_axi_qp_get_wqe_rready_o = 1'b0;
   rd_busy = 1'b0;
+  WQEReg_d = WQEReg_q;
 
   case(Read_State_q)
     RD_IDLE: begin
-      if(rd_ready) begin
+      new_wqe_fetched = 1'b0;
+      if(rd_ready) begin  
         rd_ready = 1'b0;
         m_axi_qp_get_wqe_rready_o = 1'b1;
         Read_State_d = RD_READING;
@@ -427,17 +439,20 @@ always_comb begin
     end
     RD_READING: begin
       //TODO: implement fifo for  burst transactions
+      new_wqe_fetched = 1'b0;
       rd_busy = 1'b1;
       m_axi_qp_get_wqe_rready_o = 1'b1;
       if(m_axi_qp_get_wqe_rvalid_i) begin
         WQEReg_d = m_axi_qp_get_wqe_rdata_i;
         if(m_axi_qp_get_wqe_rlast_i) begin
           //directly update QP interface after read
-          new_qp_ready = 1'b0;
-          new_wqe_fetched= 1'b1;
-          Read_State_d = RD_IDLE;
+          Read_State_d = RD_DONE;
         end
       end
+    end
+    RD_DONE: begin
+      new_wqe_fetched= 1'b1;
+      Read_State_d = RD_IDLE;
     end
   endcase
 end
@@ -456,7 +471,7 @@ assign m_axi_qp_get_wqe_wstrb_o = 'd0;
 assign m_axi_qp_get_wqe_wlast_o = 'd0;
 assign m_axi_qp_get_wqe_wvalid_o = 'd0;
 assign m_axi_qp_get_wqe_awlock_o = 'd0;
-assign m_axi_qp_get_wqe_bready_o = 'd0;
+assign m_axi_qp_get_wqe_bready_o = 'd1;
 
 //settings for ar signal
 assign m_axi_qp_get_wqe_arid_o    = 1'b1;
@@ -468,14 +483,14 @@ assign m_axi_qp_get_wqe_arcache_o = 4'h2;   // no cache, no buffer
 assign m_axi_qp_get_wqe_arprot_o  = 3'b010;  // unpriviledged, nonsecure, data access
 assign m_axi_qp_get_wqe_arlock_o  = 1'b0;    // normal signalling
 
-/*
+
 assign m_rdma_conn_interface_data_o = conn_reg_q;
 assign m_rdma_qp_interface_data_o = qp_reg_q;
-assign m_rdma_sq_interface_data_o = sq_reg_q;
+//assign m_rdma_sq_interface_data_o = sq_reg_q;
 
 //TODO: definitely needs dc fifo or simple cdc inside csr for better timing
-assign CQHEADi_o = localidx_q;
-*/
+//assign CQHEADi_o = localidx_q;
+
 
 
 always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
@@ -493,38 +508,43 @@ always_ff @(posedge axis_aclk_i, negedge rstn_i) begin
   if(!rstn_i) begin
     qp_done <= 1'b1;
     new_qp_ready <= 1'b0;
+    new_wqe_fetched <= 1'b0;
+    conn_done <= 1'b0;
+    qp_intf_done <= 1'b0;
+    rd_ready <= 1'b0;
+    
     fifo_rd_q <= IDLE;
     mtu_q <= 'd0;
-    //conn_state_q <= CONN_IDLE;
-    //qp_state_q <= QP_IDLE;
+    conn_state_q <= CONN_IDLE;
+  qp_state_q <= QP_IDLE;
     //sq_state_q <= SQ_IDLE;
-    //conn_reg_q <= 'd0;
-    //qp_reg_q <= 'd0;
+    conn_reg_q <= 'd0;
+    qp_reg_q <= 'd0;
     //sq_reg_q = 'd0;
-    //AddrRd_State_q <= AR_IDLE;
-    //AddrReg_q <= 'd0;
+    AddrRd_State_q <= AR_IDLE;
+    AddrReg_q <= 'd0;
     localidx_init_q <= 'd0;
-    //localidx_q <= 'd0;
-    //Read_State_q <= RD_IDLE;
-    //WQEReg_q <= 'd0;
+    localidx_q <= 'd0;
+    Read_State_q <= RD_IDLE;
+    WQEReg_q <= 'd0;
     //transfer_length_q <= 'd0;
     //last_q <= 1'b0;
     //first_q <= 1'b1;
   end else begin
     fifo_rd_q <= fifo_rd_d;
     mtu_q <= mtu_d;
-    //conn_state_q <= conn_state_d;
-    //qp_state_q <= qp_state_d;
+    conn_state_q <= conn_state_d;
+    qp_state_q <= qp_state_d;
     //sq_state_q <= sq_state_d;
-    //conn_reg_q <= conn_reg_d;
-    //qp_reg_q = qp_reg_d;
+    conn_reg_q <= conn_reg_d;
+    qp_reg_q = qp_reg_d;
     //sq_reg_q = sq_reg_d;
-    //AddrRd_State_q <= AddrRd_State_d;
-    //AddrReg_q <= AddrReg_d;
+    AddrRd_State_q <= AddrRd_State_d;
+    AddrReg_q <= AddrReg_d;
     localidx_init_q <= localidx_init_d;
-    //localidx_q <= localidx_d;
-    //Read_State_q <= Read_State_d;
-    //WQEReg_q <= WQEReg_d;
+    localidx_q <= localidx_d;
+    Read_State_q <= Read_State_d;
+    WQEReg_q <= WQEReg_d;
     //transfer_length_q <= transfer_length_d;
     //last_q <= last_d;
     //first_q <= first_d;
