@@ -60,7 +60,7 @@ package lynxTypes;
     // Data
     parameter integer ADDR_BITS = 64;
     parameter integer PADDR_BITS = 40;
-    parameter integer VADDR_BITS = 48;
+    parameter integer VADDR_BITS = 64;
     parameter integer LEN_BITS = 28;
     parameter integer TLB_DATA_BITS = 96;
     parameter integer DEST_BITS = 4;

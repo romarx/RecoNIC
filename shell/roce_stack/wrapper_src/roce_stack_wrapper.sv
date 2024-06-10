@@ -165,7 +165,6 @@ AXI4S #(.AXI4S_DATA_BITS(AXI4S_DATA_WIDTH)) axis_rdma_wr ();
 AXI4S #(.AXI4S_DATA_BITS(512)) axis_tx ();
 AXI4S #(.AXI4S_DATA_BITS(512)) axis_rx ();
 
-logic [255:0] rdma_sq_interface_data;
 
 //address requests
 logic rd_req_addr_valid, rd_req_addr_ready, wr_req_addr_valid, wr_req_addr_ready;
@@ -421,7 +420,6 @@ roce_stack_axis_to_aximm #(
   .m_axi_data_bus_wlast_o(m_axi_data_bus_wlast_o),
   .m_axi_data_bus_wvalid_o(m_axi_data_bus_wvalid_o),
   .m_axi_data_bus_wready_i(m_axi_data_bus_wready_i),
-  .m_axi_data_bus_awlock_o(m_axi_data_bus_awlock_o),
   .m_axi_data_bus_bid_i(m_axi_data_bus_bid_i),
   .m_axi_data_bus_bresp_i(m_axi_data_bus_bresp_i),
   .m_axi_data_bus_bvalid_i(m_axi_data_bus_bvalid_i),
@@ -435,7 +433,6 @@ roce_stack_axis_to_aximm #(
   .m_axi_data_bus_arprot_o(m_axi_data_bus_arprot_o),
   .m_axi_data_bus_arvalid_o(m_axi_data_bus_arvalid_o),
   .m_axi_data_bus_arready_i(m_axi_data_bus_arready_i),
-  .m_axi_data_bus_arlock_o(m_axi_data_bus_arlock_o),
   .m_axi_data_bus_rid_i(m_axi_data_bus_rid_i),
   .m_axi_data_bus_rdata_i(m_axi_data_bus_rdata_i),
   .m_axi_data_bus_rresp_i(m_axi_data_bus_rresp_i),

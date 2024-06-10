@@ -47,6 +47,7 @@ always_comb begin
   resp_addr_ready_o = 1'b1;
   req_addr_valid_o = 1'b0;
   cmd_valid_o = 1'b0;
+  cmd_data_d = cmd_data_q;
   req_state_d = req_state_q;
   base_vaddr_d = base_vaddr_q;
   vaddr_d = vaddr_q;
@@ -54,13 +55,13 @@ always_comb begin
   paddr_d = paddr_q;
   buflen_d = buflen_q;
   accessdesc_d = accessdesc_q;
+  first_d = first_q;
 
   case (req_state_q)
     RQ_IDLE: begin
       resp_addr_ready_o = 1'b0;
       //A request can only be handled if an incoming request arrives and the request can be taken
       if (s_rdma_req_valid_i && req_addr_ready_i) begin 
-        s_rdma_req_ready_o = 1'b0;
         len_d = s_rdma_req_len_i;
         first_d = s_rdma_req_ctl_i;
         if(first_q) begin
@@ -76,7 +77,6 @@ always_comb begin
       s_rdma_req_ready_o = 1'b0;
       req_addr_valid_o = 1'b1;
       if (resp_addr_valid_i) begin
-        resp_addr_ready_o = 1'b0;
         paddr_d = resp_addr_data_i[63:0];
         buflen_d = resp_addr_data_i[111:64];
         accessdesc_d = resp_addr_data_i[115:112];
