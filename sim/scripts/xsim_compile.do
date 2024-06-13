@@ -129,8 +129,8 @@ xvlog $xvlog_opts -work reco -L rocev2_ip --include "../build/ip/rocev2_ip/hdl/v
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w138_d2_S.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w145_d2_S.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w145_d8_A.v" \
-"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w150_d2_S.v" \
-"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w150_d512_A.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w152_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w152_d512_A.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w153_d2_S.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w178_d4_S.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w178_d512_A.v" \
@@ -140,8 +140,9 @@ xvlog $xvlog_opts -work reco -L rocev2_ip --include "../build/ip/rocev2_ip/hdl/v
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w256_d32_A.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w320_d2_S.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w320_d8_A.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w384_d2_S.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w384_d8_A.v" \
-"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w448_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w512_d2_S.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w1024_d2_S.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w1024_d4_A.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w1024_d8_A.v" \
@@ -153,7 +154,7 @@ xvlog $xvlog_opts -work reco -L rocev2_ip --include "../build/ip/rocev2_ip/hdl/v
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_handle_read_requests_0_s.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_detection_unit.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_idx0_monitor.v" \
-"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_idx6_monitor.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_idx8_monitor.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_insert_icrc_512_0_s.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_ipUdpMetaHandler_512_0_s.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_ipv4_drop_optional_ip_header_512_s.v" \
@@ -208,7 +209,7 @@ xvlog $xvlog_opts -work reco -L rocev2_ip --include "../build/ip/rocev2_ip/hdl/v
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_udp_lshiftWordByOctet_512_1_s.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_udp_rshiftWordByOctet_net_axis_512_512_2_s.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top.v" \
-"../build/ip/rocev2_ip/sim/rocev2_ip.v"
+"../build/ip/rocev2_ip/synth/rocev2_ip.v" \
 
 xvhdl $xvhdl_opts -work reco -L rocev2_ip \
 "../build/ip/roce_stack_axi_datamover/sim/roce_stack_axi_datamover.vhd"

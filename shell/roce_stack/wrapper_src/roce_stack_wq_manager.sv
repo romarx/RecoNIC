@@ -22,11 +22,11 @@ module roce_stack_wq_manager #()(
 
     output logic          m_rdma_qp_interface_valid_o, 
     input  logic          m_rdma_qp_interface_ready_i,
-    output rdma_req_t     m_rdma_qp_interface_data_o,
+    output logic [199:0]  m_rdma_qp_interface_data_o,
     
     output logic          m_rdma_sq_interface_valid_o, 
     input  logic          m_rdma_sq_interface_ready_i,
-    output logic [255:0]  m_rdma_sq_interface_data_o,
+    output rdma_req_t     m_rdma_sq_interface_data_o,
 
     output logic          m_axi_qp_get_wqe_awid_o,
     output logic  [63:0]  m_axi_qp_get_wqe_awaddr_o,
@@ -191,10 +191,57 @@ roce_stack_cdc_fifo_qp_wq inst_roce_stack_cdc_fifo_qp_wq (
 .rd_rst_busy(qp_fifo_rd_rst_busy)
 );
 
+typedef enum {QP_IDLE, QP_VALID, QP_DONE} qp_fsm_state;
+qp_fsm_state qp_state_d, qp_state_q;
+logic[11:0] qp_counter_d, qp_counter_q;
+
+typedef enum {RESET, INIT, READY_RECV, READY_SEND, SQ_ERROR, ERROR} qpState;
+
+//QP interface logic (SQ also maybe...)
+//TODO: qp_idx + 1?? or maybe dest_qp??
+always_comb begin
+  qp_reg_d = qp_reg_q;
+  qp_state_d = qp_state_q;
+  m_rdma_qp_interface_valid_o = 1'b0;
+
+  case(qp_state_q)
+    QP_IDLE: begin
+      qp_intf_done = 1'b0;
+      qp_counter_d = 0;
+      //we have a new work queue element
+      if(new_wqe_fetched && !qp_done) begin
+        
+        qp_reg_d = {WQEReg_q[255:224], WQEReg_q[223:160],  qp_fifo_output.sq_psn, qp_fifo_output.dest_sq_psn, 16'b0, 8'b0, 32'b0}; //TODO: finish with qp num and state or just 0? qp_fifo_output.qp_idx
+        //only reconnect if new state differs from old state
+        if(qp_reg_d != qp_reg_q) begin
+          qp_state_d = QP_VALID;
+        end else begin
+          qp_state_d = QP_DONE;
+        end
+      end
+    end
+    QP_VALID: begin
+      m_rdma_qp_interface_valid_o = 1'b1;
+      
+      if(m_rdma_qp_interface_ready_i) begin
+        qp_state_d = QP_DONE;
+      end
+    end
+    QP_DONE: begin
+      if(qp_counter_q < 12'd1500) begin
+        qp_counter_d = qp_counter_q + 1;
+      end else begin
+        qp_intf_done = 1'b1;
+        qp_state_d = QP_IDLE;
+      end
+    end
+  endcase
+end
+
 
 typedef enum {CONN_IDLE, CONN_VALID, CONN_DONE} conn_state;
 conn_state conn_state_d, conn_state_q;
-
+//TODO: qp_idx + 1??
 always_comb begin
   conn_reg_d = conn_reg_q;
   conn_state_d = conn_state_q;
@@ -204,8 +251,8 @@ always_comb begin
     CONN_IDLE: begin
       conn_done = 1'b0;
       //Current WQE changed, potentially also QP, send new conn configuration 
-      if(new_wqe_fetched && !qp_done) begin
-        conn_reg_d = {16'd0, qp_fifo_output.dest_ip_addr, qp_fifo_output.dest_ip_addr, qp_fifo_output.dest_ip_addr, qp_fifo_output.dest_ip_addr, 16'd0, qp_fifo_output.dest_qp};
+      if(qp_intf_done && !qp_done) begin
+        conn_reg_d = {16'h4321, qp_fifo_output.dest_ip_addr, qp_fifo_output.dest_ip_addr, qp_fifo_output.dest_ip_addr, qp_fifo_output.dest_ip_addr, qp_fifo_output.dest_qp, 8'b0, 8'b0}; //qp_idx after fix??
         //only reconnect if configuration changed
         if(conn_reg_d != conn_reg_q) begin
           conn_state_d = CONN_VALID;
@@ -228,44 +275,6 @@ always_comb begin
   endcase
 end
 
-
-typedef enum {QP_IDLE, QP_VALID, QP_DONE} qp_state;
-qp_state qp_state_d, qp_state_q;
-
-//QP interface logic (SQ also maybe...)
-always_comb begin
-  qp_reg_d = qp_reg_q;
-  qp_state_d = qp_state_q;
-  m_rdma_qp_interface_valid_o = 1'b0;
-
-  case(qp_state_q)
-    QP_IDLE: begin
-      qp_intf_done = 1'b0;
-      //we have a new work queue element
-      if(conn_done && !qp_done) begin
-        qp_reg_d = {WQEReg_q[255:224], WQEReg_q[223:160], qp_fifo_output.dest_sq_psn, qp_fifo_output.sq_psn, 56'b0}; //TODO: finish with qp num and state or just 0?
-        //only reconnect if new state differs from old state
-        if(qp_reg_d != qp_reg_q) begin
-          qp_state_d = QP_VALID;
-        end else begin
-          qp_state_d = QP_DONE;
-        end
-      end
-    end
-    QP_VALID: begin
-      m_rdma_qp_interface_valid_o = 1'b1;
-      
-      if(m_rdma_qp_interface_ready_i) begin
-        qp_intf_done = 1'b1;
-        qp_state_d = QP_IDLE;
-      end
-    end
-    QP_DONE: begin
-      qp_intf_done = 1'b1;
-      qp_state_d = QP_IDLE;
-    end
-  endcase
-end
 
 
 typedef enum {SQ_IDLE, SQ_VALID, SQ_WRITE, SQ_SEND, SQ_READ} sq_state;
@@ -291,7 +300,7 @@ always_comb begin
     SQ_IDLE: begin
       //TODO: FIFO for all WQE's fetched in current execution
       //A new WQE is fetched, start examining it...
-      if(qp_intf_done && !qp_done) begin
+      if(conn_done && !qp_done) begin
         if(WQEReg_q[135:128] == 8'h00) begin
           //WRITE
           $display("write command");
@@ -585,6 +594,8 @@ always_ff @(posedge axis_aclk_i, negedge rstn_i) begin
     transfer_length_q <= 'd0;
     last_q <= 1'b0;
     first_q <= 1'b1;
+
+    qp_counter_q <= 'd0;
   end else begin
     fifo_rd_q <= fifo_rd_d;
     mtu_q <= mtu_d;
@@ -603,6 +614,8 @@ always_ff @(posedge axis_aclk_i, negedge rstn_i) begin
     transfer_length_q <= transfer_length_d;
     last_q <= last_d;
     first_q <= first_d;
+
+    qp_counter_q <= qp_counter_d;
   end
 end
 

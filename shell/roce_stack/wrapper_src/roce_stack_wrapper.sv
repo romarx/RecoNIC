@@ -178,20 +178,27 @@ logic axis_tx_tvalid, axis_tx_tready, axis_tx_tlast;
 logic [511:0] axis_tx_tdata;
 logic [63:0] axis_tx_tkeep;
 
-
-//tx interface from roce stack
-assign axis_tx_tvalid = axis_tx.tvalid;
-assign axis_tx.tready = axis_tx_tready;
-assign axis_tx_tlast = axis_tx.tlast;
-assign axis_tx_tdata = axis_tx.tdata;
-assign axis_tx_tkeep = axis_tx.tkeep;
-
 //rx interface to roce stack
 assign axis_rx.tdata = s_cmac2rdma_roce_axis_tdata_i;
 assign axis_rx.tkeep = s_cmac2rdma_roce_axis_tkeep_i;
 assign axis_rx.tvalid = s_cmac2rdma_roce_axis_tvalid_i;
 assign axis_rx.tlast = s_cmac2rdma_roce_axis_tlast_i;
 
+//tx interface from roce stack
+assign m_rdma2cmac_axis_tvalid_o = axis_tx.tvalid;
+assign axis_tx.tready = m_rdma2cmac_axis_tready_i;
+assign m_rdma2cmac_axis_tlast_o = axis_tx.tlast;
+assign m_rdma2cmac_axis_tdata_o = axis_tx.tdata;
+assign m_rdma2cmac_axis_tkeep_o = axis_tx.tkeep;
+
+
+/*
+//tx interface from roce stack
+assign axis_tx_tvalid = axis_tx.tvalid;
+assign axis_tx.tready = axis_tx_tready;
+assign axis_tx_tlast = axis_tx.tlast;
+assign axis_tx_tdata = axis_tx.tdata;
+assign axis_tx_tkeep = axis_tx.tkeep;
 
 roce_stack_tx_axis_interconnect roce_stack_tx_axis_interconnect_inst (
   .S00_AXIS_TDATA(axis_tx_tdata),
@@ -225,7 +232,7 @@ roce_stack_tx_axis_interconnect roce_stack_tx_axis_interconnect_inst (
   .S01_AXIS_ARESETN(mod_rstn_i),
   .M00_AXIS_ARESETN(mod_rstn_i)
 );
-
+*/
 
 roce_stack_csr #(
   .NUM_QP(NUM_QP),
