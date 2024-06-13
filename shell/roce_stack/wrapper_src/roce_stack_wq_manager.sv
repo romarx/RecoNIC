@@ -211,7 +211,7 @@ always_comb begin
       //we have a new work queue element
       if(new_wqe_fetched && !qp_done) begin
         
-        qp_reg_d = {WQEReg_q[255:224], WQEReg_q[223:160],  qp_fifo_output.sq_psn, qp_fifo_output.dest_sq_psn, 16'b0, 8'b0, 32'b0}; //TODO: finish with qp num and state or just 0? qp_fifo_output.qp_idx
+        qp_reg_d = {WQEReg_q[255:224], WQEReg_q[223:160], qp_fifo_output.sq_psn, qp_fifo_output.dest_sq_psn, 16'b0, 8'b0, 32'b0}; //TODO: finish with qp num and state or just 0?
         //only reconnect if new state differs from old state
         if(qp_reg_d != qp_reg_q) begin
           qp_state_d = QP_VALID;
