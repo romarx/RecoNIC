@@ -154,6 +154,11 @@ xvlog $xvlog_opts -work reco -L rocev2_ip --include "../build/ip/rocev2_ip/hdl/v
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_detection_unit.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_idx0_monitor.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_idx6_monitor.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_idx8_monitor.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_idx10_monitor.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_idx11_monitor.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_idx12_monitor.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_idx13_monitor.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_insert_icrc_512_0_s.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_ipUdpMetaHandler_512_0_s.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_ipv4_drop_optional_ip_header_512_s.v" \

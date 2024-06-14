@@ -131,6 +131,10 @@ logic [7:0] wr_ptr_wtc;
 logic [31:0]  IPv4ADD;
 
 logic [7:0]   QPidx;
+logic [7:0]   commidx;
+
+logic [31:0]  CONF;
+
 logic [31:0]  QPCONFi;
 logic [31:0]  QPADVCONFi;
 logic [63:0]  RQBAi;
@@ -259,8 +263,12 @@ roce_stack_csr #(
   
   .VIRTADDR_o(VIRTADDRi),
 
+  .CONF_o(CONF),
+
   .IPv4ADD_o(IPv4ADD),
   .QPidx_o(QPidx),
+  .commidx_o(commidx),
+  
   .QPCONFi_o(QPCONFi),
   .QPADVCONFi_o(),
   .RQBAi_o(),
@@ -304,6 +312,10 @@ roce_stack_csr #(
 //TODO: finish this!
 roce_stack_wq_manager inst_roce_stack_wq_manager(
     .QPidx_i(QPidx),
+    .commidx_i(commidx),
+
+    .CONF_i(CONF),
+
     .QPCONFi_i(QPCONFi),
     .DESTQPCONFi_i(DESTQPCONFi),
     .IPDESADDR1i_i(IPDESADDR1i),

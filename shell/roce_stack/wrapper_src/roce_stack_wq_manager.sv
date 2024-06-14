@@ -2,6 +2,10 @@ import lynxTypes::*;
 
 module roce_stack_wq_manager #()(
     input  logic [7:0]    QPidx_i,
+    input  logic [7:0]    commidx_i,
+
+    input  logic [31:0]   CONF_i,
+
     input  logic [31:0]   QPCONFi_i,
     input  logic [23:0]   DESTQPCONFi_i,
     input  logic [31:0]   IPDESADDR1i_i,
@@ -252,7 +256,7 @@ always_comb begin
       conn_done = 1'b0;
       //Current WQE changed, potentially also QP, send new conn configuration 
       if(qp_intf_done && !qp_done) begin
-        conn_reg_d = {16'h4321, qp_fifo_output.dest_ip_addr, qp_fifo_output.dest_ip_addr, qp_fifo_output.dest_ip_addr, qp_fifo_output.dest_ip_addr, qp_fifo_output.dest_qp, 8'b0, 8'b0}; //qp_idx after fix??
+        conn_reg_d = {16'h4321, qp_fifo_output.dest_ip_addr, qp_fifo_output.dest_ip_addr, qp_fifo_output.dest_ip_addr, qp_fifo_output.dest_ip_addr, qp_fifo_output.dest_qp, 8'b0, 8'b0}; //TODO: qp_idx after fix??
         //only reconnect if configuration changed
         if(conn_reg_d != conn_reg_q) begin
           conn_state_d = CONN_VALID;

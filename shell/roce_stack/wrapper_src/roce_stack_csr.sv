@@ -57,6 +57,9 @@ module roce_stack_csr # (
 
   //Per QP registers
   output logic [7:0]                      QPidx_o,
+  output logic [7:0]                      commidx_o,
+
+
   output logic [31:0]                     QPCONFi_o,
   output logic [31:0]                     QPADVCONFi_o,
   output logic [63:0]                     RQBAi_o,
@@ -392,6 +395,7 @@ logic [REG_WIDTH-1:0] PDNUMi_d[NUM_QP-1:0], PDNUMi_q[NUM_QP-1:0];
 
 logic [7:0] QPidx_d, QPidx_q;
 logic [7:0] PDidx_d, PDidx_q;
+logic [7:0] commidx_d, commidx_q;
 
 ///////////////////////
 //                   //
@@ -1030,6 +1034,7 @@ always_comb begin
   end
 
   QPidx_d = QPidx_q;
+  commidx_d = commidx_q;
 
   case(w_state_q)
     W_IDLE: begin
@@ -1158,6 +1163,7 @@ always_comb begin
             end
             ADDR_IPDESADDR1i: begin
               IPDESADDR1i_d[qpidx_w] = apply_wstrb(IPDESADDR1i_q[qpidx_w], WDataReg_q, mask);
+              commidx_d = qpidx_w[7:0];
             end
             ADDR_IPDESADDR2i: begin
               IPDESADDR2i_d[qpidx_w] = apply_wstrb(IPDESADDR2i_q[qpidx_w], WDataReg_q, mask);
@@ -1536,6 +1542,7 @@ always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
 
     QPidx_q <= 'd0;
     PDidx_q <= 'd0;
+    commidx_q <= 'd0;
   end else begin
     r_state_q <= r_state_d;
     w_state_q <= w_state_d;
@@ -1685,6 +1692,7 @@ always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
 
     QPidx_q <= QPidx_d;
     PDidx_q <= PDidx_d;
+    commidx_q <= commidx_d;
   end
 end
 
@@ -1714,6 +1722,7 @@ assign RESPERRPKTBA_o = {RESPERRPKTBAMSB_q, RESPERRPKTBA_q};
 assign RESPERRSZ_o = {RESPERRSZMSB_q, RESPERRSZ_q};
 
 assign QPidx_o = QPidx_q;
+assign commidx_o = commidx_q;
 
 
 assign PDPDNUM_o = PDPDNUM_q[PDidx_q][23:0];
@@ -1739,7 +1748,8 @@ assign SQPSNi_o = SQPSNi_q[QPidx_q][23:0];
 assign LSTRQREQi_o = LSTRQREQi_q[QPidx_q];
 assign DESTQPCONFi_o = DESTQPCONFi_q[QPidx_q][23:0];
 assign MACDESADDi_o = {MACDESADDMSBi_q[QPidx_q], MACDESADDLSBi_q[QPidx_q]};
-assign IPDESADDR1i_o = IPDESADDR1i_q[QPidx_q];
+
+assign IPDESADDR1i_o = IPDESADDR1i_q[commidx_q];
 
 /*
 //read inputs from logic, async atm
