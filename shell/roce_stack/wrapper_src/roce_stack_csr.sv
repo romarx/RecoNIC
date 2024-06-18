@@ -57,7 +57,9 @@ module roce_stack_csr # (
 
   //Per QP registers
   output logic [7:0]                      QPidx_o,
-  output logic [7:0]                      commidx_o,
+  output logic [7:0]                      connidx_o,
+  output logic                            conn_configured_o,
+  output logic                            qp_configured_o, 
 
 
   output logic [31:0]                     QPCONFi_o,
@@ -395,7 +397,7 @@ logic [REG_WIDTH-1:0] PDNUMi_d[NUM_QP-1:0], PDNUMi_q[NUM_QP-1:0];
 
 logic [7:0] QPidx_d, QPidx_q;
 logic [7:0] PDidx_d, PDidx_q;
-logic [7:0] commidx_d, commidx_q;
+logic [7:0] connidx_d, connidx_q;
 
 ///////////////////////
 //                   //
@@ -425,6 +427,9 @@ logic[AXIL_DATA_WIDTH_BYTES-1:0] WStrbReg_d, WStrbReg_q;
 
 typedef enum {W_IDLE, W_READY, WRITE, B_RESP} write_state;
 write_state w_state_d, w_state_q;
+
+
+logic [1:0] REQUIRED_REGS_CONN [NUM_QP-1:0];
 
 
 ////////////////
@@ -886,6 +891,7 @@ endfunction
 
 
 always_comb begin
+  qp_configured_o = 1'b0;
   s_axil_awready_o = 1'b0;
   s_axil_bvalid_o = 1'b0;
   s_axil_wready_o = 1'b0;
@@ -1034,7 +1040,7 @@ always_comb begin
   end
 
   QPidx_d = QPidx_q;
-  commidx_d = commidx_q;
+  connidx_d = connidx_q;
 
   case(w_state_q)
     W_IDLE: begin
@@ -1102,6 +1108,8 @@ always_comb begin
           case(WAddrReg_q[7:0])
             ADDR_QPCONFi: begin
               QPCONFi_d[qpidx_w] = apply_wstrb(QPCONFi_q[qpidx_w], WDataReg_q, mask);
+              QPidx_d = qpidx_w[7:0];
+              qp_configured_o = 1'b1;
             end
             ADDR_QPADVCONFi: begin
               QPADVCONFi_d[qpidx_w] = apply_wstrb(QPADVCONFi_q[qpidx_w], WDataReg_q, mask);
@@ -1148,12 +1156,20 @@ always_comb begin
             end
             ADDR_SQPSNi: begin
               SQPSNi_d[qpidx_w] = apply_wstrb(SQPSNi_q[qpidx_w], WDataReg_q, mask);
+              QPidx_d = qpidx_w[7:0];
+              qp_configured_o = 1'b1;
             end
             ADDR_LSTRQREQi: begin
               LSTRQREQi_d[qpidx_w] = apply_wstrb(LSTRQREQi_q[qpidx_w], WDataReg_q, mask);
+              QPidx_d = qpidx_w[7:0];
+              qp_configured_o = 1'b1;
             end
             ADDR_DESTQPCONFi: begin
               DESTQPCONFi_d[qpidx_w] = apply_wstrb(DESTQPCONFi_q[qpidx_w], WDataReg_q, mask);
+              connidx_d = qpidx_w[7:0];
+              REQUIRED_REGS_CONN[qpidx_w[7:0]][0] = 1'b1;
+              QPidx_d = qpidx_w[7:0];
+              qp_configured_o = 1'b1;
             end
             ADDR_MACDESADDLSBi: begin
               MACDESADDLSBi_d[qpidx_w] = apply_wstrb(MACDESADDLSBi_q[qpidx_w], WDataReg_q, mask);
@@ -1163,7 +1179,8 @@ always_comb begin
             end
             ADDR_IPDESADDR1i: begin
               IPDESADDR1i_d[qpidx_w] = apply_wstrb(IPDESADDR1i_q[qpidx_w], WDataReg_q, mask);
-              commidx_d = qpidx_w[7:0];
+              connidx_d = qpidx_w[7:0];
+              REQUIRED_REGS_CONN[qpidx_w[7:0]][1] = 1'b1;
             end
             ADDR_IPDESADDR2i: begin
               IPDESADDR2i_d[qpidx_w] = apply_wstrb(IPDESADDR2i_q[qpidx_w], WDataReg_q, mask);
@@ -1538,11 +1555,12 @@ always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
       STATWQEi_q[i] <= 'd0;
       STATRQPIDBi_q[i] <= 'd0;
       PDNUMi_q[i] <= 'd0;
+      REQUIRED_REGS_CONN[i] <= 'd0;
     end
 
     QPidx_q <= 'd0;
     PDidx_q <= 'd0;
-    commidx_q <= 'd0;
+    connidx_q <= 'd0;
   end else begin
     r_state_q <= r_state_d;
     w_state_q <= w_state_d;
@@ -1692,7 +1710,7 @@ always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
 
     QPidx_q <= QPidx_d;
     PDidx_q <= PDidx_d;
-    commidx_q <= commidx_d;
+    connidx_q <= connidx_d;
   end
 end
 
@@ -1722,8 +1740,8 @@ assign RESPERRPKTBA_o = {RESPERRPKTBAMSB_q, RESPERRPKTBA_q};
 assign RESPERRSZ_o = {RESPERRSZMSB_q, RESPERRSZ_q};
 
 assign QPidx_o = QPidx_q;
-assign commidx_o = commidx_q;
-
+assign connidx_o = connidx_q;
+assign conn_configured_o = &(REQUIRED_REGS_CONN[connidx_q]);
 
 assign PDPDNUM_o = PDPDNUM_q[PDidx_q][23:0];
 assign VIRTADDR_o = {VIRTADDRMSB_q[PDidx_q], VIRTADDRLSB_q[PDidx_q]};
@@ -1749,7 +1767,7 @@ assign LSTRQREQi_o = LSTRQREQi_q[QPidx_q];
 assign DESTQPCONFi_o = DESTQPCONFi_q[QPidx_q][23:0];
 assign MACDESADDi_o = {MACDESADDMSBi_q[QPidx_q], MACDESADDLSBi_q[QPidx_q]};
 
-assign IPDESADDR1i_o = IPDESADDR1i_q[commidx_q];
+assign IPDESADDR1i_o = IPDESADDR1i_q[connidx_q];
 
 /*
 //read inputs from logic, async atm

@@ -266,7 +266,13 @@ xvlog $xvlog_opts -work reco -sv -L fifo_generator_v13_2_6 \
 "../build/ip/sys_mem_5to2_axi_crossbar/synth/sys_mem_5to2_axi_crossbar.v"
 
 xvlog $xvlog_opts -work reco -L fifo_generator_v13_2_6 \
-"../build/ip/roce_stack_cdc_fifo_qp_wq/sim/roce_stack_cdc_fifo_qp_wq.v"
+"../build/ip/cdc_fifo_qp/sim/cdc_fifo_qp.v"
+
+xvlog $xvlog_opts -work reco -L fifo_generator_v13_2_6 \
+"../build/ip/cdc_fifo_sq/sim/cdc_fifo_sq.v"
+
+xvlog $xvlog_opts -work reco -L fifo_generator_v13_2_6 \
+"../build/ip/cdc_fifo_conn/sim/cdc_fifo_conn.v"
 
 xvlog $xvlog_opts -work reco \
 "$VIVADO_DATA_DIR/verilog/src/glbl.v"

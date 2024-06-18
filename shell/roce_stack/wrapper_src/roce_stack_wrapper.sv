@@ -130,8 +130,8 @@ logic [7:0] wr_ptr_wtc;
 
 logic [31:0]  IPv4ADD;
 
-logic [7:0]   QPidx;
-logic [7:0]   commidx;
+logic [7:0]   connidx, QPidx;  
+logic         conn_configured, qp_configured;
 
 logic [31:0]  CONF;
 
@@ -267,7 +267,9 @@ roce_stack_csr #(
 
   .IPv4ADD_o(IPv4ADD),
   .QPidx_o(QPidx),
-  .commidx_o(commidx),
+  .connidx_o(connidx),
+  .conn_configured_o(conn_configured),
+  .qp_configured_o(qp_configured),
   
   .QPCONFi_o(QPCONFi),
   .QPADVCONFi_o(),
@@ -310,77 +312,81 @@ roce_stack_csr #(
 
 
 //TODO: finish this!
-roce_stack_wq_manager inst_roce_stack_wq_manager(
-    .QPidx_i(QPidx),
-    .commidx_i(commidx),
+roce_stack_wq_manager #(
+  .NUM_QP(NUM_QP)
+)inst_roce_stack_wq_manager(
+  .QPidx_i(QPidx),
+  .connidx_i(connidx),
+  .conn_configured_i(conn_configured),
+  .qp_configured_i(qp_configured),
 
-    .CONF_i(CONF),
+  .CONF_i(CONF),
 
-    .QPCONFi_i(QPCONFi),
-    .DESTQPCONFi_i(DESTQPCONFi),
-    .IPDESADDR1i_i(IPDESADDR1i),
-    .SQPSNi_i(SQPSNi),
-    .CQHEADi_i(CQHEADi_ctw),
-    .LSTRQREQi_i(LSTRQREQi),
+  .QPCONFi_i(QPCONFi),
+  .DESTQPCONFi_i(DESTQPCONFi),
+  .IPDESADDR1i_i(IPDESADDR1i),
+  .SQPSNi_i(SQPSNi),
+  .CQHEADi_i(CQHEADi_ctw),
+  .LSTRQREQi_i(LSTRQREQi),
 
-    .SQBAi_i(SQBAi),
-    .SQPIi_i(SQPIi),
-    .VIRTADDR_i(VIRTADDRi),
+  .SQBAi_i(SQBAi),
+  .SQPIi_i(SQPIi),
+  .VIRTADDR_i(VIRTADDRi),
     
-    .wr_ptr_o(wr_ptr_wtc),
-    .CQHEADi_o(CQHEADi_wtc),
+  .wr_ptr_o(wr_ptr_wtc),
+  .CQHEADi_o(CQHEADi_wtc),
 
-    .m_rdma_conn_interface_valid_o(rdma_conn_interface.valid), 
-    .m_rdma_conn_interface_ready_i(rdma_conn_interface.ready),
-    .m_rdma_conn_interface_data_o(rdma_conn_interface.data),
+  .m_rdma_conn_interface_valid_o(rdma_conn_interface.valid), 
+  .m_rdma_conn_interface_ready_i(rdma_conn_interface.ready),
+  .m_rdma_conn_interface_data_o(rdma_conn_interface.data),
 
-    .m_rdma_qp_interface_valid_o(rdma_qp_interface.valid), 
-    .m_rdma_qp_interface_ready_i(rdma_qp_interface.ready),
-    .m_rdma_qp_interface_data_o(rdma_qp_interface.data),
+  .m_rdma_qp_interface_valid_o(rdma_qp_interface.valid), 
+  .m_rdma_qp_interface_ready_i(rdma_qp_interface.ready),
+  .m_rdma_qp_interface_data_o(rdma_qp_interface.data),
     
-    .m_rdma_sq_interface_valid_o(rdma_sq.valid),
-    .m_rdma_sq_interface_ready_i(rdma_sq.ready),
-    .m_rdma_sq_interface_data_o(rdma_sq.data),
+  .m_rdma_sq_interface_valid_o(rdma_sq.valid),
+  .m_rdma_sq_interface_ready_i(rdma_sq.ready),
+  .m_rdma_sq_interface_data_o(rdma_sq.data),
 
-    .m_axi_qp_get_wqe_awid_o(m_axi_qp_get_wqe_awid_o),
-    .m_axi_qp_get_wqe_awaddr_o(m_axi_qp_get_wqe_awaddr_o),
-    .m_axi_qp_get_wqe_awlen_o(m_axi_qp_get_wqe_awlen_o),
-    .m_axi_qp_get_wqe_awsize_o(m_axi_qp_get_wqe_awsize_o),
-    .m_axi_qp_get_wqe_awburst_o(m_axi_qp_get_wqe_awburst_o),
-    .m_axi_qp_get_wqe_awcache_o(m_axi_qp_get_wqe_awcache_o),
-    .m_axi_qp_get_wqe_awprot_o(m_axi_qp_get_wqe_awprot_o),
-    .m_axi_qp_get_wqe_awvalid_o(m_axi_qp_get_wqe_awvalid_o),
-    .m_axi_qp_get_wqe_awready_i(m_axi_qp_get_wqe_awready_i),
-    .m_axi_qp_get_wqe_wdata_o(m_axi_qp_get_wqe_wdata_o),
-    .m_axi_qp_get_wqe_wstrb_o(m_axi_qp_get_wqe_wstrb_o),
-    .m_axi_qp_get_wqe_wlast_o(m_axi_qp_get_wqe_wlast_o),
-    .m_axi_qp_get_wqe_wvalid_o(m_axi_qp_get_wqe_wvalid_o),
-    .m_axi_qp_get_wqe_wready_i(m_axi_qp_get_wqe_wready_i),
-    .m_axi_qp_get_wqe_awlock_o(m_axi_qp_get_wqe_awlock_o),
-    .m_axi_qp_get_wqe_bid_i(m_axi_qp_get_wqe_bid_i),
-    .m_axi_qp_get_wqe_bresp_i(m_axi_qp_get_wqe_bresp_i),
-    .m_axi_qp_get_wqe_bvalid_i(m_axi_qp_get_wqe_bvalid_i),
-    .m_axi_qp_get_wqe_bready_o(m_axi_qp_get_wqe_bready_o),
-    .m_axi_qp_get_wqe_arid_o(m_axi_qp_get_wqe_arid_o),
-    .m_axi_qp_get_wqe_araddr_o(m_axi_qp_get_wqe_araddr_o),
-    .m_axi_qp_get_wqe_arlen_o(m_axi_qp_get_wqe_arlen_o),
-    .m_axi_qp_get_wqe_arsize_o(m_axi_qp_get_wqe_arsize_o),
-    .m_axi_qp_get_wqe_arburst_o(m_axi_qp_get_wqe_arburst_o),
-    .m_axi_qp_get_wqe_arcache_o(m_axi_qp_get_wqe_arcache_o),
-    .m_axi_qp_get_wqe_arprot_o(m_axi_qp_get_wqe_arprot_o),
-    .m_axi_qp_get_wqe_arvalid_o(m_axi_qp_get_wqe_arvalid_o),
-    .m_axi_qp_get_wqe_arready_i(m_axi_qp_get_wqe_arready_i),
-    .m_axi_qp_get_wqe_arlock_o(m_axi_qp_get_wqe_arlock_o),
-    .m_axi_qp_get_wqe_rid_i(m_axi_qp_get_wqe_rid_i),
-    .m_axi_qp_get_wqe_rdata_i(m_axi_qp_get_wqe_rdata_i),
-    .m_axi_qp_get_wqe_rresp_i(m_axi_qp_get_wqe_rresp_i),
-    .m_axi_qp_get_wqe_rlast_i(m_axi_qp_get_wqe_rlast_i),
-    .m_axi_qp_get_wqe_rvalid_i(m_axi_qp_get_wqe_rvalid_i),
-    .m_axi_qp_get_wqe_rready_o(m_axi_qp_get_wqe_rready_o),
+  .m_axi_qp_get_wqe_awid_o(m_axi_qp_get_wqe_awid_o),
+  .m_axi_qp_get_wqe_awaddr_o(m_axi_qp_get_wqe_awaddr_o),
+  .m_axi_qp_get_wqe_awlen_o(m_axi_qp_get_wqe_awlen_o),
+  .m_axi_qp_get_wqe_awsize_o(m_axi_qp_get_wqe_awsize_o),
+  .m_axi_qp_get_wqe_awburst_o(m_axi_qp_get_wqe_awburst_o),
+  .m_axi_qp_get_wqe_awcache_o(m_axi_qp_get_wqe_awcache_o),
+  .m_axi_qp_get_wqe_awprot_o(m_axi_qp_get_wqe_awprot_o),
+  .m_axi_qp_get_wqe_awvalid_o(m_axi_qp_get_wqe_awvalid_o),
+  .m_axi_qp_get_wqe_awready_i(m_axi_qp_get_wqe_awready_i),
+  .m_axi_qp_get_wqe_wdata_o(m_axi_qp_get_wqe_wdata_o),
+  .m_axi_qp_get_wqe_wstrb_o(m_axi_qp_get_wqe_wstrb_o),
+  .m_axi_qp_get_wqe_wlast_o(m_axi_qp_get_wqe_wlast_o),
+  .m_axi_qp_get_wqe_wvalid_o(m_axi_qp_get_wqe_wvalid_o),
+  .m_axi_qp_get_wqe_wready_i(m_axi_qp_get_wqe_wready_i),
+  .m_axi_qp_get_wqe_awlock_o(m_axi_qp_get_wqe_awlock_o),
+  .m_axi_qp_get_wqe_bid_i(m_axi_qp_get_wqe_bid_i),
+  .m_axi_qp_get_wqe_bresp_i(m_axi_qp_get_wqe_bresp_i),
+  .m_axi_qp_get_wqe_bvalid_i(m_axi_qp_get_wqe_bvalid_i),
+  .m_axi_qp_get_wqe_bready_o(m_axi_qp_get_wqe_bready_o),
+  .m_axi_qp_get_wqe_arid_o(m_axi_qp_get_wqe_arid_o),
+  .m_axi_qp_get_wqe_araddr_o(m_axi_qp_get_wqe_araddr_o),
+  .m_axi_qp_get_wqe_arlen_o(m_axi_qp_get_wqe_arlen_o),
+  .m_axi_qp_get_wqe_arsize_o(m_axi_qp_get_wqe_arsize_o),
+  .m_axi_qp_get_wqe_arburst_o(m_axi_qp_get_wqe_arburst_o),
+  .m_axi_qp_get_wqe_arcache_o(m_axi_qp_get_wqe_arcache_o),
+  .m_axi_qp_get_wqe_arprot_o(m_axi_qp_get_wqe_arprot_o),
+  .m_axi_qp_get_wqe_arvalid_o(m_axi_qp_get_wqe_arvalid_o),
+  .m_axi_qp_get_wqe_arready_i(m_axi_qp_get_wqe_arready_i),
+  .m_axi_qp_get_wqe_arlock_o(m_axi_qp_get_wqe_arlock_o),
+  .m_axi_qp_get_wqe_rid_i(m_axi_qp_get_wqe_rid_i),
+  .m_axi_qp_get_wqe_rdata_i(m_axi_qp_get_wqe_rdata_i),
+  .m_axi_qp_get_wqe_rresp_i(m_axi_qp_get_wqe_rresp_i),
+  .m_axi_qp_get_wqe_rlast_i(m_axi_qp_get_wqe_rlast_i),
+  .m_axi_qp_get_wqe_rvalid_i(m_axi_qp_get_wqe_rvalid_i),
+  .m_axi_qp_get_wqe_rready_o(m_axi_qp_get_wqe_rready_o),
 
-    .axil_aclk_i(axil_aclk_i),
-    .axis_aclk_i(axis_aclk_i),
-    .rstn_i(mod_rstn_i)
+  .axil_aclk_i(axil_aclk_i),
+  .axis_aclk_i(axis_aclk_i),
+  .rstn_i(mod_rstn_i)
 );
 
 

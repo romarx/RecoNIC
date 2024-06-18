@@ -209,7 +209,7 @@ roce_stack_axi_datamover roce_stack_axi_datamover_inst (
   .m_axi_s2mm_aclk(axis_aclk_i),
   .m_axi_s2mm_aresetn(aresetn_i),
   .m_axis_s2mm_cmdsts_awclk(axis_aclk_i),
-  .m_axis_s2mm_cmdsts_aresetn(arestn_i),
+  .m_axis_s2mm_cmdsts_aresetn(aresetn_i),
   
   .s2mm_err(s2mm_err),
   .mm2s_err(mm2s_err)
