@@ -129,11 +129,13 @@ module roce_stack_wrapper # (
 logic [7:0] wr_ptr_wtc;
 
 logic [31:0]  IPv4ADD;
+logic [31:0]  IPv4ADD_net;
 
 logic [7:0]   connidx, QPidx;  
 logic         conn_configured, qp_configured;
 
 logic [31:0]  CONF;
+logic [47:0]  MACADD;
 
 logic [31:0]  QPCONFi;
 logic [31:0]  QPADVCONFi;
@@ -149,8 +151,9 @@ logic [31:0]  QDEPTHi;
 logic [23:0]  SQPSNi;
 logic [31:0]  LSTRQREQi;
 logic [23:0]  DESTQPCONFi;
-logic [63:0]  MACDESADDi;
+logic [47:0]  MACDESADDi;
 logic [31:0]  IPDESADDR1i;
+logic [31:0]  IPDESADDR1i_net;
 
 logic [63:0] VIRTADDRi;
 
@@ -264,6 +267,7 @@ roce_stack_csr #(
   .VIRTADDR_o(VIRTADDRi),
 
   .CONF_o(CONF),
+  .MACADD_o(MACADD),
 
   .IPv4ADD_o(IPv4ADD),
   .QPidx_o(QPidx),
@@ -271,6 +275,8 @@ roce_stack_csr #(
   .conn_configured_o(conn_configured),
   .qp_configured_o(qp_configured),
   
+
+
   .QPCONFi_o(QPCONFi),
   .QPADVCONFi_o(),
   .RQBAi_o(),
@@ -285,7 +291,7 @@ roce_stack_csr #(
   .SQPSNi_o(SQPSNi),
   .LSTRQREQi_o(LSTRQREQi),
   .DESTQPCONFi_o(DESTQPCONFi),
-  .MACDESADDi_o(),
+  .MACDESADDi_o(MACDESADDi),
   .IPDESADDR1i_o(IPDESADDR1i),
 
   .rd_req_addr_valid_i(rd_req_addr_valid),
@@ -324,7 +330,7 @@ roce_stack_wq_manager #(
 
   .QPCONFi_i(QPCONFi),
   .DESTQPCONFi_i(DESTQPCONFi),
-  .IPDESADDR1i_i(IPDESADDR1i),
+  .IPDESADDR1i_i(IPDESADDR1i_net),
   .SQPSNi_i(SQPSNi),
   .CQHEADi_i(CQHEADi_ctw),
   .LSTRQREQi_i(LSTRQREQi),
@@ -488,7 +494,7 @@ roce_stack inst_roce_stack (
   // Control
   .s_rdma_qp_interface(rdma_qp_interface),
   .s_rdma_conn_interface(rdma_conn_interface),
-  .local_ip_address(IPv4ADD),
+  .local_ip_address(IPv4ADD_net),
 
    // Memory
   .m_rdma_rd_req(rdma_rd_req),
@@ -507,5 +513,9 @@ roce_stack inst_roce_stack (
   .retrans_count_valid(),
   .retrans_count_data()
 );
+
+//convert to network format before!
+assign IPv4ADD_net = {IPv4ADD[7:0], IPv4ADD[15:8], IPv4ADD[23:16], IPv4ADD[31:24]};
+assign IPDESADDR1i_net = {IPDESADDR1i[7:0], IPDESADDR1i[15:8], IPDESADDR1i[23:16], IPDESADDR1i[31:24]};
 
 endmodule: roce_stack_wrapper

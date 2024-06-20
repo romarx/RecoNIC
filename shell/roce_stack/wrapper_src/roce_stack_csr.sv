@@ -30,7 +30,7 @@ module roce_stack_csr # (
   //Configuration registers
   output logic [31:0]                     CONF_o,
   output logic [31:0]                     ADCONF_o,
-  output logic [63:0]                     MACADD_o,
+  output logic [47:0]                     MACADD_o,
   output logic [31:0]                     IPv4ADD_o,
   output logic [31:0]                     INTEN_o, //INTERRUPT ENABLE NOT CONNECTED
 
@@ -76,7 +76,7 @@ module roce_stack_csr # (
   output logic [23:0]                     SQPSNi_o,
   output logic [31:0]                     LSTRQREQi_o, // contains rq psn[23:0]
   output logic [23:0]                     DESTQPCONFi_o,
-  output logic [63:0]                     MACDESADDi_o,             
+  output logic [47:0]                     MACDESADDi_o,             
   output logic [31:0]                     IPDESADDR1i_o, //for IPv4 only
 
 
@@ -1727,7 +1727,7 @@ assign s_axil_bresp_o = WRespReg_q;
 
 assign CONF_o = CONF_q;
 assign ADCONF_o = ADCONF_q;
-assign MACADD_o = {MACADDMSB_q, MACADDLSB_q};
+assign MACADD_o = {MACADDMSB_q[15:0], MACADDLSB_q};
 assign IPv4ADD_o = IPv4ADD_q;
 assign INTEN_o = INTEN_q;
 assign ERRBUFBA_o = {ERRBUFBAMSB_q, ERRBUFBA_q};
@@ -1765,7 +1765,7 @@ assign QDEPTHi_o = QDEPTHi_q[QPidx_q];
 assign SQPSNi_o = SQPSNi_q[QPidx_q][23:0];
 assign LSTRQREQi_o = LSTRQREQi_q[QPidx_q];
 assign DESTQPCONFi_o = DESTQPCONFi_q[QPidx_q][23:0];
-assign MACDESADDi_o = {MACDESADDMSBi_q[QPidx_q], MACDESADDLSBi_q[QPidx_q]};
+assign MACDESADDi_o = {MACDESADDMSBi_q[QPidx_q][15:0], MACDESADDLSBi_q[QPidx_q]};
 
 assign IPDESADDR1i_o = IPDESADDR1i_q[connidx_q];
 
