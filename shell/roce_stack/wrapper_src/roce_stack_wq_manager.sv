@@ -1,5 +1,6 @@
 import lynxTypes::*;
 
+//TODO: better control logic for multiple QP's (except maybe for conn interface)
 module roce_stack_wq_manager #(
   parameter int NUM_QP = 8
 )(
@@ -257,11 +258,11 @@ always_comb begin
       end
     end
     READ: begin
-      qp_fifo_input_d.qp_idx        = QPidx_i; //NEEDED
-      qp_fifo_input_d.src_qp_conf   = QPCONFi_i; //NEEDED
-      qp_fifo_input_d.dest_qp       = DESTQPCONFi_i; //NEEDED (not sure)
-      qp_fifo_input_d.sq_psn        = SQPSNi_i; //NEEDED
-      qp_fifo_input_d.dest_sq_psn   = LSTRQREQi_i[23:0]; //NEEDED
+      qp_fifo_input_d.qp_idx        = QPidx_i;
+      qp_fifo_input_d.src_qp_conf   = QPCONFi_i;
+      qp_fifo_input_d.dest_qp       = DESTQPCONFi_i;
+      qp_fifo_input_d.sq_psn        = SQPSNi_i;
+      qp_fifo_input_d.dest_sq_psn   = LSTRQREQi_i[23:0];
       qp_fifo_wr_d = VALID;
     end
     VALID: begin
@@ -291,7 +292,7 @@ always_comb begin
         qp_fifo_rd_en = 1'b1;
         qp_state_d = QP_FIFO_VALID;
       end else if (new_wqe_fetched) begin
-        qp_reg_d = {WQEReg_q[255:224], WQEReg_q[223:160], qp_fifo_output.sq_psn, qp_fifo_output.dest_sq_psn, 16'b0, 8'b0, 32'b0}; //update directly
+        qp_reg_d = {WQEReg_q[255:224], WQEReg_q[223:160], (qp_fifo_output.dest_sq_psn + 24'b1), qp_fifo_output.sq_psn, 16'b0, 8'b0, 32'b0}; //update directly
         qp_state_d = QP_SQ_VALID;
       end
     end
@@ -302,7 +303,7 @@ always_comb begin
         if(qp_fifo_output.src_qp_conf[0] && qp_fifo_output.src_qp_conf[10:8] <= 3'b100) begin
           mtu_d = 'd256 << qp_fifo_output.src_qp_conf[10:8];
           //Maybe WQEReg is not yet set but who cares
-          qp_reg_d = {WQEReg_q[255:224], WQEReg_q[223:160], qp_fifo_output.sq_psn, qp_fifo_output.dest_sq_psn, 16'b0, 8'b0, 32'b0}; //TODO: finish with qp num and state or just 0?
+          qp_reg_d = {WQEReg_q[255:224], WQEReg_q[223:160], (qp_fifo_output.dest_sq_psn + 24'b1), qp_fifo_output.sq_psn, 16'b0, 8'b0, 32'b0}; //TODO: finish with qp num and state or just 0?
           qp_state_d = QP_VALID;
         end else begin
           qp_state_d = QP_IDLE;
