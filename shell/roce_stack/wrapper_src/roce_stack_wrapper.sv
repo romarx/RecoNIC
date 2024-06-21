@@ -136,6 +136,7 @@ logic         conn_configured, qp_configured;
 
 logic [31:0]  CONF;
 logic [47:0]  MACADD;
+logic [47:0]  MACADD_net;
 
 logic [31:0]  QPCONFi;
 logic [31:0]  QPADVCONFi;
@@ -152,6 +153,7 @@ logic [23:0]  SQPSNi;
 logic [31:0]  LSTRQREQi;
 logic [23:0]  DESTQPCONFi;
 logic [47:0]  MACDESADDi;
+logic [47:0]  MACDESADDi_net;
 logic [31:0]  IPDESADDR1i;
 logic [31:0]  IPDESADDR1i_net;
 
@@ -172,6 +174,7 @@ AXI4S #(.AXI4S_DATA_BITS(AXI4S_DATA_WIDTH)) axis_rdma_wr ();
 AXI4S #(.AXI4S_DATA_BITS(512)) axis_tx ();
 AXI4S #(.AXI4S_DATA_BITS(512)) axis_tx_roce_to_eth ();
 AXI4S #(.AXI4S_DATA_BITS(512)) axis_rx ();
+AXI4S #(.AXI4S_DATA_BITS(512)) axis_rx_handler_to_roce ();
 
 
 //address requests
@@ -491,8 +494,8 @@ mac_ip_encode_ip mac_ip_encode_inst (
     .m_axis_ip_TKEEP(axis_tx.tkeep),
     .m_axis_ip_TLAST(axis_tx.tlast),
   
-    .myMacAddress(MACADD),                                    // input wire [47 : 0] regMacAddress_V
-    .theirMacAddress(MACDESADDi),
+    .myMacAddress(MACADD_net),
+    .theirMacAddress(MACDESADDi_net),
     
     .ap_clk(axis_aclk_i), // input aclk
     .ap_rst_n(mod_rstn_i) // input aresetn
@@ -509,13 +512,38 @@ mac_ip_encode_ip mac_ip_encode_inst (
     .m_axis_ip_TKEEP(axis_tx.tkeep),
     .m_axis_ip_TLAST(axis_tx.tlast),
     
-    .myMacAddress_V(MACADD),                                    // input wire [47 : 0] regMacAddress_V
-    .theirMacAddress_V(MACDESADDi),
+    .myMacAddress_V(MACADD_net),
+    .theirMacAddress_V(MACDESADDi_net),
     
     .ap_clk(axis_aclk_i), // input aclk
     .ap_rst_n(mod_rstn_i) // input aresetn
 `endif
 );
+
+
+// IP handler
+ip_handler_ip ip_handler_inst ( 
+    .s_axis_raw_TVALID(axis_rx.tvalid),
+    .s_axis_raw_TREADY(axis_rx.tready),
+    .s_axis_raw_TDATA(axis_rx.tdata),
+    .s_axis_raw_TKEEP(axis_rx.tkeep),
+    .s_axis_raw_TLAST(axis_rx.tlast),
+    
+    .m_axis_roce_TVALID(axis_rx_handler_to_roce.tvalid),
+    .m_axis_roce_TREADY(axis_rx_handler_to_roce.tready),
+    .m_axis_roce_TDATA(axis_rx_handler_to_roce.tdata),
+    .m_axis_roce_TKEEP(axis_rx_handler_to_roce.tkeep),
+    .m_axis_roce_TLAST(axis_rx_handler_to_roce.tlast),
+
+`ifdef VITIS_HLS
+    .myIpAddress(IPv4ADD_net),
+`else
+    .myIpAddress_V(IPv4ADD_net),
+`endif
+
+    .ap_clk(axis_aclk_i), // input aclk
+    .ap_rst_n(mod_rstn_i) // input aresetn
+); 
 
 
 
@@ -525,7 +553,7 @@ roce_stack inst_roce_stack (
   .nresetn(mod_rstn_i),
 
   // Network interface
-  .s_axis_rx(axis_rx),
+  .s_axis_rx(axis_rx_handler_to_roce),
   .m_axis_tx(axis_tx_roce_to_eth),
 
   // User command
@@ -555,8 +583,10 @@ roce_stack inst_roce_stack (
   .retrans_count_data()
 );
 
-//convert to network format before!
+//convert to network format
 assign IPv4ADD_net = {IPv4ADD[7:0], IPv4ADD[15:8], IPv4ADD[23:16], IPv4ADD[31:24]};
 assign IPDESADDR1i_net = {IPDESADDR1i[7:0], IPDESADDR1i[15:8], IPDESADDR1i[23:16], IPDESADDR1i[31:24]};
+assign MACADD_net = {MACADD[7:0], MACADD[15:8], MACADD[23:16], MACADD[31:24], MACADD[39:32], MACADD[47:40]};
+assign MACDESADDi_net = {MACDESADDi[7:0], MACDESADDi[15:8], MACDESADDi[23:16], MACDESADDi[31:24], MACDESADDi[39:32], MACDESADDi[47:40]};
 
 endmodule: roce_stack_wrapper

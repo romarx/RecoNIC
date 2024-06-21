@@ -300,19 +300,19 @@ roce_stack_wrapper #(
   .s_qdma2rdma_non_roce_axis_tready_o   (qdma2rdma_non_roce_axis_tready),
 
 
-  //TODO: ETHERNET HEADER + IP in network format
   // RDMA RX interface from CMAC RX, no rx backpressure
-  //.s_cmac2rdma_roce_axis_tdata_i        (cmac2rdma_roce_axis_tdata),
-  //.s_cmac2rdma_roce_axis_tkeep_i        (cmac2rdma_roce_axis_tkeep),
-  //.s_cmac2rdma_roce_axis_tvalid_i       (cmac2rdma_roce_axis_tvalid),
-  //.s_cmac2rdma_roce_axis_tlast_i        (cmac2rdma_roce_axis_tlast),
-  //.s_cmac2rdma_roce_axis_tuser_i        (cmac2rdma_roce_axis_tuser),
+  .s_cmac2rdma_roce_axis_tdata_i        (cmac2rdma_roce_axis_tdata),
+  .s_cmac2rdma_roce_axis_tkeep_i        (cmac2rdma_roce_axis_tkeep),
+  .s_cmac2rdma_roce_axis_tvalid_i       (cmac2rdma_roce_axis_tvalid),
+  .s_cmac2rdma_roce_axis_tlast_i        (cmac2rdma_roce_axis_tlast),
+  .s_cmac2rdma_roce_axis_tuser_i        (cmac2rdma_roce_axis_tuser),
   
-  .s_cmac2rdma_roce_axis_tdata_i        (s_axis_cmac_rx_tdata),
-  .s_cmac2rdma_roce_axis_tkeep_i        (s_axis_cmac_rx_tkeep),
-  .s_cmac2rdma_roce_axis_tvalid_i       (s_axis_cmac_rx_tvalid),
-  .s_cmac2rdma_roce_axis_tlast_i        (s_axis_cmac_rx_tlast),
-  .s_cmac2rdma_roce_axis_tuser_i        ('d0),
+  //RDMA RX direct connection
+  //.s_cmac2rdma_roce_axis_tdata_i        (s_axis_cmac_rx_tdata),
+  //.s_cmac2rdma_roce_axis_tkeep_i        (s_axis_cmac_rx_tkeep),
+  //.s_cmac2rdma_roce_axis_tvalid_i       (s_axis_cmac_rx_tvalid),
+  //.s_cmac2rdma_roce_axis_tlast_i        (s_axis_cmac_rx_tlast),
+  //.s_cmac2rdma_roce_axis_tuser_i        ('d0),
 
   //AXI Master to fetch WQEs
   .m_axi_qp_get_wqe_awid_o    (m_axi_rdma_get_wqe_awid),

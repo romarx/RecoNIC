@@ -237,6 +237,38 @@ xvlog $xvlog_opts -work reco -L rocev2_ip --include "../build/ip/mac_ip_encode_i
 "../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top.v" \
 "../build/ip/mac_ip_encode_ip/synth/mac_ip_encode_ip.v" \
 
+xvlog $xvlog_opts -work reco -L rocev2_ip --include "../build/ip/ip_handler_ip/hdl/verilog" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_convert_axis_to_net_axis_512_s.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_convert_net_axis_to_axis_512_1.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_convert_net_axis_to_axis_512_s.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_cut_length.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_detect_eth_protocol_512_s.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_detect_ipv4_protocol_512_s.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_entry_proc.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_extract_ip_meta_512_s.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_fifo_w1_d4_S.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_fifo_w1_d8_S.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_fifo_w1_d32_S.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_fifo_w8_d32_S.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_fifo_w16_d2_S.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_fifo_w32_d6_S.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_fifo_w544_d2_S.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_fifo_w577_d2_S.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_fifo_w577_d64_A.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_fifo_w1024_d2_S.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_fifo_w1024_d4_A.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_hls_deadlock_detection_unit.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_hls_deadlock_idx0_monitor.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_ip_handler_check_ipv4_checksum_32_s.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_ip_handler_compute_ipv4_checksum.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_ip_handler_rshiftWordByOctet_net_axis_512_512_1_s.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_ip_invalid_dropper_512_s.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_mux_646_64_1_1.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_regslice_both.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top_route_by_eth_protocol_512_s.v" \
+"../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top.v" \
+"../build/ip/ip_handler_ip/synth/ip_handler_ip.v" \
+
 
 xvhdl $xvhdl_opts -work reco -L rocev2_ip \
 "../build/ip/roce_stack_axi_datamover/sim/roce_stack_axi_datamover.vhd"
