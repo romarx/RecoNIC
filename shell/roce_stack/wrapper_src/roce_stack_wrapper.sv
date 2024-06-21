@@ -170,6 +170,7 @@ metaIntf #(.STYPE(rdma_ack_t)) rdma_ack();
 AXI4S #(.AXI4S_DATA_BITS(AXI4S_DATA_WIDTH)) axis_rdma_rd ();
 AXI4S #(.AXI4S_DATA_BITS(AXI4S_DATA_WIDTH)) axis_rdma_wr ();
 AXI4S #(.AXI4S_DATA_BITS(512)) axis_tx ();
+AXI4S #(.AXI4S_DATA_BITS(512)) axis_tx_roce_to_eth ();
 AXI4S #(.AXI4S_DATA_BITS(512)) axis_rx ();
 
 
@@ -476,6 +477,46 @@ roce_stack_axis_to_aximm #(
 
 );
 
+mac_ip_encode_ip mac_ip_encode_inst (
+`ifdef VITIS_HLS
+    .s_axis_ip_TVALID(axis_tx_roce_to_eth.tvalid),
+    .s_axis_ip_TREADY(axis_tx_roce_to_eth.tready),
+    .s_axis_ip_TDATA(axis_tx_roce_to_eth.tdata),
+    .s_axis_ip_TKEEP(axis_tx_roce_to_eth.tkeep),
+    .s_axis_ip_TLAST(axis_tx_roce_to_eth.tlast),
+    
+    .m_axis_ip_TVALID(axis_tx.tvalid),
+    .m_axis_ip_TREADY(axis_tx.tready),
+    .m_axis_ip_TDATA(axis_tx.tdata),
+    .m_axis_ip_TKEEP(axis_tx.tkeep),
+    .m_axis_ip_TLAST(axis_tx.tlast),
+  
+    .myMacAddress(MACADD),                                    // input wire [47 : 0] regMacAddress_V
+    .theirMacAddress(MACDESADDi),
+    
+    .ap_clk(axis_aclk_i), // input aclk
+    .ap_rst_n(mod_rstn_i) // input aresetn
+`else
+    .s_axis_ip_TVALID(axis_tx_roce_to_eth.tvalid),
+    .s_axis_ip_TREADY(axis_tx_roce_to_eth.tready),
+    .s_axis_ip_TDATA(axis_tx_roce_to_eth.tdata),
+    .s_axis_ip_TKEEP(axis_tx_roce_to_eth.tkeep),
+    .s_axis_ip_TLAST(axis_tx_roce_to_eth.tlast),
+    
+    .m_axis_ip_TVALID(axis_tx.tvalid),
+    .m_axis_ip_TREADY(axis_tx.tready),
+    .m_axis_ip_TDATA(axis_tx.tdata),
+    .m_axis_ip_TKEEP(axis_tx.tkeep),
+    .m_axis_ip_TLAST(axis_tx.tlast),
+    
+    .myMacAddress_V(MACADD),                                    // input wire [47 : 0] regMacAddress_V
+    .theirMacAddress_V(MACDESADDi),
+    
+    .ap_clk(axis_aclk_i), // input aclk
+    .ap_rst_n(mod_rstn_i) // input aresetn
+`endif
+);
+
 
 
 //TODO: definitions for AXI4S, metaIntf....
@@ -485,7 +526,7 @@ roce_stack inst_roce_stack (
 
   // Network interface
   .s_axis_rx(axis_rx),
-  .m_axis_tx(axis_tx),
+  .m_axis_tx(axis_tx_roce_to_eth),
 
   // User command
   .s_rdma_sq(rdma_sq),

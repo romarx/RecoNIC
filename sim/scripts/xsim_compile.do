@@ -215,6 +215,29 @@ xvlog $xvlog_opts -work reco -L rocev2_ip --include "../build/ip/rocev2_ip/hdl/v
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top.v" \
 "../build/ip/rocev2_ip/synth/rocev2_ip.v" \
 
+xvlog $xvlog_opts -work reco -L rocev2_ip --include "../build/ip/mac_ip_encode_ip/hdl/verilog" \
+"../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top_convert_axis_to_net_axis_512_s.v" \
+"../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top_convert_net_axis_to_axis_512_s.v" \
+"../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top_create_ethernet_header_512_s.v" \
+"../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top_entry_proc.v" \
+"../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top_fifo_w16_d16_S.v" \
+"../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top_fifo_w48_d6_S.v" \
+"../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top_fifo_w129_d2_S.v" \
+"../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top_fifo_w577_d2_S.v" \
+"../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top_fifo_w577_d32_A.v" \
+"../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top_fifo_w1024_d2_S.v" \
+"../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top_hls_deadlock_detection_unit.v" \
+"../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top_hls_deadlock_idx0_monitor.v" \
+"../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top_insert_ethernet_header_512_s.v" \
+"../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top_insert_ip_checksum_512_s.v" \
+"../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top_mac_compute_ipv4_checksum.v" \
+"../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top_mac_finalize_ipv4_checksum_32_s.v" \
+"../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top_mac_lshiftWordByOctet_512_1_s.v" \
+"../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top_regslice_both.v" \
+"../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top.v" \
+"../build/ip/mac_ip_encode_ip/synth/mac_ip_encode_ip.v" \
+
+
 xvhdl $xvhdl_opts -work reco -L rocev2_ip \
 "../build/ip/roce_stack_axi_datamover/sim/roce_stack_axi_datamover.vhd"
 
