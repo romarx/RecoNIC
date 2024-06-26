@@ -293,12 +293,18 @@ roce_stack_wrapper #(
   .m_rdma2cmac_axis_tready_i (rdma2cmac_axis_tready),
 
   // Non-RDMA packets from QDMA TX bypassing RDMA TX
-  .s_qdma2rdma_non_roce_axis_tdata_i    (qdma2rdma_non_roce_axis_tdata),
-  .s_qdma2rdma_non_roce_axis_tkeep_i    (qdma2rdma_non_roce_axis_tkeep),
-  .s_qdma2rdma_non_roce_axis_tvalid_i   (qdma2rdma_non_roce_axis_tvalid),
-  .s_qdma2rdma_non_roce_axis_tlast_i    (qdma2rdma_non_roce_axis_tlast),
-  .s_qdma2rdma_non_roce_axis_tready_o   (qdma2rdma_non_roce_axis_tready),
+  //.s_qdma2rdma_non_roce_axis_tdata_i    (qdma2rdma_non_roce_axis_tdata),
+  //.s_qdma2rdma_non_roce_axis_tkeep_i    (qdma2rdma_non_roce_axis_tkeep),
+  //.s_qdma2rdma_non_roce_axis_tvalid_i   (qdma2rdma_non_roce_axis_tvalid),
+  //.s_qdma2rdma_non_roce_axis_tlast_i    (qdma2rdma_non_roce_axis_tlast),
+  //.s_qdma2rdma_non_roce_axis_tready_o   (qdma2rdma_non_roce_axis_tready),
 
+  // Non-RDMA packets from QDMA TX bypassing RDMA TX
+  .s_qdma2rdma_non_roce_axis_tdata_i    (512'd0),
+  .s_qdma2rdma_non_roce_axis_tkeep_i    (64'd0),
+  .s_qdma2rdma_non_roce_axis_tvalid_i   (1'b0),
+  .s_qdma2rdma_non_roce_axis_tlast_i    (1'b0),
+  .s_qdma2rdma_non_roce_axis_tready_o   (qdma2rdma_non_roce_axis_tready),
 
   // RDMA RX interface from CMAC RX, no rx backpressure
   .s_cmac2rdma_roce_axis_tdata_i        (cmac2rdma_roce_axis_tdata),

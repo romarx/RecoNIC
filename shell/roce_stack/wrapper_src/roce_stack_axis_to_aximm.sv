@@ -1,4 +1,4 @@
-import lynxTypes::*;
+import roceTypes::*;
 
 module roce_stack_axis_to_aximm #(
   parameter int AXI4_DATA_WIDTH = 512
@@ -32,14 +32,14 @@ module roce_stack_axis_to_aximm #(
   output logic  [63:0]                  rd_req_addr_vaddr_o,
   input  logic                          rd_resp_addr_valid_i,
   output logic                          rd_resp_addr_ready_o,
-  input  logic  [115:0]                 rd_resp_addr_data_i,
+  input  dma_req_t                      rd_resp_addr_data_i,
 
   output logic                          wr_req_addr_valid_o,
   input  logic                          wr_req_addr_ready_i,
   output logic  [63:0]                  wr_req_addr_vaddr_o,
   input  logic                          wr_resp_addr_valid_i,
   output logic                          wr_resp_addr_ready_o,
-  input  logic  [115:0]                 wr_resp_addr_data_i,
+  input  dma_req_t                      wr_resp_addr_data_i,
 
   output logic                          m_axi_data_bus_awid_o,
   output logic  [63:0]                  m_axi_data_bus_awaddr_o,
@@ -84,9 +84,11 @@ logic [103:0] rd_mm2s_cmd_data, wr_s2mm_cmd_data;
 logic rd_mm2s_cmd_valid, rd_mm2s_cmd_ready, wr_s2mm_cmd_valid, wr_s2mm_cmd_ready;
 
 logic [7:0] s2mm_sts_data, mm2s_sts_data;
-logic s2mm_sts_valid, s2mm_sts_last, s2mm_sts_keep, mm2s_sts_valid, mm2s_sts_last, mm2s_sts_keep;
+logic s2mm_sts_valid, s2mm_sts_ready, s2mm_sts_last, s2mm_sts_keep, mm2s_sts_valid, mm2s_sts_ready, mm2s_sts_last, mm2s_sts_keep;
 logic s2mm_err, mm2s_err;
 
+assign s2mm_sts_ready = 1'b1;
+assign mm2s_sts_ready = 1'b1;
 
 //READ REQUEST
 roce_stack_request_handler #(
@@ -146,13 +148,13 @@ roce_stack_axi_datamover roce_stack_axi_datamover_inst (
   .m_axis_s2mm_sts_tdata(s2mm_sts_data),
   .m_axis_s2mm_sts_tkeep(s2mm_sts_keep),
   .m_axis_s2mm_sts_tlast(s2mm_sts_last),
-  .m_axis_s2mm_sts_tready(1'b1),
+  .m_axis_s2mm_sts_tready(s2mm_sts_ready),
   .m_axis_s2mm_sts_tvalid(s2mm_sts_valid),
 
   .m_axis_mm2s_sts_tdata(mm2s_sts_data),
   .m_axis_mm2s_sts_tkeep(mm2s_sts_keep),
   .m_axis_mm2s_sts_tlast(mm2s_sts_last),
-  .m_axis_mm2s_sts_tready(1'b1),
+  .m_axis_mm2s_sts_tready(mm2s_sts_ready),
   .m_axis_mm2s_sts_tvalid(mm2s_sts_valid),
 
   .m_axis_mm2s_tdata(m_axis_rdma_rd_tdata_o),

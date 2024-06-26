@@ -12,7 +12,7 @@ module roce_stack_request_handler #(
   output logic  [63:0]  req_addr_vaddr_o,
   input  logic          resp_addr_valid_i,
   output logic          resp_addr_ready_o,
-  input  logic  [115:0] resp_addr_data_i,
+  input  dma_req_t      resp_addr_data_i,
 
   output logic          cmd_valid_o,
   input  logic          cmd_ready_i,
@@ -77,11 +77,11 @@ always_comb begin
       s_rdma_req_ready_o = 1'b0;
       req_addr_valid_o = 1'b1;
       if (resp_addr_valid_i) begin
-        paddr_d = resp_addr_data_i[63:0];
-        buflen_d = resp_addr_data_i[111:64];
-        accessdesc_d = resp_addr_data_i[115:112];
+        paddr_d = resp_addr_data_i.paddr;
+        buflen_d = resp_addr_data_i.buflen;
+        accessdesc_d = resp_addr_data_i.accesdesc;
         //In this case, directly send cmd 4b reserved, 4b tag, 64b address, 1b dre realign, 1b EOF, 6b dre stream align, 1b type (fixed, incr), 22b len
-        cmd_data_d = {8'b0, resp_addr_data_i[63:0], 1'b0, 1'b1, 6'b0, 1'b1, len_q[22:0]};
+        cmd_data_d = {8'b0, resp_addr_data_i.paddr, 1'b0, 1'b1, 6'b0, 1'b1, len_q[22:0]};
         req_state_d = RQ_SENDCMD;
       end
     end

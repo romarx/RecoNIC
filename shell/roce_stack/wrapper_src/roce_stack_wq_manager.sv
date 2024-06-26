@@ -1,4 +1,4 @@
-import lynxTypes::*;
+import roceTypes::*;
 
 //TODO: better control logic for multiple QP's (except maybe for conn interface)
 module roce_stack_wq_manager #(
@@ -78,12 +78,6 @@ module roce_stack_wq_manager #(
     input  logic          rstn_i
 );
 
-typedef struct packed {
-  logic [7:0]   qp_idx;
-  logic [63:0]  sq_base_addr;
-  logic [31:0]  sq_prod_idx;
-  logic [63:0]  pd_vaddr;
-} SQdata_struct; //168 bits
 
 SQdata_struct sq_fifo_input_d, sq_fifo_input_q, sq_fifo_output;
 logic sq_fifo_full, sq_fifo_wr_en, sq_fifo_wr_ack, sq_fifo_wr_rst_busy;
@@ -94,22 +88,6 @@ logic [31:0] SQPIi_tmp;
 logic [7:0]  QPidx_tmp;
 logic fetch_wqe;
 logic fetch_next_wqe;
-
-typedef struct packed { 
-  logic [7:0]   qp_idx;
-  logic [31:0]  src_qp_conf;
-  logic [23:0]  dest_qp;
-  logic [23:0]  sq_psn;
-  logic [23:0]  dest_sq_psn;
-} QPdata_struct; //112 bits
-
-
-typedef struct packed {
-  logic [7:0]   conn_idx;
-  logic [23:0]  dest_qp;
-  logic [31:0]  dest_ip_addr;
-  logic [15:0]  port; //take port from conf (assume it's standard port)
-} conndata_struct; //80 bits
 
 QPdata_struct qp_fifo_input_d, qp_fifo_input_q, qp_fifo_output;
 
@@ -125,8 +103,8 @@ conndata_struct conn_fifo_input_d, conn_fifo_input_q, conn_fifo_output;
 logic conn_fifo_full, conn_fifo_wr_en, conn_fifo_wr_ack, conn_fifo_wr_rst_busy;
 logic conn_fifo_empty, conn_fifo_rd_en, conn_fifo_rd_valid, conn_fifo_rd_rst_busy;
 
-logic [183:0] conn_reg_d, conn_reg_q;
-logic [199:0] qp_reg_d, qp_reg_q;
+logic [RDMA_QP_CONN_BITS-1:0] conn_reg_d, conn_reg_q;
+logic [RDMA_QP_INTF_BITS-1:0] qp_reg_d, qp_reg_q;
 
 rdma_req_t sq_reg_d, sq_reg_q;
 
@@ -197,10 +175,9 @@ always_comb begin
                         conn_fifo_output.dest_ip_addr, 
                         conn_fifo_output.dest_ip_addr, 
                         conn_fifo_output.dest_ip_addr, 
-                        //conn_fifo_output.dest_qp, 
-                        24'b0,
+                        (conn_fifo_output.dest_qp - 24'b1), 
                         8'b0, 
-                        8'b0}; //TODO: conn_idx at the end after fix??
+                        conn_fifo_output.conn_idx}; //TODO: conn_idx at the end after fix??
                         //conn_fifo_output.conn_idx} 
           conn_state_d = CONN_VALID;
         end else begin
@@ -292,7 +269,7 @@ always_comb begin
         qp_fifo_rd_en = 1'b1;
         qp_state_d = QP_FIFO_VALID;
       end else if (new_wqe_fetched) begin
-        qp_reg_d = {WQEReg_q[255:224], WQEReg_q[223:160], (qp_fifo_output.dest_sq_psn + 24'b1), qp_fifo_output.sq_psn, 16'b0, 8'b0, 32'b0}; //update directly
+        qp_reg_d = {WQEReg_q[255:224], WQEReg_q[223:160], (qp_fifo_output.dest_sq_psn + 24'b1), qp_fifo_output.sq_psn, 16'b0, qp_fifo_output.qp_idx, 32'b0}; //update directly
         qp_state_d = QP_SQ_VALID;
       end
     end
@@ -303,7 +280,7 @@ always_comb begin
         if(qp_fifo_output.src_qp_conf[0] && qp_fifo_output.src_qp_conf[10:8] <= 3'b100) begin
           mtu_d = 'd256 << qp_fifo_output.src_qp_conf[10:8];
           //Maybe WQEReg is not yet set but who cares
-          qp_reg_d = {WQEReg_q[255:224], WQEReg_q[223:160], (qp_fifo_output.dest_sq_psn + 24'b1), qp_fifo_output.sq_psn, 16'b0, 8'b0, 32'b0}; //TODO: finish with qp num and state or just 0?
+          qp_reg_d = {WQEReg_q[255:224], WQEReg_q[223:160], (qp_fifo_output.dest_sq_psn + 24'b1), qp_fifo_output.sq_psn, 16'b0, qp_fifo_output.qp_idx, 32'b0}; //TODO: finish with qp num and state or just 0?
           qp_state_d = QP_VALID;
         end else begin
           qp_state_d = QP_IDLE;
@@ -444,6 +421,8 @@ always_comb begin
   last_d = last_q;
   first_d = first_q;
   transfer_length_d = transfer_length_q;
+  curr_local_vaddr_d = curr_local_vaddr_q;
+  curr_remote_vaddr_d = curr_remote_vaddr_q;
   for(int i=0; i < NUM_QP; i++) begin
     localidx_d[i] = localidx_q[i];
   end
@@ -472,7 +451,7 @@ always_comb begin
       if(first_q) begin
         if(WQEReg_q[127:96] <= mtu_q) begin
           sq_reg_d.opcode = 5'h0a;
-          sq_reg_d.qpn    = 10'h0;
+          sq_reg_d.qpn    = {2'b0, sq_fifo_output.qp_idx};
           sq_reg_d.host   = 1'b0;
           sq_reg_d.mode   = 1'b0;
           sq_reg_d.last   = 1'b1;
@@ -486,7 +465,7 @@ always_comb begin
           sq_state_d = SQ_VALID;
         end else begin          
           sq_reg_d.opcode = 5'h06;
-          sq_reg_d.qpn    = 10'h0;
+          sq_reg_d.qpn    = {2'b0, sq_fifo_output.qp_idx};
           sq_reg_d.host   = 1'b0;
           sq_reg_d.mode   = 1'b0;
           sq_reg_d.last   = 1'b0;
@@ -507,7 +486,7 @@ always_comb begin
         if(transfer_length_q <= mtu_q) begin
           //TODO: vaddr handling
           sq_reg_d.opcode = 5'h08;
-          sq_reg_d.qpn    = 10'h0;
+          sq_reg_d.qpn    = {2'b0, sq_fifo_output.qp_idx};
           sq_reg_d.host   = 1'b0;
           sq_reg_d.mode   = 1'b0;
           sq_reg_d.last   = 1'b1;
@@ -522,7 +501,7 @@ always_comb begin
         end else begin
           //TODO: vaddr handling
           sq_reg_d.opcode = 5'h07;
-          sq_reg_d.qpn    = 10'h0;
+          sq_reg_d.qpn    = {2'b0, sq_fifo_output.qp_idx};
           sq_reg_d.host   = 1'b0;
           sq_reg_d.mode   = 1'b0;
           sq_reg_d.last   = 1'b0;
@@ -543,7 +522,7 @@ always_comb begin
     end
     SQ_READ: begin      
       sq_reg_d.opcode = 5'h0c;
-      sq_reg_d.qpn    = 10'h0;
+      sq_reg_d.qpn    = {2'b0, sq_fifo_output.qp_idx};
       sq_reg_d.host   = 1'b0;
       sq_reg_d.mode   = 1'b0;
       sq_reg_d.last   = 1'b1;
@@ -553,7 +532,6 @@ always_comb begin
       sq_reg_d.msg    = {32'b0, WQEReg_q[127:96], sq_fifo_output.pd_vaddr, WQEReg_q[223:160]};
       sq_reg_d.rsrvd  = 'd0;
       
-      
       last_d = 1'b1;
       sq_state_d = SQ_VALID;
     end
@@ -561,6 +539,7 @@ always_comb begin
       m_rdma_sq_interface_valid_o = 1'b1;
       if(m_rdma_sq_interface_ready_i) begin
         if(last_q) begin
+          last_d = 1'b0;
           first_d = 1'b1;
           sq_state_d = SQ_IDLE;
           localidx_d[sq_fifo_output.qp_idx] = localidx_q[sq_fifo_output.qp_idx] + 1;
@@ -738,6 +717,8 @@ always_ff @(posedge axis_aclk_i, negedge rstn_i) begin
     AddrReg_q <= 'd0;
     Read_State_q <= RD_IDLE;
     WQEReg_q <= 'd0;
+    curr_local_vaddr_q <= 'd0;
+    curr_remote_vaddr_q <= 'd0;
     transfer_length_q <= 'd0;
     last_q <= 1'b0;
     first_q <= 1'b1;
@@ -758,6 +739,8 @@ always_ff @(posedge axis_aclk_i, negedge rstn_i) begin
     AddrReg_q <= AddrReg_d;
     Read_State_q <= Read_State_d;
     WQEReg_q <= WQEReg_d;
+    curr_local_vaddr_q <= curr_local_vaddr_d;
+    curr_remote_vaddr_q <= curr_remote_vaddr_d;
     transfer_length_q <= transfer_length_d;
     last_q <= last_d;
     first_q <= first_d;

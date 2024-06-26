@@ -85,14 +85,14 @@ module roce_stack_csr # (
   input  logic   [63:0]                   rd_req_addr_vaddr_i,
   output logic                            rd_resp_addr_valid_o,
   input  logic                            rd_resp_addr_ready_i,
-  output logic  [115 : 0]                 rd_resp_addr_data_o,
+  output dma_req_t                        rd_resp_addr_data_o,
 
   input  logic                            wr_req_addr_valid_i,
   output logic                            wr_req_addr_ready_o,
   input  logic   [63:0]                   wr_req_addr_vaddr_i,
   output logic                            wr_resp_addr_valid_o,
   input  logic                            wr_resp_addr_ready_i,
-  output logic  [115 : 0]                 wr_resp_addr_data_o,
+  output dma_req_t                        wr_resp_addr_data_o,
 
   //input  logic  [7:0]                     wr_ptr_i,
 
@@ -429,7 +429,7 @@ typedef enum {W_IDLE, W_READY, WRITE, B_RESP} write_state;
 write_state w_state_d, w_state_q;
 
 
-logic [1:0] REQUIRED_REGS_CONN [NUM_QP-1:0];
+logic [1:0] REQUIRED_REGS_CONN_d [NUM_QP-1:0], REQUIRED_REGS_CONN_q [NUM_QP-1:0];
 
 
 ////////////////
@@ -1037,6 +1037,8 @@ always_comb begin
     STATWQEi_d[i] = STATWQEi_q[i];
     STATRQPIDBi_d[i] = STATRQPIDBi_q[i];
     PDNUMi_d[i] = PDNUMi_q[i];
+
+    REQUIRED_REGS_CONN_d[i] = REQUIRED_REGS_CONN_q[i];
   end
 
   QPidx_d = QPidx_q;
@@ -1167,7 +1169,7 @@ always_comb begin
             ADDR_DESTQPCONFi: begin
               DESTQPCONFi_d[qpidx_w] = apply_wstrb(DESTQPCONFi_q[qpidx_w], WDataReg_q, mask);
               connidx_d = qpidx_w[7:0];
-              REQUIRED_REGS_CONN[qpidx_w[7:0]][0] = 1'b1;
+              REQUIRED_REGS_CONN_d[qpidx_w[7:0]][0] = 1'b1;
               QPidx_d = qpidx_w[7:0];
               qp_configured_o = 1'b1;
             end
@@ -1180,7 +1182,7 @@ always_comb begin
             ADDR_IPDESADDR1i: begin
               IPDESADDR1i_d[qpidx_w] = apply_wstrb(IPDESADDR1i_q[qpidx_w], WDataReg_q, mask);
               connidx_d = qpidx_w[7:0];
-              REQUIRED_REGS_CONN[qpidx_w[7:0]][1] = 1'b1;
+              REQUIRED_REGS_CONN_d[qpidx_w[7:0]][1] = 1'b1;
             end
             ADDR_IPDESADDR2i: begin
               IPDESADDR2i_d[qpidx_w] = apply_wstrb(IPDESADDR2i_q[qpidx_w], WDataReg_q, mask);
@@ -1555,7 +1557,7 @@ always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
       STATWQEi_q[i] <= 'd0;
       STATRQPIDBi_q[i] <= 'd0;
       PDNUMi_q[i] <= 'd0;
-      REQUIRED_REGS_CONN[i] <= 'd0;
+      REQUIRED_REGS_CONN_q[i] <= 'd0;
     end
 
     QPidx_q <= 'd0;
@@ -1706,6 +1708,8 @@ always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
       STATWQEi_q[i] <= STATWQEi_d[i];
       STATRQPIDBi_q[i] <= STATRQPIDBi_d[i];
       PDNUMi_q[i] <= PDNUMi_d[i];
+
+      REQUIRED_REGS_CONN_q[i] <= REQUIRED_REGS_CONN_d[i];
     end
 
     QPidx_q <= QPidx_d;
@@ -1741,7 +1745,7 @@ assign RESPERRSZ_o = {RESPERRSZMSB_q, RESPERRSZ_q};
 
 assign QPidx_o = QPidx_q;
 assign connidx_o = connidx_q;
-assign conn_configured_o = &(REQUIRED_REGS_CONN[connidx_q]);
+assign conn_configured_o = &(REQUIRED_REGS_CONN_q[connidx_q]);
 
 assign PDPDNUM_o = PDPDNUM_q[PDidx_q][23:0];
 assign VIRTADDR_o = {VIRTADDRMSB_q[PDidx_q], VIRTADDRLSB_q[PDidx_q]};
@@ -1794,11 +1798,11 @@ end
 
 typedef enum {VTP_IDLE, VTP_VALID} virt_to_phys_state;
 virt_to_phys_state rd_vtp_st_d, rd_vtp_st_q, wr_vtp_st_d, wr_vtp_st_q;
-logic [115:0] rd_resp_addr_data_d, rd_resp_addr_data_q, wr_resp_addr_data_d, wr_resp_addr_data_q;
+dma_req_t rd_resp_addr_data_d, rd_resp_addr_data_q, wr_resp_addr_data_d, wr_resp_addr_data_q;
 
 
 always_comb begin
-  rd_req_addr_ready_o = !writing;
+  rd_req_addr_ready_o = 1'b1;
   rd_resp_addr_valid_o = 1'b0;
   rd_resp_addr_data_d = rd_resp_addr_data_q;
   rd_vtp_st_d = rd_vtp_st_q;
@@ -1809,10 +1813,14 @@ always_comb begin
       //TODO: check if this can lead to problems
       if(rd_req_addr_valid_i && rd_req_addr_ready_o) begin
         rd_req_addr_ready_o = 1'b0;
-        rd_resp_addr_data_d = 'hFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+        rd_resp_addr_data_d.accesdesc = 'hF;
+        rd_resp_addr_data_d.buflen = 'hFFFFFFFFFFFF;
+        rd_resp_addr_data_d.paddr = 'hFFFFFFFFFFFFFFFF;
         for(int i = 0; i < NUM_PD; i++) begin
           if(rd_req_addr_vaddr_i == {VIRTADDRMSB_q[i], VIRTADDRLSB_q[i]}) begin
-            rd_resp_addr_data_d = {ACCESSDESC_q[i][3:0], ACCESSDESC_q[i][31:16], WRRDBUFLEN_q[i], BUFBASEADDRMSB_q[i], BUFBASEADDRLSB_q[i]};
+            rd_resp_addr_data_d.accesdesc = ACCESSDESC_q[i][3:0];
+            rd_resp_addr_data_d.buflen = {ACCESSDESC_q[i][31:16], WRRDBUFLEN_q[i]}; 
+            rd_resp_addr_data_d.paddr = {BUFBASEADDRMSB_q[i], BUFBASEADDRLSB_q[i]};
           end
         end
         rd_vtp_st_d = VTP_VALID;
@@ -1830,7 +1838,7 @@ end
 
 
 always_comb begin
-  wr_req_addr_ready_o = !writing;
+  wr_req_addr_ready_o = 1'b1;
   wr_resp_addr_valid_o = 1'b0;
   wr_resp_addr_data_d = wr_resp_addr_data_q;
   wr_vtp_st_d = wr_vtp_st_q;
@@ -1841,10 +1849,14 @@ always_comb begin
       //TODO: check if this can lead to problems
       if(wr_req_addr_valid_i && wr_req_addr_ready_o) begin
         wr_req_addr_ready_o = 1'b0;
-        wr_resp_addr_data_d = 'hFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+        wr_resp_addr_data_d.accesdesc = 'hF;
+        wr_resp_addr_data_d.buflen = 'hFFFFFFFFFFFF;
+        wr_resp_addr_data_d.paddr = 'hFFFFFFFFFFFFFFFF;
         for(int i = 0; i < NUM_PD; i++) begin
           if(wr_req_addr_vaddr_i == {VIRTADDRMSB_q[i], VIRTADDRLSB_q[i]}) begin
-            wr_resp_addr_data_d = {ACCESSDESC_q[i][3:0], ACCESSDESC_q[i][31:16], WRRDBUFLEN_q[i], BUFBASEADDRMSB_q[i], BUFBASEADDRLSB_q[i]};
+            wr_resp_addr_data_d.accesdesc = ACCESSDESC_q[i][3:0];
+            wr_resp_addr_data_d.buflen = {ACCESSDESC_q[i][31:16], WRRDBUFLEN_q[i]}; 
+            wr_resp_addr_data_d.paddr = {BUFBASEADDRMSB_q[i], BUFBASEADDRLSB_q[i]};          
           end
         end
         wr_vtp_st_d = VTP_VALID;

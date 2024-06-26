@@ -29,7 +29,7 @@
 
 //`define DBG_IBV
 
-import lynxTypes::*;
+import roceTypes::*;
 
 /**
  * @brief   RoCE instantiation

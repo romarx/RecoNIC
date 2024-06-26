@@ -1,5 +1,5 @@
 
-import lynxTypes::*;
+import roceTypes::*;
 
 module roce_stack_wrapper # (
   parameter int NUM_QP = 8, //min: 8, max: 256
@@ -126,7 +126,7 @@ module roce_stack_wrapper # (
   input logic                           mod_rstn_i
 );
 
-logic [7:0] wr_ptr_wtc;
+logic [7:0]   wr_ptr_wtc;
 
 logic [31:0]  IPv4ADD;
 logic [31:0]  IPv4ADD_net;
@@ -182,7 +182,7 @@ logic rd_req_addr_valid, rd_req_addr_ready, wr_req_addr_valid, wr_req_addr_ready
 logic [63:0] rd_req_addr_vaddr, wr_req_addr_vaddr;
 //address response
 logic rd_resp_addr_valid, rd_resp_addr_ready, wr_resp_addr_valid, wr_resp_addr_ready;
-logic [115:0] rd_resp_addr_data, wr_resp_addr_data;
+dma_req_t rd_resp_addr_data, wr_resp_addr_data;
 
 //tx interface from roce stack
 logic axis_tx_tvalid, axis_tx_tready, axis_tx_tlast;
@@ -196,14 +196,14 @@ assign axis_rx.tvalid = s_cmac2rdma_roce_axis_tvalid_i;
 assign axis_rx.tlast = s_cmac2rdma_roce_axis_tlast_i;
 
 //tx interface from roce stack
-assign m_rdma2cmac_axis_tvalid_o = axis_tx.tvalid;
-assign axis_tx.tready = m_rdma2cmac_axis_tready_i;
-assign m_rdma2cmac_axis_tlast_o = axis_tx.tlast;
-assign m_rdma2cmac_axis_tdata_o = axis_tx.tdata;
-assign m_rdma2cmac_axis_tkeep_o = axis_tx.tkeep;
+//assign m_rdma2cmac_axis_tvalid_o = axis_tx.tvalid;
+//assign axis_tx.tready = m_rdma2cmac_axis_tready_i;
+//assign m_rdma2cmac_axis_tlast_o = axis_tx.tlast;
+//assign m_rdma2cmac_axis_tdata_o = axis_tx.tdata;
+//assign m_rdma2cmac_axis_tkeep_o = axis_tx.tkeep;
 
 
-/*
+
 //tx interface from roce stack
 assign axis_tx_tvalid = axis_tx.tvalid;
 assign axis_tx.tready = axis_tx_tready;
@@ -243,7 +243,7 @@ roce_stack_tx_axis_interconnect roce_stack_tx_axis_interconnect_inst (
   .S01_AXIS_ARESETN(mod_rstn_i),
   .M00_AXIS_ARESETN(mod_rstn_i)
 );
-*/
+
 
 roce_stack_csr #(
   .NUM_QP(NUM_QP),

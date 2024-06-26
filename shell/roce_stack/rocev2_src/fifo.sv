@@ -1,6 +1,6 @@
 `timescale 1ns / 1ps
 
-import lynxTypes::*;
+import roceTypes::*;
 
 module fifo #(
 	parameter integer DATA_BITS = 64,

@@ -269,16 +269,14 @@ xvlog $xvlog_opts -work reco -L rocev2_ip --include "../build/ip/ip_handler_ip/h
 "../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top.v" \
 "../build/ip/ip_handler_ip/synth/ip_handler_ip.v" \
 
+xvlog $xvlog_opts -work reco -L rocev2_ip \
+"../build/ip/roce_stack_axi_datamover/roce_stack_axi_datamover_sim_netlist.v"
 
-xvhdl $xvhdl_opts -work reco -L rocev2_ip \
-"../build/ip/roce_stack_axi_datamover/sim/roce_stack_axi_datamover.vhd"
-
-xvlog $xvlog_opts -work reco -L axis_interconnect_v1_1_19 -L fifo_generator_v13_2_6 --include "../build/ip/roce_stack_tx_axis_interconnect/hdl" \
-"../build/ip/roce_stack_tx_axis_interconnect/hdl/axis_interconnect_v1_1_vl_rfs.v" \
-"../build/ip/roce_stack_tx_axis_interconnect/sim/roce_stack_tx_axis_interconnect.v"
+xvlog $xvlog_opts -work reco -L axis_interconnect_v1_1_19 -L fifo_generator_v13_2_6 \
+"../build/ip/roce_stack_tx_axis_interconnect/roce_stack_tx_axis_interconnect_sim_netlist.v"
 
 xvlog $xvlog_opts -work reco -sv -L rocev2_ip -L axis_interconnect_v1_1_19 \
-"../../shell/roce_stack/rocev2_src/interfaces/lynx_pkg.sv" \
+"../../shell/roce_stack/rocev2_src/interfaces/roce_pkg.sv" \
 "../../shell/roce_stack/rocev2_src/interfaces/lynx_intf.sv" \
 "../../shell/roce_stack/rocev2_src/interfaces/axi_intf.sv" \
 "../../shell/roce_stack/rocev2_src/buffer_fifo.sv" \

@@ -1,4 +1,4 @@
-import lynxTypes::*;
+import roceTypes::*;
 
 module queue_meta #(
     parameter QDEPTH = 8

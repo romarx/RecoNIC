@@ -1,4 +1,4 @@
-import lynxTypes::*;
+import roceTypes::*;
 
 module rdma_flow (
     // Incoming user commands 
