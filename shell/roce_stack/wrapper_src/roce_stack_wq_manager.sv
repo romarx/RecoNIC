@@ -173,6 +173,7 @@ end
 //  QP INTERFACE  //
 //                //
 ////////////////////
+//TODO: make this completely dependent on SQ, WQE gets read, request psn values for if from CSR, then proceed to SQ if
 
 //AXIL CLOCK DOMAIN
 always_comb begin
@@ -205,7 +206,7 @@ always_comb begin
       if(qp_if_output_q != qp_if_input_q) begin
         qp_if_output_d = qp_if_input_q;
         qp_state_d = QP_IF_VALID;
-      end else if (new_wqe_fetched) begin
+      end else if (new_wqe_fetched) begin //TODO: save values for new wqe's in array??
         if(qp_if_output_q.src_qp_conf[0] && qp_if_output_q.src_qp_conf[10:8] <= 3'b100) begin //if it's wrongly configured, don't proceed.
           qp_reg_d = {WQEReg_q[255:224], WQEReg_q[223:160], (qp_if_output_q.dest_sq_psn + 24'b1), qp_if_output_q.sq_psn, 16'b0, qp_if_output_q.qp_idx, 32'b0}; //update directly
           qp_state_d = QP_SQ_VALID;
@@ -246,7 +247,7 @@ end
 //                //
 ////////////////////
 
-//This interface might actually need a FIFO, if SQPIi updates on another queue but the WQE's of the previous one didn't finish yet.
+//TODO: This interface might actually need a FIFO, if SQPIi updates on another queue but the WQE's of the previous one didn't finish yet.
 //also make a separate index for sqpii
 //AXIL CLOCK DOMAIN
 always_comb begin
