@@ -79,9 +79,9 @@ module roce_stack_wq_manager #(
 );
 
 
-SQdata_struct sq_fifo_input_d, sq_fifo_input_q, sq_fifo_output;
-logic sq_fifo_full, sq_fifo_wr_en, sq_fifo_wr_ack, sq_fifo_wr_rst_busy;
-logic sq_fifo_empty, sq_fifo_rd_en, sq_fifo_rd_valid, sq_fifo_rd_rst_busy;
+conndata_struct conn_if_input_d, conn_if_input_q, conn_if_output_d, conn_if_output_q;
+QPdata_struct qp_if_input_d, qp_if_input_q, qp_if_output_d, qp_if_output_q;
+SQdata_struct sq_if_input_d, sq_if_input_q, sq_if_output_d, sq_if_output_q;
 
 logic [31:0] localidx_d[NUM_QP-1:0], localidx_q[NUM_QP-1:0];
 logic [31:0] SQPIi_tmp;
@@ -89,17 +89,7 @@ logic [7:0]  QPidx_tmp;
 logic fetch_wqe;
 logic fetch_next_wqe;
 
-conndata_struct conn_if_input_d, conn_if_input_q, conn_if_output_d, conn_if_output_q;
 
-QPdata_struct qp_fifo_input_d, qp_fifo_input_q, qp_fifo_output;
-
-typedef enum {IDLE, READ, VALID} fifo_state;
-fifo_state qp_fifo_wr_d, qp_fifo_wr_q;
-
-fifo_state sq_fifo_wr_d, sq_fifo_wr_q;
-
-logic qp_fifo_full, qp_fifo_wr_en, qp_fifo_wr_ack, qp_fifo_wr_rst_busy;
-logic qp_fifo_empty, qp_fifo_rd_en, qp_fifo_rd_valid, qp_fifo_rd_rst_busy;
 
 logic [RDMA_QP_CONN_BITS-1:0] conn_reg_d, conn_reg_q;
 logic [RDMA_QP_INTF_BITS-1:0] qp_reg_d, qp_reg_q;
@@ -111,9 +101,7 @@ logic [31:0] mtu_d, mtu_q;
 logic [511:0] WQEReg_d, WQEReg_q;
 
 
-logic new_qp_ready;
 logic new_wqe_fetched;
-logic conn_done;
 logic qp_intf_done;
 
 
@@ -186,41 +174,27 @@ end
 //                //
 ////////////////////
 
-
+//AXIL CLOCK DOMAIN
 always_comb begin
-  qp_fifo_wr_en = 1'b0;
-  qp_fifo_input_d = qp_fifo_input_q;
-  qp_fifo_wr_d = qp_fifo_wr_q;
-
-  case (qp_fifo_wr_q)
-    IDLE: begin
-      if(qp_configured_i && !qp_fifo_full && !qp_fifo_wr_rst_busy) begin
-        qp_fifo_wr_d = READ;
-      end
-    end
-    READ: begin
-      qp_fifo_input_d.qp_idx        = QPidx_i;
-      qp_fifo_input_d.src_qp_conf   = QPCONFi_i;
-      qp_fifo_input_d.dest_qp       = DESTQPCONFi_i;
-      qp_fifo_input_d.sq_psn        = SQPSNi_i;
-      qp_fifo_input_d.dest_sq_psn   = LSTRQREQi_i[23:0];
-      qp_fifo_wr_d = VALID;
-    end
-    VALID: begin
-      qp_fifo_wr_en = 1'b1;
-      if(qp_fifo_wr_ack) begin
-        qp_fifo_wr_d = IDLE;
-      end
-    end
-  endcase
+  qp_if_input_d = qp_if_input_q;
+  if(qp_configured_i) begin  
+      qp_if_input_d.qp_idx        = QPidx_i;
+      qp_if_input_d.src_qp_conf   = QPCONFi_i;
+      qp_if_input_d.dest_qp       = DESTQPCONFi_i;
+      qp_if_input_d.sq_psn        = SQPSNi_i;
+      qp_if_input_d.dest_sq_psn   = LSTRQREQi_i[23:0];
+  end
+   
 end
 
-typedef enum {QP_IDLE, QP_FIFO_VALID, QP_VALID, QP_SQ_VALID} qp_state;
+
+//AXIS CLOCK DOMAIN
+typedef enum {QP_IDLE, QP_IF_VALID, QP_VALID, QP_SQ_VALID} qp_state;
 qp_state qp_state_d, qp_state_q;
 
 always_comb begin
-  qp_fifo_rd_en = 1'b0;
   qp_state_d = qp_state_q;
+  qp_if_output_d = qp_if_output_q;
   mtu_d = mtu_q;
   qp_reg_d = qp_reg_q;
   m_rdma_qp_interface_valid_o = 1'b0;
@@ -228,29 +202,27 @@ always_comb begin
 
   case(qp_state_q) //TODO: two things can happen here.....
     QP_IDLE: begin
-      new_qp_ready = 1'b0;
-      if(!qp_fifo_empty && !qp_fifo_rd_rst_busy) begin
-        qp_fifo_rd_en = 1'b1;
-        qp_state_d = QP_FIFO_VALID;
+      if(qp_if_output_q != qp_if_input_q) begin
+        qp_if_output_d = qp_if_input_q;
+        qp_state_d = QP_IF_VALID;
       end else if (new_wqe_fetched) begin
-        qp_reg_d = {WQEReg_q[255:224], WQEReg_q[223:160], (qp_fifo_output.dest_sq_psn + 24'b1), qp_fifo_output.sq_psn, 16'b0, qp_fifo_output.qp_idx, 32'b0}; //update directly
-        qp_state_d = QP_SQ_VALID;
+        if(qp_if_output_q.src_qp_conf[0] && qp_if_output_q.src_qp_conf[10:8] <= 3'b100) begin //if it's wrongly configured, don't proceed.
+          qp_reg_d = {WQEReg_q[255:224], WQEReg_q[223:160], (qp_if_output_q.dest_sq_psn + 24'b1), qp_if_output_q.sq_psn, 16'b0, qp_if_output_q.qp_idx, 32'b0}; //update directly
+          qp_state_d = QP_SQ_VALID;
+        end
       end
     end
-    QP_FIFO_VALID: begin
-      qp_fifo_rd_en = 1'b1;
-      if(qp_fifo_rd_valid) begin
+    QP_IF_VALID: begin
         // only proceed if qp is enabled and mtu conf is valid
-        if(qp_fifo_output.src_qp_conf[0] && qp_fifo_output.src_qp_conf[10:8] <= 3'b100) begin
-          mtu_d = 'd256 << qp_fifo_output.src_qp_conf[10:8];
-          //Maybe WQEReg is not yet set but who cares
-          qp_reg_d = {WQEReg_q[255:224], WQEReg_q[223:160], (qp_fifo_output.dest_sq_psn + 24'b1), qp_fifo_output.sq_psn, 16'b0, qp_fifo_output.qp_idx, 32'b0}; //TODO: finish with qp num and state or just 0?
+        if(qp_if_output_q.src_qp_conf[0] && qp_if_output_q.src_qp_conf[10:8] <= 3'b100) begin
+          mtu_d = 'd256 << qp_if_output_q.src_qp_conf[10:8];
+          //Maybe WQEReg is not yet set but who cares, these values are pointless anyway.........
+          qp_reg_d = {WQEReg_q[255:224], WQEReg_q[223:160], (qp_if_output_q.dest_sq_psn + 24'b1), qp_if_output_q.sq_psn, 16'b0, qp_if_output_q.qp_idx, 32'b0};
           qp_state_d = QP_VALID;
         end else begin
           qp_state_d = QP_IDLE;
         end
       end
-    end
     QP_VALID: begin
       m_rdma_qp_interface_valid_o = 1'b1;
       if(m_rdma_qp_interface_ready_i) begin
@@ -267,24 +239,6 @@ always_comb begin
   endcase
 end
 
-cdc_fifo_qp cdc_fifo_qp_inst (
-.full(qp_fifo_full),
-.din(qp_fifo_input_q),
-.wr_en(qp_fifo_wr_en),
-.wr_ack(qp_fifo_wr_ack),
-
-.empty(qp_fifo_empty),
-.dout(qp_fifo_output),
-.rd_en(qp_fifo_rd_en),
-.valid(qp_fifo_rd_valid),
-
-.wr_clk(axil_aclk_i),
-.rd_clk(axis_aclk_i),
-.srst(!rstn_i),
-.wr_rst_busy(qp_fifo_wr_rst_busy),
-.rd_rst_busy(qp_fifo_rd_rst_busy)
-);
-
 
 ////////////////////
 //                //
@@ -292,78 +246,48 @@ cdc_fifo_qp cdc_fifo_qp_inst (
 //                //
 ////////////////////
 
-
+//This interface might actually need a FIFO, if SQPIi updates on another queue but the WQE's of the previous one didn't finish yet.
+//also make a separate index for sqpii
+//AXIL CLOCK DOMAIN
 always_comb begin
-  sq_fifo_wr_en = 1'b0;
-  sq_fifo_input_d = sq_fifo_input_q;
-  sq_fifo_wr_d = sq_fifo_wr_q;
+  sq_if_input_d = sq_if_input_q;
 
-  case (sq_fifo_wr_q)
-    IDLE: begin
-      if(SQPIi_i > localidx_q[QPidx_i] && !qp_fifo_full && !qp_fifo_wr_rst_busy) begin //Assume all fields are set on SQPIi increase
-        sq_fifo_input_d.qp_idx = QPidx_i;
-        sq_fifo_input_d.sq_base_addr = SQBAi_i;
-        sq_fifo_input_d.sq_prod_idx = SQPIi_i;
-        sq_fifo_input_d.pd_vaddr = VIRTADDR_i;
-        sq_fifo_wr_d = VALID;
-      end
-    end
-    VALID: begin
-      sq_fifo_wr_en = 1'b1;
-      if(sq_fifo_wr_ack) begin
-        sq_fifo_wr_d = IDLE;
-      end
-    end
-  endcase
+  if(SQPIi_i > localidx_q[QPidx_i]) begin //Assume all fields are set on SQPIi increase
+    sq_if_input_d.qp_idx = QPidx_i;
+    sq_if_input_d.sq_base_addr = SQBAi_i;
+    sq_if_input_d.sq_prod_idx = SQPIi_i;
+    sq_if_input_d.pd_vaddr = VIRTADDR_i;
+  end
+    
+    
 end
 
-typedef enum {SQ_FIFO_IDLE, SQ_FIFO_VALID} sq_fifo_state;
-sq_fifo_state sq_fifo_state_d, sq_fifo_state_q;
+//AXIS CLOCK DOMAIN
+typedef enum {SQ_IF_IDLE, SQ_IF_VALID} sq_if_state;
+sq_if_state sq_if_state_d, sq_if_state_q;
 
 always_comb begin
-  sq_fifo_state_d = sq_fifo_state_q;
-  sq_fifo_rd_en = 1'b0;
+  sq_if_state_d = sq_if_state_q;
+  sq_if_output_d = sq_if_output_q;
   fetch_wqe = 1'b0;
 
-  case(sq_fifo_state_q) 
-    SQ_FIFO_IDLE: begin
-      if(!sq_fifo_empty && !sq_fifo_rd_rst_busy) begin
-        sq_fifo_rd_en = 1'b1;
-        sq_fifo_state_d = SQ_FIFO_VALID;
+  case(sq_if_state_q) 
+    SQ_IF_IDLE: begin
+      if(sq_if_output_q != sq_if_input_q) begin
+        sq_if_output_d = sq_if_input_q;
+        sq_if_state_d = SQ_IF_VALID;
       end
     end
-    SQ_FIFO_VALID: begin
-      sq_fifo_rd_en = 1'b1;
-      if(sq_fifo_rd_valid) begin
-        if(SQPIi_tmp != sq_fifo_output.sq_prod_idx || QPidx_tmp != sq_fifo_output.qp_idx) begin
+    SQ_IF_VALID: begin
+        if(SQPIi_tmp != sq_if_output_q.sq_prod_idx || QPidx_tmp != sq_if_output_q.qp_idx) begin
+          SQPIi_tmp = sq_if_output_q.sq_prod_idx;
+          QPidx_tmp = sq_if_output_q.qp_idx;
           fetch_wqe = 1'b1;
-          SQPIi_tmp = sq_fifo_output.sq_prod_idx;
-          QPidx_tmp = sq_fifo_output.qp_idx;
         end
-        sq_fifo_state_d = SQ_FIFO_IDLE;
+        sq_if_state_d = SQ_IF_IDLE;
       end
-    end
   endcase
 end
-
-cdc_fifo_sq cdc_fifo_sq_inst (
-.full(sq_fifo_full),
-.din(sq_fifo_input_q),
-.wr_en(sq_fifo_wr_en),
-.wr_ack(sq_fifo_wr_ack),
-
-.empty(sq_fifo_empty),
-.dout(sq_fifo_output),
-.rd_en(sq_fifo_rd_en),
-.valid(sq_fifo_rd_valid),
-
-.wr_clk(axil_aclk_i),
-.rd_clk(axis_aclk_i),
-.srst(!rstn_i),
-.wr_rst_busy(sq_fifo_wr_rst_busy),
-.rd_rst_busy(sq_fifo_rd_rst_busy)
-);
-
 
 
 
@@ -373,7 +297,6 @@ sq_state sq_state_d, sq_state_q;
 
 
 //TODO: wait for ack or check if first sqe
-//TODO: probably need to split it up for each packet, send last signal
 logic last_d, last_q;
 logic first_d, first_q;
 logic [31:0] transfer_length_d, transfer_length_q;
@@ -415,32 +338,32 @@ always_comb begin
       if(first_q) begin
         if(WQEReg_q[127:96] <= mtu_q) begin
           sq_reg_d.opcode = 5'h0a;
-          sq_reg_d.qpn    = {2'b0, sq_fifo_output.qp_idx};
+          sq_reg_d.qpn    = {2'b0, sq_if_output_q.qp_idx};
           sq_reg_d.host   = 1'b0;
           sq_reg_d.mode   = 1'b0;
           sq_reg_d.last   = 1'b1;
           sq_reg_d.cmplt  = 1'b0;
           sq_reg_d.ssn    = 24'b0;
           sq_reg_d.offs   = 4'b0;
-          sq_reg_d.msg    = {32'b0, WQEReg_q[127:96], sq_fifo_output.pd_vaddr, WQEReg_q[223:160]};
+          sq_reg_d.msg    = {32'b0, WQEReg_q[127:96], sq_if_output_q.pd_vaddr, WQEReg_q[223:160]};
           sq_reg_d.rsrvd  = 'd0;
           
           last_d = 1'b1;
           sq_state_d = SQ_VALID;
         end else begin          
           sq_reg_d.opcode = 5'h06;
-          sq_reg_d.qpn    = {2'b0, sq_fifo_output.qp_idx};
+          sq_reg_d.qpn    = {2'b0, sq_if_output_q.qp_idx};
           sq_reg_d.host   = 1'b0;
           sq_reg_d.mode   = 1'b0;
           sq_reg_d.last   = 1'b0;
           sq_reg_d.cmplt  = 1'b0;
           sq_reg_d.ssn    = 24'b0;
           sq_reg_d.offs   = 4'b0;
-          sq_reg_d.msg    = {32'b0, mtu_q, sq_fifo_output.pd_vaddr, WQEReg_q[223:160]};
+          sq_reg_d.msg    = {32'b0, mtu_q, sq_if_output_q.pd_vaddr, WQEReg_q[223:160]};
           sq_reg_d.rsrvd  = 'd0;
           
           transfer_length_d = WQEReg_q[127:96] - mtu_q;
-          curr_local_vaddr_d = sq_fifo_output.pd_vaddr + mtu_q;
+          curr_local_vaddr_d = sq_if_output_q.pd_vaddr + mtu_q;
           curr_remote_vaddr_d = WQEReg_q[223:160] + mtu_q;
           last_d = 1'b0;
           first_d = 1'b0;
@@ -450,7 +373,7 @@ always_comb begin
         if(transfer_length_q <= mtu_q) begin
           //TODO: vaddr handling
           sq_reg_d.opcode = 5'h08;
-          sq_reg_d.qpn    = {2'b0, sq_fifo_output.qp_idx};
+          sq_reg_d.qpn    = {2'b0, sq_if_output_q.qp_idx};
           sq_reg_d.host   = 1'b0;
           sq_reg_d.mode   = 1'b0;
           sq_reg_d.last   = 1'b1;
@@ -465,7 +388,7 @@ always_comb begin
         end else begin
           //TODO: vaddr handling
           sq_reg_d.opcode = 5'h07;
-          sq_reg_d.qpn    = {2'b0, sq_fifo_output.qp_idx};
+          sq_reg_d.qpn    = {2'b0, sq_if_output_q.qp_idx};
           sq_reg_d.host   = 1'b0;
           sq_reg_d.mode   = 1'b0;
           sq_reg_d.last   = 1'b0;
@@ -486,14 +409,14 @@ always_comb begin
     end
     SQ_READ: begin      
       sq_reg_d.opcode = 5'h0c;
-      sq_reg_d.qpn    = {2'b0, sq_fifo_output.qp_idx};
+      sq_reg_d.qpn    = {2'b0, sq_if_output_q.qp_idx};
       sq_reg_d.host   = 1'b0;
       sq_reg_d.mode   = 1'b0;
       sq_reg_d.last   = 1'b1;
       sq_reg_d.cmplt  = 1'b0;
       sq_reg_d.ssn    = 24'b0;
       sq_reg_d.offs   = 4'b0;
-      sq_reg_d.msg    = {32'b0, WQEReg_q[127:96], sq_fifo_output.pd_vaddr, WQEReg_q[223:160]};
+      sq_reg_d.msg    = {32'b0, WQEReg_q[127:96], sq_if_output_q.pd_vaddr, WQEReg_q[223:160]};
       sq_reg_d.rsrvd  = 'd0;
       
       last_d = 1'b1;
@@ -506,8 +429,8 @@ always_comb begin
           last_d = 1'b0;
           first_d = 1'b1;
           sq_state_d = SQ_IDLE;
-          localidx_d[sq_fifo_output.qp_idx] = localidx_q[sq_fifo_output.qp_idx] + 1;
-          if(localidx_q[sq_fifo_output.qp_idx] + 1 < sq_fifo_output.sq_prod_idx) begin
+          localidx_d[sq_if_output_q.qp_idx] = localidx_q[sq_if_output_q.qp_idx] + 1;
+          if(localidx_q[sq_if_output_q.qp_idx] + 1 < sq_if_output_q.sq_prod_idx) begin
             fetch_next_wqe = 1'b1;
           end
         end else if(WQEReg_q[135:128] == 8'h00) begin
@@ -555,7 +478,7 @@ always_comb begin
     end
     AR_CALC_ADDR: begin
       //64 byte aligned 
-      AddrReg_d = {sq_fifo_output.sq_base_addr[63:38], sq_fifo_output.sq_base_addr[37:6] + localidx_q[sq_fifo_output.qp_idx], sq_fifo_output.sq_base_addr[5:0]};
+      AddrReg_d = {sq_if_output_q.sq_base_addr[63:38], sq_if_output_q.sq_base_addr[37:6] + localidx_q[sq_if_output_q.qp_idx], sq_if_output_q.sq_base_addr[5:0]};
       AddrRd_State_d = AR_VALID;
     end
     AR_VALID: begin
@@ -644,37 +567,34 @@ assign m_rdma_sq_interface_data_o = sq_reg_q;
 always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
   if(!rstn_i) begin
     conn_if_input_q <= 'd0;
-    qp_fifo_wr_q <= IDLE;
-    qp_fifo_input_q <= 'hff00000000000000000000000000;
-    sq_fifo_wr_q <= IDLE;
-    sq_fifo_input_q <= 'hff0000000000000000000000000000000000000000;
+    qp_if_input_q <= 'd0;
+    sq_if_input_q <= 'd0;
   end else begin
     conn_if_input_q <= conn_if_input_d;
-    qp_fifo_wr_q <= qp_fifo_wr_d;
-    qp_fifo_input_q <= qp_fifo_input_d;
-    sq_fifo_wr_q <= sq_fifo_wr_d;
-    sq_fifo_input_q <= sq_fifo_input_d;
+    qp_if_input_q <= qp_if_input_d;
+    sq_if_input_q <= sq_if_input_d;
   end
 end
 
 
 always_ff @(posedge axis_aclk_i, negedge rstn_i) begin
   if(!rstn_i) begin
-    new_qp_ready <= 1'b0;
     new_wqe_fetched <= 1'b0;
-    conn_done <= 1'b0;
     rd_ready <= 1'b0;
     SQPIi_tmp <= 'd0;
     QPidx_tmp <= 'd0;
    
-    mtu_q <= 'd0;
     conn_state_q <= CONN_IDLE;
     conn_if_output_q <= 'd0;
     conn_reg_q <= 'd0;
     
+    mtu_q <= 'd0;
     qp_state_q <= QP_IDLE;
+    qp_if_output_q <= 'd0;
     qp_reg_q <= 'd0;
-    sq_fifo_state_q <= SQ_FIFO_IDLE;
+    
+    sq_if_state_q <= SQ_IF_IDLE;
+    sq_if_output_q <= 'd0;
     sq_state_q <= SQ_IDLE;
     sq_reg_q = 'd0;
     
@@ -692,16 +612,18 @@ always_ff @(posedge axis_aclk_i, negedge rstn_i) begin
     end
 
   end else begin
-    mtu_q <= mtu_d;
     conn_state_q <= conn_state_d;
     conn_if_output_q <= conn_if_output_d;
     conn_reg_q <= conn_reg_d;
     
+    mtu_q <= mtu_d;
     qp_state_q <= qp_state_d;
+    qp_if_output_q <= qp_if_output_d;
     qp_reg_q = qp_reg_d;
     
+    sq_if_state_q <= sq_if_state_d;
+    sq_if_output_q <= sq_if_output_d;
     sq_state_q <= sq_state_d;
-    sq_fifo_state_q <= sq_fifo_state_d;
     sq_reg_q = sq_reg_d;
     
     AddrRd_State_q <= AddrRd_State_d;

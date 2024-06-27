@@ -410,6 +410,7 @@ logic [7:0] connidx_d, connidx_q;
 logic reading, writing;
 
 logic conn_configured_d, conn_configured_q;
+logic qp_configured_d, qp_configured_q;
 
 logic[7:0] pdidx_r, pdidx_w;
 logic[9:0] qpidx_r, qpidx_w;
@@ -893,8 +894,6 @@ endfunction
 
 
 always_comb begin
-  qp_configured_o = 1'b0;
-  
   s_axil_awready_o = 1'b0;
   s_axil_bvalid_o = 1'b0;
   s_axil_wready_o = 1'b0;
@@ -907,6 +906,7 @@ always_comb begin
   w_state_d = w_state_q;
 
   conn_configured_d = 1'b0;
+  qp_configured_d = 1'b0;
   
   CONF_d = CONF_q;
   ADCONF_d = ADCONF_q;
@@ -1114,7 +1114,7 @@ always_comb begin
             ADDR_QPCONFi: begin
               QPCONFi_d[qpidx_w] = apply_wstrb(QPCONFi_q[qpidx_w], WDataReg_q, mask);
               QPidx_d = qpidx_w[7:0];
-              qp_configured_o = 1'b1;
+              qp_configured_d = 1'b1;
             end
             ADDR_QPADVCONFi: begin
               QPADVCONFi_d[qpidx_w] = apply_wstrb(QPADVCONFi_q[qpidx_w], WDataReg_q, mask);
@@ -1162,18 +1162,18 @@ always_comb begin
             ADDR_SQPSNi: begin
               SQPSNi_d[qpidx_w] = apply_wstrb(SQPSNi_q[qpidx_w], WDataReg_q, mask);
               QPidx_d = qpidx_w[7:0];
-              qp_configured_o = 1'b1;
+              qp_configured_d = 1'b1;
             end
             ADDR_LSTRQREQi: begin
               LSTRQREQi_d[qpidx_w] = apply_wstrb(LSTRQREQi_q[qpidx_w], WDataReg_q, mask);
               QPidx_d = qpidx_w[7:0];
-              qp_configured_o = 1'b1;
+              qp_configured_d = 1'b1;
             end
             ADDR_DESTQPCONFi: begin
               DESTQPCONFi_d[qpidx_w] = apply_wstrb(DESTQPCONFi_q[qpidx_w], WDataReg_q, mask);
               connidx_d = qpidx_w[7:0];
               QPidx_d = qpidx_w[7:0];
-              qp_configured_o = 1'b1;
+              qp_configured_d = 1'b1;
               conn_configured_d = 1'b1;
             end
             ADDR_MACDESADDLSBi: begin
@@ -1426,7 +1426,8 @@ always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
     WRespReg_q <= 'd0;
     WStrbReg_q <= 'd0;
 
-    conn_configured_q <= 'b0;
+    conn_configured_q <= 1'b0;
+    qp_configured_q <= 1'b0;
 
     CONF_q <= 'd0;
     ADCONF_q <= 'd0;
@@ -1579,6 +1580,7 @@ always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
     WStrbReg_q <= WStrbReg_d;
 
     conn_configured_q <= conn_configured_d;
+    qp_configured_q <= qp_configured_d;
 
     CONF_q <= CONF_d;
     ADCONF_q <= ADCONF_d;
@@ -1750,6 +1752,7 @@ assign RESPERRSZ_o = {RESPERRSZMSB_q, RESPERRSZ_q};
 assign QPidx_o = QPidx_q;
 assign connidx_o = connidx_q;
 assign conn_configured_o = conn_configured_q;
+assign qp_configured_o = qp_configured_q;
 
 
 assign PDPDNUM_o = PDPDNUM_q[PDidx_q][23:0];
