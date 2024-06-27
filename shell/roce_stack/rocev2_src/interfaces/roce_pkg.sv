@@ -84,8 +84,8 @@ package roceTypes;
     parameter integer RDMA_MSG_BITS = 192;
     
 
-    parameter integer RDMA_QP_INTF_BITS = 184;
-    parameter integer RDMA_QP_CONN_BITS = 200;
+    parameter integer RDMA_QP_INTF_BITS = 200;
+    parameter integer RDMA_QP_CONN_BITS = 184;
     parameter integer RDMA_MSN_BITS = 24;
     parameter integer RDMA_OFFS_BITS = 4;
     
@@ -155,7 +155,7 @@ package roceTypes;
     } SQdata_struct; //168 bits
 
     typedef struct packed { 
-        logic [RDMA_QP_IDX_BITS:0]   qp_idx;
+        logic [RDMA_QP_IDX_BITS-1:0]   qp_idx;
         logic [AXIL_DATA_BITS-1:0]  src_qp_conf; //AXI lite data bits for complete regs
         logic [RDMA_IF_QPN_BITS-1:0] dest_qp;
         logic [RDMA_MSN_BITS-1:0]  sq_psn;

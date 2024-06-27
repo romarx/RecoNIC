@@ -89,19 +89,17 @@ logic [7:0]  QPidx_tmp;
 logic fetch_wqe;
 logic fetch_next_wqe;
 
+conndata_struct conn_if_input_d, conn_if_input_q, conn_if_output_d, conn_if_output_q;
+
 QPdata_struct qp_fifo_input_d, qp_fifo_input_q, qp_fifo_output;
 
 typedef enum {IDLE, READ, VALID} fifo_state;
 fifo_state qp_fifo_wr_d, qp_fifo_wr_q;
-fifo_state conn_fifo_wr_d, conn_fifo_wr_q;
+
 fifo_state sq_fifo_wr_d, sq_fifo_wr_q;
 
 logic qp_fifo_full, qp_fifo_wr_en, qp_fifo_wr_ack, qp_fifo_wr_rst_busy;
 logic qp_fifo_empty, qp_fifo_rd_en, qp_fifo_rd_valid, qp_fifo_rd_rst_busy;
-
-conndata_struct conn_fifo_input_d, conn_fifo_input_q, conn_fifo_output;
-logic conn_fifo_full, conn_fifo_wr_en, conn_fifo_wr_ack, conn_fifo_wr_rst_busy;
-logic conn_fifo_empty, conn_fifo_rd_en, conn_fifo_rd_valid, conn_fifo_rd_rst_busy;
 
 logic [RDMA_QP_CONN_BITS-1:0] conn_reg_d, conn_reg_q;
 logic [RDMA_QP_INTF_BITS-1:0] qp_reg_d, qp_reg_q;
@@ -125,66 +123,53 @@ logic qp_intf_done;
 //                  //
 //////////////////////
 
+//AXIL CLOCK DOMAIN
 
 always_comb begin
-  conn_fifo_wr_en = 1'b0;
-  conn_fifo_input_d = conn_fifo_input_q;
-  conn_fifo_wr_d = conn_fifo_wr_q;
-
-  case (conn_fifo_wr_q)
-    IDLE: begin
-      if((conn_configured_i && conn_fifo_input_q.conn_idx != connidx_i) && !conn_fifo_full && !conn_fifo_wr_rst_busy ) begin
-        conn_fifo_input_d.conn_idx      = connidx_i;
-        conn_fifo_input_d.dest_qp       = DESTQPCONFi_i;
-        conn_fifo_input_d.dest_ip_addr  = IPDESADDR1i_i;
-        conn_fifo_input_d.port          = CONF_i[31:16];
-        conn_fifo_wr_d = VALID;
-      end
-    end
-    VALID: begin
-      conn_fifo_wr_en = 1'b1;
-      if(conn_fifo_wr_ack) begin
-        conn_fifo_wr_d = IDLE;
-      end
-    end
-  endcase
+  conn_if_input_d = conn_if_input_q;
+  if(conn_configured_i) begin
+    conn_if_input_d.conn_idx      = connidx_i;
+    conn_if_input_d.dest_qp       = DESTQPCONFi_i;
+    conn_if_input_d.dest_ip_addr  = IPDESADDR1i_i;
+    conn_if_input_d.port          = CONF_i[31:16];
+  end
 end
 
-typedef enum {CONN_IDLE, FIFO_VALID, CONN_VALID} conn_state;
+//AXIS CLOCK DOMAIN
+
+typedef enum {CONN_IDLE, CONN_IF_VALID, CONN_VALID} conn_state;
 conn_state conn_state_d, conn_state_q;
 
 always_comb begin
-  conn_fifo_rd_en = 1'b0;
+  
   m_rdma_conn_interface_valid_o = 1'b0;
+  conn_if_output_d = conn_if_output_q;
   conn_state_d = conn_state_q;
   conn_reg_d = conn_reg_q;
 
   case(conn_state_q)
     CONN_IDLE: begin
-      if(!conn_fifo_empty && !conn_fifo_rd_rst_busy) begin
-        conn_fifo_rd_en = 1'b1;
-        conn_state_d = FIFO_VALID;
+      //should be safe, updating a reg takes a few cycles
+      if(conn_if_output_q != conn_if_input_q) begin
+        conn_if_output_d = conn_if_input_q;
+        conn_state_d = CONN_IF_VALID;
       end
     end
-    FIFO_VALID: begin
-      conn_fifo_rd_en = 1'b1;
-      if(conn_fifo_rd_valid) begin
-        if(conn_fifo_output.dest_ip_addr != 'd0) begin
-          conn_reg_d = {conn_fifo_output.port, 
-                        conn_fifo_output.dest_ip_addr, 
-                        conn_fifo_output.dest_ip_addr, 
-                        conn_fifo_output.dest_ip_addr, 
-                        conn_fifo_output.dest_ip_addr, 
-                        (conn_fifo_output.dest_qp - 24'b1), 
-                        8'b0, 
-                        conn_fifo_output.conn_idx}; //TODO: conn_idx at the end after fix??
-                        //conn_fifo_output.conn_idx} 
-          conn_state_d = CONN_VALID;
-        end else begin
-          conn_state_d = CONN_IDLE;
-        end
-      end 
-    end
+    CONN_IF_VALID: begin
+      if(conn_if_output_q.dest_ip_addr != 'd0) begin
+        conn_reg_d = {conn_if_output_q.port, 
+                      conn_if_output_q.dest_ip_addr, 
+                      conn_if_output_q.dest_ip_addr, 
+                      conn_if_output_q.dest_ip_addr, 
+                      conn_if_output_q.dest_ip_addr, 
+                      (conn_if_output_q.dest_qp - 24'b1), 
+                      8'b0, 
+                      conn_if_output_q.conn_idx};
+        conn_state_d = CONN_VALID;
+      end else begin
+        conn_state_d = CONN_IDLE;
+      end
+    end 
     CONN_VALID: begin
       m_rdma_conn_interface_valid_o = 1'b1;
       if(m_rdma_conn_interface_ready_i) begin
@@ -193,27 +178,6 @@ always_comb begin
     end
   endcase
 end
-
-
-cdc_fifo_conn cdc_fifo_conn_inst (
-  .full(conn_fifo_full),
-  .din(conn_fifo_input_q),
-  .wr_en(conn_fifo_wr_en),
-  .wr_ack(conn_fifo_wr_ack),
-
-  .empty(conn_fifo_empty),
-  .dout(conn_fifo_output),
-  .rd_en(conn_fifo_rd_en),
-  .valid(conn_fifo_rd_valid),
-
-  .wr_clk(axil_aclk_i),
-  .rd_clk(axis_aclk_i),
-  .srst(!rstn_i),
-  .wr_rst_busy(conn_fifo_wr_rst_busy),
-  .rd_rst_busy(conn_fifo_rd_rst_busy)
-);
-
-
 
 
 ////////////////////
@@ -679,17 +643,15 @@ assign m_rdma_sq_interface_data_o = sq_reg_q;
 
 always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
   if(!rstn_i) begin
+    conn_if_input_q <= 'd0;
     qp_fifo_wr_q <= IDLE;
     qp_fifo_input_q <= 'hff00000000000000000000000000;
-    conn_fifo_wr_q <= IDLE;
-    conn_fifo_input_q <= 'hff000000000000000000;
     sq_fifo_wr_q <= IDLE;
     sq_fifo_input_q <= 'hff0000000000000000000000000000000000000000;
   end else begin
+    conn_if_input_q <= conn_if_input_d;
     qp_fifo_wr_q <= qp_fifo_wr_d;
     qp_fifo_input_q <= qp_fifo_input_d;
-    conn_fifo_wr_q <= conn_fifo_wr_d;
-    conn_fifo_input_q <= conn_fifo_input_d;
     sq_fifo_wr_q <= sq_fifo_wr_d;
     sq_fifo_input_q <= sq_fifo_input_d;
   end
@@ -707,12 +669,15 @@ always_ff @(posedge axis_aclk_i, negedge rstn_i) begin
    
     mtu_q <= 'd0;
     conn_state_q <= CONN_IDLE;
+    conn_if_output_q <= 'd0;
+    conn_reg_q <= 'd0;
+    
     qp_state_q <= QP_IDLE;
+    qp_reg_q <= 'd0;
     sq_fifo_state_q <= SQ_FIFO_IDLE;
     sq_state_q <= SQ_IDLE;
-    conn_reg_q <= 'd0;
-    qp_reg_q <= 'd0;
     sq_reg_q = 'd0;
+    
     AddrRd_State_q <= AR_IDLE;
     AddrReg_q <= 'd0;
     Read_State_q <= RD_IDLE;
@@ -729,12 +694,16 @@ always_ff @(posedge axis_aclk_i, negedge rstn_i) begin
   end else begin
     mtu_q <= mtu_d;
     conn_state_q <= conn_state_d;
+    conn_if_output_q <= conn_if_output_d;
+    conn_reg_q <= conn_reg_d;
+    
     qp_state_q <= qp_state_d;
+    qp_reg_q = qp_reg_d;
+    
     sq_state_q <= sq_state_d;
     sq_fifo_state_q <= sq_fifo_state_d;
-    conn_reg_q <= conn_reg_d;
-    qp_reg_q = qp_reg_d;
     sq_reg_q = sq_reg_d;
+    
     AddrRd_State_q <= AddrRd_State_d;
     AddrReg_q <= AddrReg_d;
     Read_State_q <= Read_State_d;

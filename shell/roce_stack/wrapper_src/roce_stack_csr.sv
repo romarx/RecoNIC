@@ -409,6 +409,8 @@ logic [7:0] connidx_d, connidx_q;
 //AXI Lite clock domain
 logic reading, writing;
 
+logic conn_configured_d, conn_configured_q;
+
 logic[7:0] pdidx_r, pdidx_w;
 logic[9:0] qpidx_r, qpidx_w;
 logic[AXIL_DATA_WIDTH_BYTES-1:0] mask;
@@ -429,7 +431,7 @@ typedef enum {W_IDLE, W_READY, WRITE, B_RESP} write_state;
 write_state w_state_d, w_state_q;
 
 
-logic [1:0] REQUIRED_REGS_CONN_d [NUM_QP-1:0], REQUIRED_REGS_CONN_q [NUM_QP-1:0];
+
 
 
 ////////////////
@@ -892,6 +894,7 @@ endfunction
 
 always_comb begin
   qp_configured_o = 1'b0;
+  
   s_axil_awready_o = 1'b0;
   s_axil_bvalid_o = 1'b0;
   s_axil_wready_o = 1'b0;
@@ -902,6 +905,8 @@ always_comb begin
   WStrbReg_d = WStrbReg_q;
   
   w_state_d = w_state_q;
+
+  conn_configured_d = 1'b0;
   
   CONF_d = CONF_q;
   ADCONF_d = ADCONF_q;
@@ -1037,8 +1042,6 @@ always_comb begin
     STATWQEi_d[i] = STATWQEi_q[i];
     STATRQPIDBi_d[i] = STATRQPIDBi_q[i];
     PDNUMi_d[i] = PDNUMi_q[i];
-
-    REQUIRED_REGS_CONN_d[i] = REQUIRED_REGS_CONN_q[i];
   end
 
   QPidx_d = QPidx_q;
@@ -1169,9 +1172,9 @@ always_comb begin
             ADDR_DESTQPCONFi: begin
               DESTQPCONFi_d[qpidx_w] = apply_wstrb(DESTQPCONFi_q[qpidx_w], WDataReg_q, mask);
               connidx_d = qpidx_w[7:0];
-              REQUIRED_REGS_CONN_d[qpidx_w[7:0]][0] = 1'b1;
               QPidx_d = qpidx_w[7:0];
               qp_configured_o = 1'b1;
+              conn_configured_d = 1'b1;
             end
             ADDR_MACDESADDLSBi: begin
               MACDESADDLSBi_d[qpidx_w] = apply_wstrb(MACDESADDLSBi_q[qpidx_w], WDataReg_q, mask);
@@ -1182,7 +1185,7 @@ always_comb begin
             ADDR_IPDESADDR1i: begin
               IPDESADDR1i_d[qpidx_w] = apply_wstrb(IPDESADDR1i_q[qpidx_w], WDataReg_q, mask);
               connidx_d = qpidx_w[7:0];
-              REQUIRED_REGS_CONN_d[qpidx_w[7:0]][1] = 1'b1;
+              conn_configured_d = 1'b1;
             end
             ADDR_IPDESADDR2i: begin
               IPDESADDR2i_d[qpidx_w] = apply_wstrb(IPDESADDR2i_q[qpidx_w], WDataReg_q, mask);
@@ -1423,6 +1426,8 @@ always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
     WRespReg_q <= 'd0;
     WStrbReg_q <= 'd0;
 
+    conn_configured_q <= 'b0;
+
     CONF_q <= 'd0;
     ADCONF_q <= 'd0;
     BUF_THRESHOLD_ROCE_q <= 'd0;
@@ -1557,7 +1562,6 @@ always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
       STATWQEi_q[i] <= 'd0;
       STATRQPIDBi_q[i] <= 'd0;
       PDNUMi_q[i] <= 'd0;
-      REQUIRED_REGS_CONN_q[i] <= 'd0;
     end
 
     QPidx_q <= 'd0;
@@ -1573,6 +1577,8 @@ always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
     WDataReg_q <= WDataReg_d;
     WRespReg_q <= WRespReg_d;
     WStrbReg_q <= WStrbReg_d;
+
+    conn_configured_q <= conn_configured_d;
 
     CONF_q <= CONF_d;
     ADCONF_q <= ADCONF_d;
@@ -1708,8 +1714,6 @@ always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
       STATWQEi_q[i] <= STATWQEi_d[i];
       STATRQPIDBi_q[i] <= STATRQPIDBi_d[i];
       PDNUMi_q[i] <= PDNUMi_d[i];
-
-      REQUIRED_REGS_CONN_q[i] <= REQUIRED_REGS_CONN_d[i];
     end
 
     QPidx_q <= QPidx_d;
@@ -1745,7 +1749,8 @@ assign RESPERRSZ_o = {RESPERRSZMSB_q, RESPERRSZ_q};
 
 assign QPidx_o = QPidx_q;
 assign connidx_o = connidx_q;
-assign conn_configured_o = &(REQUIRED_REGS_CONN_q[connidx_q]);
+assign conn_configured_o = conn_configured_q;
+
 
 assign PDPDNUM_o = PDPDNUM_q[PDidx_q][23:0];
 assign VIRTADDR_o = {VIRTADDRMSB_q[PDidx_q], VIRTADDRLSB_q[PDidx_q]};
