@@ -514,7 +514,7 @@ logic [63:0] AddrReg_d, AddrReg_q;
 
 typedef enum {RD_IDLE, RD_READING, RD_DONE} rd_state;
 rd_state Read_State_d, Read_State_q;
-logic rd_busy, rd_done;
+logic rd_busy;
 logic rd_ready;
 
 
