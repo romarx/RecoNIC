@@ -131,7 +131,7 @@ logic [7:0]   wr_ptr_wtc;
 logic [31:0]  IPv4ADD;
 logic [31:0]  IPv4ADD_net;
 
-logic [7:0]   connidx, QPidx;  
+logic [7:0]   connidx, QPidx, SQidx;
 logic         conn_configured, qp_configured;
 
 logic [31:0]  CONF;
@@ -274,6 +274,8 @@ roce_stack_csr #(
   .MACADD_o(MACADD),
 
   .IPv4ADD_o(IPv4ADD),
+  
+  .SQidx_o(SQidx),
   .QPidx_o(QPidx),
   .connidx_o(connidx),
   .conn_configured_o(conn_configured),
@@ -290,7 +292,6 @@ roce_stack_csr #(
   .CQDBADDi_o(),
   .SQPIi_o(SQPIi),
   .CQHEADi_i(CQHEADi_wtc),
-  .CQHEADi_o(CQHEADi_ctw),
   .QDEPTHi_o(),
   .SQPSNi_o(SQPSNi),
   .LSTRQREQi_o(LSTRQREQi),
@@ -325,6 +326,7 @@ roce_stack_csr #(
 roce_stack_wq_manager #(
   .NUM_QP(NUM_QP)
 )inst_roce_stack_wq_manager(
+  .SQidx_i(SQidx),
   .QPidx_i(QPidx),
   .connidx_i(connidx),
   .conn_configured_i(conn_configured),

@@ -4,8 +4,12 @@ import roceTypes::*;
 module roce_stack_wq_manager #(
   parameter int NUM_QP = 8
 )(
+    input  logic [7:0]    SQidx_i,
     input  logic [7:0]    QPidx_i,
     input  logic [7:0]    connidx_i,
+
+    output logic [7:0]    C_SQidx_o,
+
     input  logic          conn_configured_i,
     input  logic          qp_configured_i,
 
@@ -83,11 +87,12 @@ conndata_struct conn_if_input_d, conn_if_input_q, conn_if_output_d, conn_if_outp
 QPdata_struct qp_if_input_d, qp_if_input_q, qp_if_output_d, qp_if_output_q;
 SQdata_struct sq_if_input_d, sq_if_input_q, sq_if_output_d, sq_if_output_q;
 
-logic [31:0] localidx_d[NUM_QP-1:0], localidx_q[NUM_QP-1:0];
+logic [31:0] localidx_d[NUM_QP-1:0], localidx_q[NUM_QP-1:0], localpi_d[NUM_QP-1:0], localpi_q[NUM_QP-1:0];
 logic [31:0] SQPIi_tmp;
 logic [7:0]  QPidx_tmp;
 logic fetch_wqe;
 logic fetch_next_wqe;
+logic wqe_done;
 
 
 
@@ -173,7 +178,7 @@ end
 //  QP INTERFACE  //
 //                //
 ////////////////////
-//TODO: make this completely dependent on SQ, WQE gets read, request psn values for if from CSR, then proceed to SQ if
+
 
 //AXIL CLOCK DOMAIN
 always_comb begin
@@ -206,7 +211,7 @@ always_comb begin
       if(qp_if_output_q != qp_if_input_q) begin
         qp_if_output_d = qp_if_input_q;
         qp_state_d = QP_IF_VALID;
-      end else if (new_wqe_fetched) begin //TODO: save values for new wqe's in array??
+      end else if (new_wqe_fetched) begin //TODO: take sq idx here!
         if(qp_if_output_q.src_qp_conf[0] && qp_if_output_q.src_qp_conf[10:8] <= 3'b100) begin //if it's wrongly configured, don't proceed.
           qp_reg_d = {WQEReg_q[255:224], WQEReg_q[223:160], (qp_if_output_q.dest_sq_psn + 24'b1), qp_if_output_q.sq_psn, 16'b0, qp_if_output_q.qp_idx, 32'b0}; //update directly
           qp_state_d = QP_SQ_VALID;
@@ -250,43 +255,92 @@ end
 //TODO: This interface might actually need a FIFO, if SQPIi updates on another queue but the WQE's of the previous one didn't finish yet.
 //also make a separate index for sqpii
 //AXIL CLOCK DOMAIN
+
+typedef enum {SQ_FIFO_IDLE, SQ_FIFO_VALID } sq_fifo_st;
+sq_fifo_st sq_fifo_state_d, sq_fifo_state_q;
+
+logic sq_fifo_full, sq_fifo_wr_en, sq_fifo_wr_ack, sq_fifo_wr_rst_busy;
+logic sq_fifo_empty, sq_fifo_rd_en, sq_fifo_rd_valid, sq_fifo_rd_rst_busy;
+
 always_comb begin
   sq_if_input_d = sq_if_input_q;
-
-  if(SQPIi_i > localidx_q[QPidx_i]) begin //Assume all fields are set on SQPIi increase
-    sq_if_input_d.qp_idx = QPidx_i;
-    sq_if_input_d.sq_base_addr = SQBAi_i;
-    sq_if_input_d.sq_prod_idx = SQPIi_i;
-    sq_if_input_d.pd_vaddr = VIRTADDR_i;
+  for(int i=0; i < NUM_QP; i++) begin
+    localpi_d[i] = localpi_q[i];
   end
-    
-    
+  sq_fifo_state_d = sq_fifo_state_q;
+  sq_fifo_wr_en = 1'b0;
+
+  case(sq_fifo_state_q)
+    SQ_FIFO_IDLE: begin
+      if(SQPIi_i > localpi_q[SQidx_i] && !sq_fifo_full && !sq_fifo_wr_rst_busy) begin //Assume all fields are set on SQPIi increase
+        localpi_d[SQidx_i] = SQPIi_i;
+        sq_if_input_d.sq_prod_idx = SQPIi_i;
+        sq_if_input_d.sq_idx = SQidx_i;
+        sq_if_input_d.sq_base_addr = SQBAi_i;
+        sq_if_input_d.pd_vaddr = VIRTADDR_i;
+        sq_fifo_state_d = SQ_FIFO_VALID;
+      end
+    end
+    SQ_FIFO_VALID: begin
+      sq_fifo_wr_en = 1'b1;
+      if(sq_fifo_wr_ack) begin
+        sq_fifo_state_d = SQ_FIFO_IDLE;
+      end
+    end
+  endcase
 end
 
+
+cdc_fifo_sq cdc_fifo_sq_inst (
+  .full(sq_fifo_full),
+  .din(sq_if_input_q),
+  .wr_en(sq_fifo_wr_en),
+  .wr_ack(sq_fifo_wr_ack),
+
+  .empty(sq_fifo_empty),
+  .dout(sq_if_output_d),
+  .rd_en(sq_fifo_rd_en),
+  .valid(sq_fifo_rd_valid),
+
+  .wr_clk(axil_aclk_i),
+  .rd_clk(axis_aclk_i),
+  .srst(!rstn_i),
+  .wr_rst_busy(sq_fifo_wr_rst_busy),
+  .rd_rst_busy(sq_fifo_rd_rst_busy)
+);
+
+
 //AXIS CLOCK DOMAIN
-typedef enum {SQ_IF_IDLE, SQ_IF_VALID} sq_if_state;
+//TODO: get the values!!!!
+typedef enum {SQ_IF_IDLE, SQ_OUT_VALID, SQ_IF_VALID} sq_if_state;
 sq_if_state sq_if_state_d, sq_if_state_q;
 
 always_comb begin
   sq_if_state_d = sq_if_state_q;
-  sq_if_output_d = sq_if_output_q;
   fetch_wqe = 1'b0;
+  sq_fifo_rd_en = 1'b0;
 
   case(sq_if_state_q) 
     SQ_IF_IDLE: begin
-      if(sq_if_output_q != sq_if_input_q) begin
-        sq_if_output_d = sq_if_input_q;
-        sq_if_state_d = SQ_IF_VALID;
+      if(wqe_done && !sq_fifo_empty && !sq_fifo_rd_rst_busy) begin
+        sq_if_state_d = SQ_OUT_VALID;
+      end
+    end
+    SQ_OUT_VALID: begin
+      sq_fifo_rd_en = 1'b1;
+      if(sq_fifo_rd_valid) begin
+        if(sq_if_output_d != sq_if_output_q) begin
+          wqe_done = 1'b0;
+          sq_if_state_d = SQ_IF_VALID;
+        end else begin
+          sq_if_state_d = SQ_IF_IDLE;
+        end
       end
     end
     SQ_IF_VALID: begin
-        if(SQPIi_tmp != sq_if_output_q.sq_prod_idx || QPidx_tmp != sq_if_output_q.qp_idx) begin
-          SQPIi_tmp = sq_if_output_q.sq_prod_idx;
-          QPidx_tmp = sq_if_output_q.qp_idx;
-          fetch_wqe = 1'b1;
-        end
-        sq_if_state_d = SQ_IF_IDLE;
-      end
+      fetch_wqe = 1'b1;
+      sq_if_state_d = SQ_IF_IDLE;
+    end
   endcase
 end
 
@@ -339,7 +393,7 @@ always_comb begin
       if(first_q) begin
         if(WQEReg_q[127:96] <= mtu_q) begin
           sq_reg_d.opcode = 5'h0a;
-          sq_reg_d.qpn    = {2'b0, sq_if_output_q.qp_idx};
+          sq_reg_d.qpn    = {2'b0, sq_if_output_q.sq_idx};
           sq_reg_d.host   = 1'b0;
           sq_reg_d.mode   = 1'b0;
           sq_reg_d.last   = 1'b1;
@@ -353,7 +407,7 @@ always_comb begin
           sq_state_d = SQ_VALID;
         end else begin          
           sq_reg_d.opcode = 5'h06;
-          sq_reg_d.qpn    = {2'b0, sq_if_output_q.qp_idx};
+          sq_reg_d.qpn    = {2'b0, sq_if_output_q.sq_idx};
           sq_reg_d.host   = 1'b0;
           sq_reg_d.mode   = 1'b0;
           sq_reg_d.last   = 1'b0;
@@ -374,7 +428,7 @@ always_comb begin
         if(transfer_length_q <= mtu_q) begin
           //TODO: vaddr handling
           sq_reg_d.opcode = 5'h08;
-          sq_reg_d.qpn    = {2'b0, sq_if_output_q.qp_idx};
+          sq_reg_d.qpn    = {2'b0, sq_if_output_q.sq_idx};
           sq_reg_d.host   = 1'b0;
           sq_reg_d.mode   = 1'b0;
           sq_reg_d.last   = 1'b1;
@@ -389,7 +443,7 @@ always_comb begin
         end else begin
           //TODO: vaddr handling
           sq_reg_d.opcode = 5'h07;
-          sq_reg_d.qpn    = {2'b0, sq_if_output_q.qp_idx};
+          sq_reg_d.qpn    = {2'b0, sq_if_output_q.sq_idx};
           sq_reg_d.host   = 1'b0;
           sq_reg_d.mode   = 1'b0;
           sq_reg_d.last   = 1'b0;
@@ -410,7 +464,7 @@ always_comb begin
     end
     SQ_READ: begin      
       sq_reg_d.opcode = 5'h0c;
-      sq_reg_d.qpn    = {2'b0, sq_if_output_q.qp_idx};
+      sq_reg_d.qpn    = {2'b0, sq_if_output_q.sq_idx};
       sq_reg_d.host   = 1'b0;
       sq_reg_d.mode   = 1'b0;
       sq_reg_d.last   = 1'b1;
@@ -430,9 +484,11 @@ always_comb begin
           last_d = 1'b0;
           first_d = 1'b1;
           sq_state_d = SQ_IDLE;
-          localidx_d[sq_if_output_q.qp_idx] = localidx_q[sq_if_output_q.qp_idx] + 1;
-          if(localidx_q[sq_if_output_q.qp_idx] + 1 < sq_if_output_q.sq_prod_idx) begin
+          localidx_d[sq_if_output_q.sq_idx] = localidx_q[sq_if_output_q.sq_idx] + 1;
+          if(localidx_q[sq_if_output_q.sq_idx] + 1 < sq_if_output_q.sq_prod_idx) begin
             fetch_next_wqe = 1'b1;
+          end else begin
+            wqe_done = 1'b1;
           end
         end else if(WQEReg_q[135:128] == 8'h00) begin
           sq_state_d = SQ_WRITE;
@@ -479,7 +535,7 @@ always_comb begin
     end
     AR_CALC_ADDR: begin
       //64 byte aligned 
-      AddrReg_d = {sq_if_output_q.sq_base_addr[63:38], sq_if_output_q.sq_base_addr[37:6] + localidx_q[sq_if_output_q.qp_idx], sq_if_output_q.sq_base_addr[5:0]};
+      AddrReg_d = {sq_if_output_q.sq_base_addr[63:38], sq_if_output_q.sq_base_addr[37:6] + localidx_q[sq_if_output_q.sq_idx], sq_if_output_q.sq_base_addr[5:0]};
       AddrRd_State_d = AR_VALID;
     end
     AR_VALID: begin
@@ -570,16 +626,25 @@ always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
     conn_if_input_q <= 'd0;
     qp_if_input_q <= 'd0;
     sq_if_input_q <= 'd0;
+    sq_fifo_state_q <= SQ_FIFO_IDLE;
+    for(int i=0; i < NUM_QP; i++) begin
+      localpi_q[i] = 'd0;
+    end
   end else begin
     conn_if_input_q <= conn_if_input_d;
     qp_if_input_q <= qp_if_input_d;
     sq_if_input_q <= sq_if_input_d;
+    sq_fifo_state_q <= sq_fifo_state_d;
+    for(int i=0; i < NUM_QP; i++) begin
+      localpi_q[i] = localpi_d[i];
+    end
   end
 end
 
 
 always_ff @(posedge axis_aclk_i, negedge rstn_i) begin
   if(!rstn_i) begin
+    wqe_done = 1'b1;
     new_wqe_fetched <= 1'b0;
     rd_ready <= 1'b0;
     SQPIi_tmp <= 'd0;

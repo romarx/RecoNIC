@@ -56,6 +56,7 @@ module roce_stack_csr # (
   output logic [15:0]                     ACCESSDESC_o,
 
   //Per QP registers
+  output logic [7:0]                      SQidx_o,
   output logic [7:0]                      QPidx_o,
   output logic [7:0]                      connidx_o,
   output logic                            conn_configured_o,
@@ -71,7 +72,6 @@ module roce_stack_csr # (
   output logic [63:0]                     CQDBADDi_o,
   output logic [31:0]                     SQPIi_o,
   input  logic [31:0]                     CQHEADi_i,
-  output logic [31:0]                     CQHEADi_o,
   output logic [31:0]                     QDEPTHi_o,
   output logic [23:0]                     SQPSNi_o,
   output logic [31:0]                     LSTRQREQi_o, // contains rq psn[23:0]
@@ -396,6 +396,7 @@ logic [REG_WIDTH-1:0] STATRQPIDBi_d[NUM_QP-1:0], STATRQPIDBi_q[NUM_QP-1:0];
 logic [REG_WIDTH-1:0] PDNUMi_d[NUM_QP-1:0], PDNUMi_q[NUM_QP-1:0];
 
 logic [7:0] QPidx_d, QPidx_q;
+logic [7:0] SQidx_d, SQidx_q;
 logic [7:0] PDidx_d, PDidx_q;
 logic [7:0] connidx_d, connidx_q;
 
@@ -907,6 +908,10 @@ always_comb begin
 
   conn_configured_d = 1'b0;
   qp_configured_d = 1'b0;
+
+  QPidx_d = QPidx_q;
+  SQidx_d = SQidx_q;
+  connidx_d = connidx_q;
   
   CONF_d = CONF_q;
   ADCONF_d = ADCONF_q;
@@ -1044,9 +1049,6 @@ always_comb begin
     PDNUMi_d[i] = PDNUMi_q[i];
   end
 
-  QPidx_d = QPidx_q;
-  connidx_d = connidx_q;
-
   case(w_state_q)
     W_IDLE: begin
       if(s_axil_awvalid_i && !reading) begin
@@ -1154,7 +1156,7 @@ always_comb begin
             end
             ADDR_SQPIi: begin
               SQPIi_d[qpidx_w] = apply_wstrb(SQPIi_q[qpidx_w], WDataReg_q, mask);
-              QPidx_d = qpidx_w[7:0];
+              SQidx_d = qpidx_w[7:0];
             end
             ADDR_QDEPTHi: begin
               QDEPTHi_d[qpidx_w] = apply_wstrb(QDEPTHi_q[qpidx_w], WDataReg_q, mask);
@@ -1403,9 +1405,9 @@ end
 //find PD associated to current QP
 always_comb begin
   PDidx_d = PDidx_q;
-  if(QPidx_q != QPidx_d || SQPIi_d[QPidx_q] != SQPIi_q[QPidx_q]) begin
+  if(SQidx_q != SQidx_d || SQPIi_d[SQidx_q] != SQPIi_q[SQidx_q]) begin
     for(int i=0; i < NUM_PD; i++) begin
-      if(PDPDNUM_q[i][24:0] == {1'b1, PDNUMi_q[QPidx_q][23:0]}) begin
+      if(PDPDNUM_q[i][24:0] == {1'b1, PDNUMi_q[SQidx_q][23:0]}) begin
         PDidx_d = i;
       end
     end
@@ -1565,6 +1567,7 @@ always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
       PDNUMi_q[i] <= 'd0;
     end
 
+    SQidx_q <= 'hff;
     QPidx_q <= 'd0;
     PDidx_q <= 'd0;
     connidx_q <= 'd0;
@@ -1718,6 +1721,7 @@ always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
       PDNUMi_q[i] <= PDNUMi_d[i];
     end
 
+    SQidx_q <= SQidx_d;
     QPidx_q <= QPidx_d;
     PDidx_q <= PDidx_d;
     connidx_q <= connidx_d;
@@ -1749,6 +1753,7 @@ assign DATBUFSZ_o = DATBUFSZ_q;
 assign RESPERRPKTBA_o = {RESPERRPKTBAMSB_q, RESPERRPKTBA_q};
 assign RESPERRSZ_o = {RESPERRSZMSB_q, RESPERRSZ_q};
 
+assign SQidx_o = SQidx_q;
 assign QPidx_o = QPidx_q;
 assign connidx_o = connidx_q;
 assign conn_configured_o = conn_configured_q;
@@ -1767,12 +1772,14 @@ assign ACCESSDESC_o = ACCESSDESC_q[PDidx_q][15:0];
 assign QPCONFi_o = QPCONFi_q[QPidx_q];
 assign QPADVCONFi_o = QPADVCONFi_q[QPidx_q];
 assign RQBAi_o = {RQBAMSBi_q[QPidx_q], RQBAi_q[QPidx_q]};
-assign SQBAi_o = {SQBAMSBi_q[QPidx_q], SQBAi_q[QPidx_q]};
-assign CQBAi_o = {CQBAMSBi_q[QPidx_q], CQBAi_q[QPidx_q]};
+
+assign SQBAi_o = {SQBAMSBi_q[SQidx_q], SQBAi_q[SQidx_q]};
+assign CQBAi_o = {CQBAMSBi_q[SQidx_q], CQBAi_q[SQidx_q]};
+assign SQPIi_o = SQPIi_q[SQidx_q];
+
 assign RQWPTRDBADDi_o = {RQWPTRDBADDMSBi_q[QPidx_q], RQWPTRDBADDi_q[QPidx_q]};
 assign CQDBADDi_o = {CQDBADDMSBi_q[QPidx_q], CQDBADDi_q[QPidx_q]};
-assign SQPIi_o = SQPIi_q[QPidx_q];
-assign CQHEADi_o = CQHEADi_q[QPidx_q];
+
 assign QDEPTHi_o = QDEPTHi_q[QPidx_q];
 assign SQPSNi_o = SQPSNi_q[QPidx_q][23:0];
 assign LSTRQREQi_o = LSTRQREQi_q[QPidx_q];

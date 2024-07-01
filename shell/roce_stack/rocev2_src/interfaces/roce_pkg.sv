@@ -140,26 +140,26 @@ package roceTypes;
     } rdma_ack_t;
 
     typedef struct packed {
-        logic [RDMA_QP_IDX_BITS-1:0]   conn_idx;
+        logic [RDMA_QP_IDX_BITS-1:0]  conn_idx;
         logic [RDMA_IF_QPN_BITS-1:0]  dest_qp;
-        logic [IPv4_BITS-1:0]  dest_ip_addr;
-        logic [PORT_BITS-1:0]  port; //take port from conf (assume it's standard port)
+        logic [IPv4_BITS-1:0]         dest_ip_addr;
+        logic [PORT_BITS-1:0]         port; //take port from conf (assume it's standard port)
     } conndata_struct; //80 bits
 
 
     typedef struct packed {
-        logic [RDMA_QP_IDX_BITS-1:0]   qp_idx;
-        logic [PADDR_BITS-1:0]  sq_base_addr;
-        logic [AXIL_DATA_BITS-1:0]  sq_prod_idx; //AXI lite data bits for complete regs
-        logic [VADDR_BITS-1:0]  pd_vaddr;
+        logic [RDMA_QP_IDX_BITS-1:0]  sq_idx;
+        logic [PADDR_BITS-1:0]        sq_base_addr;
+        logic [AXIL_DATA_BITS-1:0]    sq_prod_idx; //AXI lite data bits for complete regs
+        logic [VADDR_BITS-1:0]        pd_vaddr;
     } SQdata_struct; //168 bits
 
     typedef struct packed { 
-        logic [RDMA_QP_IDX_BITS-1:0]   qp_idx;
-        logic [AXIL_DATA_BITS-1:0]  src_qp_conf; //AXI lite data bits for complete regs
-        logic [RDMA_IF_QPN_BITS-1:0] dest_qp;
-        logic [RDMA_MSN_BITS-1:0]  sq_psn;
-        logic [RDMA_MSN_BITS-1:0]  dest_sq_psn;
+        logic [RDMA_QP_IDX_BITS-1:0]  qp_idx;
+        logic [AXIL_DATA_BITS-1:0]    src_qp_conf; //AXI lite data bits for complete regs
+        logic [RDMA_IF_QPN_BITS-1:0]  dest_qp;
+        logic [RDMA_MSN_BITS-1:0]     sq_psn;
+        logic [RDMA_MSN_BITS-1:0]     dest_sq_psn;
     } QPdata_struct; //112 bits
 
     typedef struct packed {
