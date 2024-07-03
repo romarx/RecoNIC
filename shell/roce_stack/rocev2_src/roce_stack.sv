@@ -72,79 +72,43 @@ module roce_stack (
 );
 
 //
-// SQ -- reframing of the user commands between rdma_flow and roce_v2_ip
+// SQ
 //
-metaIntf #(.STYPE(rdma_req_t)) rdma_sq ();
-`ifdef VITIS_HLS
-    logic [RDMA_REQ_BITS+32-RDMA_OPCODE_BITS-1:0] rdma_sq_data;
-`else
-    logic [RDMA_REQ_BITS-1:0] rdma_sq_data;
-`endif
+
+metaIntf #(.STYPE(dreq_t)) rdma_sq ();
+logic [RDMA_REQ_BITS-1:0] rdma_sq_data;
 
 always_comb begin
-`ifdef VITIS_HLS
-  rdma_sq_data                                                      = 0;
-  
-  rdma_sq_data[0+:RDMA_OPCODE_BITS]                                 = rdma_sq.data.opcode;
-  rdma_sq_data[32+:RDMA_QPN_BITS]                                   = rdma_sq.data.qpn;
-
-  rdma_sq_data[32+RDMA_QPN_BITS+0+:1]                               = rdma_sq.data.host;
-  rdma_sq_data[32+RDMA_QPN_BITS+1+:1]                               = rdma_sq.data.last;
-
-  rdma_sq_data[32+RDMA_QPN_BITS+2+:RDMA_OFFS_BITS]                  = rdma_sq.data.offs;
-
-  rdma_sq_data[32+RDMA_QPN_BITS+2+RDMA_OFFS_BITS+:RDMA_MSG_BITS]    = rdma_sq.data.msg;
-`else
-  rdma_sq_data                                                      = 0;
-
-  rdma_sq_data[0+:RDMA_OPCODE_BITS]                                 = rdma_sq.data.opcode;
-  rdma_sq_data[RDMA_OPCODE_BITS+:RDMA_QPN_BITS]                     = rdma_sq.data.qpn;
-  
-  rdma_sq_data[RDMA_OPCODE_BITS+RDMA_QPN_BITS+0+:1]                 = rdma_sq.data.host;
-  rdma_sq_data[RDMA_OPCODE_BITS+RDMA_QPN_BITS+1+:1]                 = rdma_sq.data.last;
-
-  rdma_sq_data[RDMA_OPCODE_BITS+RDMA_QPN_BITS+2+:RDMA_OFFS_BITS]    = rdma_sq.data.offs;
-
-  rdma_sq_data[RDMA_OPCODE_BITS+RDMA_QPN_BITS+2+RDMA_OFFS_BITS+:RDMA_MSG_BITS] = rdma_sq.data.msg;
-`endif
+  rdma_sq_data                                                           = 0;
+  rdma_sq_data[0+:RDMA_OPCODE_BITS]                                      = rdma_sq.data.req_1.opcode;
+  rdma_sq_data[32+:RDMA_QPN_BITS]                                        = rdma_sq.data.req_1.qpn;
+  rdma_sq_data[32+RDMA_QPN_BITS+0+:1]                                    = rdma_sq.data.req_1.host;
+  rdma_sq_data[32+RDMA_QPN_BITS+1+:1]                                    = rdma_sq.data.req_1.last;
+  rdma_sq_data[32+RDMA_QPN_BITS+2+:OFFS_BITS]                            = rdma_sq.data.req_1.offs;
+  rdma_sq_data[32+RDMA_QPN_BITS+2+OFFS_BITS+:VADDR_BITS]                 = rdma_sq.data.req_1.vaddr;
+  rdma_sq_data[32+RDMA_QPN_BITS+2+OFFS_BITS+VADDR_BITS+:VADDR_BITS]      = rdma_sq.data.req_2.vaddr;
+  rdma_sq_data[32+RDMA_QPN_BITS+2+OFFS_BITS+2*VADDR_BITS+:RDMA_LEN_BITS] = rdma_sq.data.req_1.len;
+  rdma_sq_data[32+RDMA_QPN_BITS+2+OFFS_BITS+2*VADDR_BITS+RDMA_LEN_BITS+:RDMA_IMM_BITS] = {rdma_sq.data.req_2.offs[3:0], rdma_sq.data.req_2.len};
 end
 
-//
-// RD and WR interface - reframing of memory access commands 
-// 
-logic [RDMA_BASE_REQ_BITS-1:0] rd_cmd_data;
-logic [RDMA_BASE_REQ_BITS-1:0] wr_cmd_data;
-
-assign m_rdma_rd_req.data.vaddr             = rd_cmd_data[0+:VADDR_BITS];
-assign m_rdma_rd_req.data.len               = rd_cmd_data[VADDR_BITS+:LEN_BITS];
-assign m_rdma_rd_req.data.ctl               = rd_cmd_data[VADDR_BITS+LEN_BITS+:1];
-assign m_rdma_rd_req.data.stream            = rd_cmd_data[VADDR_BITS+LEN_BITS+1+:1];
-assign m_rdma_rd_req.data.sync              = rd_cmd_data[VADDR_BITS+LEN_BITS+2+:1];
-assign m_rdma_rd_req.data.host              = rd_cmd_data[VADDR_BITS+LEN_BITS+3+:1];
-assign m_rdma_rd_req.data.dest              = rd_cmd_data[VADDR_BITS+LEN_BITS+4+:DEST_BITS];
-assign m_rdma_rd_req.data.pid               = rd_cmd_data[VADDR_BITS+LEN_BITS+4+DEST_BITS+:PID_BITS];
-assign m_rdma_rd_req.data.vfid              = rd_cmd_data[VADDR_BITS+LEN_BITS+4+DEST_BITS+PID_BITS+:N_REGIONS_BITS];
-
-assign m_rdma_wr_req.data.vaddr             = wr_cmd_data[0+:VADDR_BITS];
-assign m_rdma_wr_req.data.len               = wr_cmd_data[VADDR_BITS+:LEN_BITS];
-assign m_rdma_wr_req.data.ctl               = wr_cmd_data[VADDR_BITS+LEN_BITS+:1];
-assign m_rdma_wr_req.data.stream            = wr_cmd_data[VADDR_BITS+LEN_BITS+1+:1];
-assign m_rdma_wr_req.data.sync              = wr_cmd_data[VADDR_BITS+LEN_BITS+2+:1];
-assign m_rdma_wr_req.data.host              = wr_cmd_data[VADDR_BITS+LEN_BITS+3+:1];
-assign m_rdma_wr_req.data.dest              = wr_cmd_data[VADDR_BITS+LEN_BITS+4+:DEST_BITS];
-assign m_rdma_wr_req.data.pid               = wr_cmd_data[VADDR_BITS+LEN_BITS+4+DEST_BITS+:PID_BITS];
-assign m_rdma_wr_req.data.vfid              = wr_cmd_data[VADDR_BITS+LEN_BITS+4+DEST_BITS+PID_BITS+:N_REGIONS_BITS];
 
 //
-// ACKs - reframing of rdma_acks between rdma_flow and roce_v2_ip
+// FC and CQ
 //
-metaIntf #(.STYPE(rdma_ack_t)) rdma_ack ();
+
+metaIntf #(.STYPE(dack_t)) rdma_ack ();
 logic [RDMA_ACK_BITS-1:0] ack_meta_data;
-assign rdma_ack.data.rd = ack_meta_data[0];
-assign rdma_ack.data.cmplt = 1'b0;
-assign rdma_ack.data.pid = ack_meta_data[1+:PID_BITS];
-assign rdma_ack.data.vfid = ack_meta_data[1+PID_BITS+:N_REGIONS_BITS]; 
-assign rdma_ack.data.ssn = ack_meta_data[1+RDMA_ACK_QPN_BITS+:RDMA_ACK_PSN_BITS]; // msn
+
+assign rdma_ack.data.ack.opcode = ack_meta_data[0+:RDMA_OPCODE_BITS];
+assign rdma_ack.data.ack.remote = 1'b1;
+assign rdma_ack.data.ack.pid    = ack_meta_data[32+:PID_BITS];
+assign rdma_ack.data.ack.vfid   = ack_meta_data[32+PID_BITS+:DEST_BITS];
+assign rdma_ack.data.ack.host   = ack_meta_data[32+RDMA_QPN_BITS+:1];
+assign rdma_ack.data.ack.dest   = ack_meta_data[32+RDMA_QPN_BITS+1+:DEST_BITS];
+assign rdma_ack.data.ack.strm   = ack_meta_data[32+RDMA_QPN_BITS+1+DEST_BITS+:STRM_BITS];
+assign rdma_ack.data.ack.rsrvd  = 0;
+assign rdma_ack.data.last       = ack_meta_data[32+RDMA_QPN_BITS+1+DEST_BITS+STRM_BITS+:1];
+
 
 // Flow control - controls flow of user commands 
 rdma_flow inst_rdma_flow (
@@ -155,6 +119,96 @@ rdma_flow inst_rdma_flow (
     .s_ack(rdma_ack),
     .m_ack(m_rdma_ack)
 );
+
+// Definition of the AXI-bus from roce-ip to icrc 
+AXI4S #(.AXI4S_DATA_BITS(AXI_NET_BITS)) roce_to_icrc();
+
+// Integrate the ICRC-module on the outgoing datapath 
+icrc inst_icrc (
+    .m_axis_rx(roce_to_icrc), 
+    .m_axis_tx(m_axis_tx), 
+    .nclk(nclk), 
+    .nresetn(nresetn)
+);
+
+
+//
+// BUFF RQ
+//
+
+metaIntf #(.STYPE(req_t)) rdma_rd_req ();
+metaIntf #(.STYPE(req_t)) rdma_wr_req ();
+logic [RDMA_BASE_REQ_BITS-1:0] rd_cmd_data;
+logic [RDMA_BASE_REQ_BITS-1:0] wr_cmd_data;
+
+AXI4S #(.AXI4S_DATA_BITS(AXI_NET_BITS)) axis_rdma_rd ();
+
+// RD
+assign rdma_rd_req.data.opcode            = rd_cmd_data[0+:RDMA_OPCODE_BITS];
+assign rdma_rd_req.data.mode              = 1'b1;
+assign rdma_rd_req.data.rdma              = 1'b1;
+assign rdma_rd_req.data.remote            = 1'b0;
+
+assign rdma_rd_req.data.pid               = rd_cmd_data[32+:PID_BITS];
+assign rdma_rd_req.data.vfid              = rd_cmd_data[32+PID_BITS+:DEST_BITS];
+
+assign rdma_rd_req.data.last              = rd_cmd_data[32+RDMA_QPN_BITS+0+:1];
+assign rdma_rd_req.data.vaddr             = rd_cmd_data[32+RDMA_QPN_BITS+1+:VADDR_BITS];
+assign rdma_rd_req.data.dest              = rd_cmd_data[32+RDMA_QPN_BITS+1+VADDR_BITS+:DEST_BITS];
+assign rdma_rd_req.data.strm              = rd_cmd_data[32+RDMA_QPN_BITS+1+VADDR_BITS+DEST_BITS+:STRM_BITS];
+assign rdma_rd_req.data.len               = rd_cmd_data[32+RDMA_QPN_BITS+1+VADDR_BITS+DEST_BITS+STRM_BITS+:LEN_BITS];
+assign rdma_rd_req.data.actv              = rd_cmd_data[32+RDMA_QPN_BITS+1+VADDR_BITS+DEST_BITS+STRM_BITS+LEN_BITS+0+:1];
+assign rdma_rd_req.data.host              = rd_cmd_data[32+RDMA_QPN_BITS+1+VADDR_BITS+DEST_BITS+STRM_BITS+LEN_BITS+1+:1];
+assign rdma_rd_req.data.offs              = rd_cmd_data[32+RDMA_QPN_BITS+1+VADDR_BITS+DEST_BITS+STRM_BITS+LEN_BITS+2+:OFFS_BITS];
+
+// WR
+assign rdma_wr_req.data.opcode            = wr_cmd_data[0+:RDMA_OPCODE_BITS];
+assign rdma_wr_req.data.mode              = 1'b1;
+assign rdma_wr_req.data.rdma              = 1'b1;
+assign rdma_wr_req.data.remote            = 1'b0;
+
+assign rdma_wr_req.data.pid               = wr_cmd_data[32+:PID_BITS];
+assign rdma_wr_req.data.vfid              = wr_cmd_data[32+PID_BITS+:DEST_BITS];
+
+assign rdma_wr_req.data.last              = wr_cmd_data[32+RDMA_QPN_BITS+0+:1];
+assign rdma_wr_req.data.vaddr             = wr_cmd_data[32+RDMA_QPN_BITS+1+:VADDR_BITS];
+assign rdma_wr_req.data.dest              = wr_cmd_data[32+RDMA_QPN_BITS+1+VADDR_BITS+:DEST_BITS];
+assign rdma_wr_req.data.strm              = wr_cmd_data[32+RDMA_QPN_BITS+1+VADDR_BITS+DEST_BITS+:STRM_BITS];
+assign rdma_wr_req.data.len               = wr_cmd_data[32+RDMA_QPN_BITS+1+VADDR_BITS+DEST_BITS+STRM_BITS+:LEN_BITS];
+assign rdma_wr_req.data.actv              = wr_cmd_data[32+RDMA_QPN_BITS+1+VADDR_BITS+DEST_BITS+STRM_BITS+LEN_BITS+0+:1];
+assign rdma_wr_req.data.host              = wr_cmd_data[32+RDMA_QPN_BITS+1+VADDR_BITS+DEST_BITS+STRM_BITS+LEN_BITS+1+:1];
+assign rdma_wr_req.data.offs              = wr_cmd_data[32+RDMA_QPN_BITS+1+VADDR_BITS+DEST_BITS+STRM_BITS+LEN_BITS+2+:OFFS_BITS];
+
+/*
+// Retransmission mux (buffering)
+rdma_mux_retrans inst_mux_retrans (
+  .aclk(nclk),
+  .aresetn(nresetn),
+
+  .s_req_net(rdma_rd_req),
+  .m_req_user(m_rdma_rd_req),
+
+  .s_axis_user_req(s_axis_rdma_rd_req),
+  .s_axis_user_rsp(s_axis_rdma_rd_rsp),
+  .m_axis_net(axis_rdma_rd),
+  
+  .m_req_ddr_rd(m_rdma_mem_rd_cmd),
+  .m_req_ddr_wr(m_rdma_mem_wr_cmd),
+  .s_axis_ddr(s_axis_rdma_mem_rd),
+  .m_axis_ddr(m_axis_rdma_mem_wr)
+);  
+
+assign s_rdma_mem_rd_sts.ready = 1'b1;
+assign s_rdma_mem_wr_sts.ready = 1'b1;
+*/
+
+assign m_rdma_wr_req.valid = rdma_wr_req.valid;
+assign m_rdma_wr_req.data = rdma_wr_req.data;
+assign rdma_wr_req.ready = m_rdma_wr_req.ready;
+
+assign m_rdma_rd_req.valid = rdma_rd_req.valid;
+assign m_rdma_rd_req.data = rdma_rd_req.data;
+assign rdma_rd_req.ready = m_rdma_rd_req.ready;
 
 /*ila_ack inst_ila_ack (
     .clk(nclk),
@@ -204,17 +258,7 @@ ila_mem inst_ila_mem_wr(
 
 */
 
-// Definition of the AXI-bus from roce-ip to icrc 
-AXI4S #(.AXI4S_DATA_BITS(AXI_NET_BITS)) roce_to_icrc();
-
-// Integrate the ICRC-module on the outgoing datapath 
-icrc inst_icrc (
-    .m_axis_rx(roce_to_icrc), 
-    .m_axis_tx(m_axis_tx), 
-    .nclk(nclk), 
-    .nresetn(nresetn)
-);
-
+/*
 // ChipScope around the ICRC 
 metaIntf #(.STYPE(logic [49:0])) ackEvent_dbg (); 
 metaIntf #(.STYPE(logic [7:0])) ibh_dbg (); 
@@ -243,7 +287,7 @@ assign ibhfsm_metain_debug.ready = 1'b1;
 assign gexh_state_debug.ready = 1'b1;
 assign gibh_state_debug.ready = 1'b1;
 assign iumm_dstQpFifo_debug.ready = 1'b1;
-
+*/
 /*
 ila_tx inst_ila_tx (
     .clk(nclk),
@@ -303,8 +347,8 @@ ila_rx inst_ila_rx(
 //
 // DBG
 // 
-metaIntf #(.STYPE(logic [87:0])) axis_dbg ();
-assign axis_dbg.ready = 1'b1;
+//metaIntf #(.STYPE(logic [87:0])) axis_dbg ();
+//assign axis_dbg.ready = 1'b1;
 
 /*
 ila_dbg_rdma inst_ila_dbg_rdma (
@@ -337,6 +381,13 @@ set_property -dict [list CONFIG.C_PROBE16_WIDTH {32} CONFIG.C_PROBE15_WIDTH {40}
 //
 // RoCE stack - HLS stack for RDMA-networking
 //
+metaIntf #(.STYPE(logic[103:0])) m_axis_dbg_0 ();
+metaIntf #(.STYPE(logic[103:0])) m_axis_dbg_1 ();
+metaIntf #(.STYPE(logic[103:0])) m_axis_dbg_2 ();
+assign m_axis_dbg_0.ready = 1'b1;
+assign m_axis_dbg_1.ready = 1'b1;
+assign m_axis_dbg_2.ready = 1'b1;
+
 rocev2_ip rocev2_inst(
     .ap_clk(nclk), // input aclk
     .ap_rst_n(nresetn), // input aresetn
@@ -345,61 +396,27 @@ rocev2_ip rocev2_inst(
 
     // Debug
 `ifdef DBG_IBV
-    .m_axis_dbg_TVALID(axis_dbg.valid),
-    .m_axis_dbg_TREADY(axis_dbg.ready),
-    .m_axis_dbg_TDATA(axis_dbg.data),
+    .m_axis_dbg_0_TVALID(m_axis_dbg_0.valid),
+    .m_axis_dbg_0_TREADY(m_axis_dbg_0.ready),
+    .m_axis_dbg_0_TDATA(m_axis_dbg_0.data),
+    
+    .m_axis_dbg_1_TVALID(m_axis_dbg_1.valid),
+    .m_axis_dbg_1_TREADY(m_axis_dbg_1.ready),
+    .m_axis_dbg_1_TDATA(m_axis_dbg_1.data),
+    
+    .m_axis_dbg_2_TVALID(m_axis_dbg_2.valid),
+    .m_axis_dbg_2_TREADY(m_axis_dbg_2.ready),
+    .m_axis_dbg_2_TDATA(m_axis_dbg_2.data),
 `endif
 
-    // Debug Outputs for ACKs and IBHs 
-    .tx_ackEvent_debug_TVALID(ackEvent_dbg.valid), 
-    .tx_ackEvent_debug_TREADY(ackEvent_dbg.ready), 
-    .tx_ackEvent_debug_TDATA(ackEvent_dbg.data), 
-    .tx_ibhHeaderFifo_debug_TVALID(ibh_dbg.valid), 
-    .tx_ibhHeaderFifo_debug_TREADY(ibh_dbg.ready), 
-    .tx_ibhHeaderFifo_debug_TDATA(ibh_dbg.data), 
-    // Debug Outputs for ACKs and IBHs 
-    .tx_gibh_opcode_debug_TVALID(gibh_opcode_debug.valid), 
-    .tx_gibh_opcode_debug_TREADY(gibh_opcode_debug.ready), 
-    .tx_gibh_opcode_debug_TDATA(gibh_opcode_debug.data), 
-    .tx_gibh_psn_debug_TVALID(gibh_psn_debug.valid),
-    .tx_gibh_psn_debug_TREADY(gibh_psn_debug.ready), 
-    .tx_gibh_psn_debug_TDATA(gibh_psn_debug.data), 
-    .tx_pibh_opcode_debug_TVALID(pibh_opcode_debug.valid), 
-    .tx_pibh_opcode_debug_TREADY(pibh_opcode_debug.ready), 
-    .tx_pibh_opcode_debug_TDATA(pibh_opcode_debug.data), 
-    .tx_gexh_meta_debug_TVALID(gexh_meta_debug.valid), 
-    .tx_gexh_meta_debug_TREADY(gexh_meta_debug.ready), 
-    .tx_gexh_meta_debug_TDATA(gexh_meta_debug.data), 
-    .tx_iumm_fire_debug_TVALID(iumm_fire_debug.valid), 
-    .tx_iumm_fire_debug_TREADY(iumm_fire_debug.ready), 
-    .tx_iumm_fire_debug_TDATA(iumm_fire_debug.data), 
-    .tx_pibh_fire_debug_TVALID(pibh_fire_debug.valid), 
-    .tx_pibh_fire_debug_TREADY(pibh_fire_debug.ready), 
-    .tx_pibh_fire_debug_TDATA(pibh_fire_debug.data), 
-    .tx_lrh_fire_debug_TVALID(lrh_fire_debug.valid), 
-    .tx_lrh_fire_debug_TREADY(lrh_fire_debug.ready), 
-    .tx_lrh_fire_debug_TDATA(lrh_fire_debug.data), 
-    .tx_ibhfsm_metain_debug_TVALID(ibhfsm_metain_debug.valid),
-    .tx_ibhfsm_metain_debug_TREADY(ibhfsm_metain_debug.ready),
-    .tx_ibhfsm_metain_debug_TDATA(ibhfsm_metain_debug.data),
-    .tx_gexh_state_debug_TVALID(gexh_state_debug.valid), 
-    .tx_gexh_state_debug_TREADY(gexh_state_debug.ready), 
-    .tx_gexh_state_debug_TDATA(gexh_state_debug.data), 
-    .tx_gibh_state_debug_TVALID(gibh_state_debug.valid), 
-    .tx_gibh_state_debug_TREADY(gibh_state_debug.ready), 
-    .tx_gibh_state_debug_TDATA(gibh_state_debug.data), 
-    .tx_iumm_dstQpFifo_debug_TVALID(iumm_dstQpFifo_debug.valid),
-    .tx_iumm_dstQpFifo_debug_TREADY(iumm_dstQpFifo_debug.ready),
-    .tx_iumm_dstQpFifo_debug_TDATA(iumm_dstQpFifo_debug.data), 
-
-    // RX - network input 
+    // RX
     .s_axis_rx_data_TVALID(s_axis_rx.tvalid),
     .s_axis_rx_data_TREADY(s_axis_rx.tready),
     .s_axis_rx_data_TDATA(s_axis_rx.tdata),
     .s_axis_rx_data_TKEEP(s_axis_rx.tkeep),
     .s_axis_rx_data_TLAST(s_axis_rx.tlast),
     
-    // TX - network output
+    // TX
     .m_axis_tx_data_TVALID(roce_to_icrc.tvalid),
     .m_axis_tx_data_TREADY(roce_to_icrc.tready),
     .m_axis_tx_data_TDATA(roce_to_icrc.tdata),
@@ -451,6 +468,7 @@ rocev2_ip rocev2_inst(
     // IP
     .local_ip_address({local_ip_address,local_ip_address,local_ip_address,local_ip_address}), //Use IPv4 addr
 
+    //DBG
     .regIbvCountRx(ibv_rx_pkg_count_data),
     .regIbvCountRx_ap_vld(ibv_rx_pkg_count_valid),
     .regIbvCountTx(ibv_tx_pkg_count_data),
@@ -466,42 +484,7 @@ rocev2_ip rocev2_inst(
 
     // Debug
 `ifdef DBG_IBV
-    .m_axis_dbg_TVALID(),
-    .m_axis_dbg_TREADY(),
-    .m_axis_dbg_TDATA(),
 `endif
-
-    // Debug Outputs for ACKs and IBHs 
-    .tx_ackEvent_debug_TVALID(ackEvent_dbg.valid), 
-    .tx_ackEvent_debug_TREADY(ackEvent_dbg.ready), 
-    .tx_ackEvent_debug_TDATA(ackEvent_dbg.data), 
-    .tx_ibhHeaderFifo_debug_TVALID(ibh_dbg.valid), 
-    .tx_ibhHeaderFifo_debug_TREADY(ibh_dbg.ready), 
-    .tx_ibhHeaderFifo_debug_TDATA(ibh_dbg.data), 
-    .tx_gibh_opcode_debug_TVALID(gibh_opcode_debug.valid), 
-    .tx_gibh_opcode_debug_TREADY(gibh_opcode_debug.ready), 
-    .tx_gibh_opcode_debug_TDATA(gibh_opcode_debug.data), 
-    .tx_gibh_psn_debug_TVALID(gibh_psn_debug.valid),
-    .tx_gibh_psn_debug_TREADY(gibh_psn_debug.ready), 
-    .tx_gibh_psn_debug_TDATA(gibh_psn_debug.data), 
-    .tx_pibh_opcode_debug_TVALID(pibh_opcode_debug.valid), 
-    .tx_pibh_opcode_debug_TREADY(pibh_opcode_debug.ready), 
-    .tx_pibh_opcode_debug_TDATA(pibh_opcode_debug.data), 
-    .tx_lrh_fire_debug_TVALID(lrh_fire_debug.valid), 
-    .tx_lrh_fire_debug_TREADY(lrh_fire_debug.ready), 
-    .tx_lrh_fire_debug_TDATA(lrh_fire_debug.data), 
-    .tx_ibhfsm_metain_debug_TVALID(ibhfsm_metain_debug.valid),
-    .tx_ibhfsm_metain_debug_TREADY(ibhfsm_metain_debug.ready),
-    .tx_ibhfsm_metain_debug_TDATA(ibhfsm_metain_debug.data),
-    .tx_gexh_state_debug_TVALID(gexh_state_debug.valid), 
-    .tx_gexh_state_debug_TREADY(gexh_state_debug.ready), 
-    .tx_gexh_state_debug_TDATA(gexh_state_debug.data),
-    .tx_gibh_state_debug_TVALID(gibh_state_debug.valid), 
-    .tx_gibh_state_debug_TREADY(gibh_state_debug.ready), 
-    .tx_gibh_state_debug_TDATA(gibh_state_debug.data),
-    .tx_iumm_dstQpFifo_debug_TVALID(iumm_dstQpFifo_debug.valid),
-    .tx_iumm_dstQpFifo_debug_TREADY(iumm_dstQpFifo_debug.ready),
-    .tx_iumm_dstQpFifo_debug_TDATA(iumm_dstQpFifo_debug.data),  
 
     // RX
     .s_axis_rx_data_TVALID(s_axis_rx.tvalid),

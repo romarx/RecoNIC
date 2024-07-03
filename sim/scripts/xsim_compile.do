@@ -129,8 +129,8 @@ xvlog $xvlog_opts -work reco -L rocev2_ip --include "../build/ip/rocev2_ip/hdl/v
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w138_d2_S.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w145_d2_S.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w145_d8_A.v" \
-"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w150_d2_S.v" \
-"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w150_d512_A.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w152_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w152_d512_A.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w153_d2_S.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w178_d4_S.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w178_d512_A.v" \
@@ -140,8 +140,9 @@ xvlog $xvlog_opts -work reco -L rocev2_ip --include "../build/ip/rocev2_ip/hdl/v
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w256_d32_A.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w320_d2_S.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w320_d8_A.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w384_d2_S.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w384_d8_A.v" \
-"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w448_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w512_d2_S.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w1024_d2_S.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w1024_d4_A.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w1024_d8_A.v" \
@@ -153,12 +154,7 @@ xvlog $xvlog_opts -work reco -L rocev2_ip --include "../build/ip/rocev2_ip/hdl/v
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_handle_read_requests_0_s.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_detection_unit.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_idx0_monitor.v" \
-"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_idx6_monitor.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_idx8_monitor.v" \
-"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_idx10_monitor.v" \
-"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_idx11_monitor.v" \
-"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_idx12_monitor.v" \
-"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_hls_deadlock_idx13_monitor.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_insert_icrc_512_0_s.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_ipUdpMetaHandler_512_0_s.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_ipv4_drop_optional_ip_header_512_s.v" \
@@ -215,6 +211,8 @@ xvlog $xvlog_opts -work reco -L rocev2_ip --include "../build/ip/rocev2_ip/hdl/v
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top.v" \
 "../build/ip/rocev2_ip/synth/rocev2_ip.v" \
 
+#xvlog $xvlog_opts -work reco -L rocev2_ip "../build/ip/rocev2_ip/rocev2_ip_sim_netlist.v"
+
 xvlog $xvlog_opts -work reco -L rocev2_ip --include "../build/ip/mac_ip_encode_ip/hdl/verilog" \
 "../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top_convert_axis_to_net_axis_512_s.v" \
 "../build/ip/mac_ip_encode_ip/hdl/verilog/mac_ip_encode_top_convert_net_axis_to_axis_512_s.v" \
@@ -269,6 +267,8 @@ xvlog $xvlog_opts -work reco -L rocev2_ip --include "../build/ip/ip_handler_ip/h
 "../build/ip/ip_handler_ip/hdl/verilog/ip_handler_top.v" \
 "../build/ip/ip_handler_ip/synth/ip_handler_ip.v" \
 
+#xvlog $xvlog_opts -work reco -L rocev2_ip "../build/ip/ip_handler_ip/ip_handler_ip_sim_netlist.v"
+
 xvlog $xvlog_opts -work reco -L rocev2_ip \
 "../build/ip/roce_stack_axi_datamover/roce_stack_axi_datamover_sim_netlist.v"
 
@@ -319,13 +319,7 @@ xvlog $xvlog_opts -work reco -sv -L fifo_generator_v13_2_6 \
 "../build/ip/sys_mem_5to2_axi_crossbar/synth/sys_mem_5to2_axi_crossbar.v"
 
 xvlog $xvlog_opts -work reco -L fifo_generator_v13_2_6 \
-"../build/ip/cdc_fifo_qp/sim/cdc_fifo_qp.v"
-
-xvlog $xvlog_opts -work reco -L fifo_generator_v13_2_6 \
 "../build/ip/cdc_fifo_sq/sim/cdc_fifo_sq.v"
-
-xvlog $xvlog_opts -work reco -L fifo_generator_v13_2_6 \
-"../build/ip/cdc_fifo_conn/sim/cdc_fifo_conn.v"
 
 xvlog $xvlog_opts -work reco \
 "$VIVADO_DATA_DIR/verilog/src/glbl.v"

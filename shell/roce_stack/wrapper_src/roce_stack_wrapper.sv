@@ -164,10 +164,10 @@ logic [63:0] VIRTADDRi;
 metaIntf #(.STYPE(req_t)) rdma_rd_req ();
 metaIntf #(.STYPE(req_t)) rdma_wr_req ();
 
-metaIntf #(.STYPE(logic[183:0])) rdma_conn_interface();
-metaIntf #(.STYPE(logic[199:0])) rdma_qp_interface();
-metaIntf #(.STYPE(rdma_req_t)) rdma_sq();
-metaIntf #(.STYPE(rdma_ack_t)) rdma_ack();
+metaIntf #(.STYPE(rdma_qp_conn_t)) rdma_conn_interface();
+metaIntf #(.STYPE(rdma_qp_ctx_t)) rdma_qp_interface();
+metaIntf #(.STYPE(dreq_t)) rdma_sq();
+metaIntf #(.STYPE(dack_t)) rdma_ack();
 
 AXI4S #(.AXI4S_DATA_BITS(AXI4S_DATA_WIDTH)) axis_rdma_rd ();
 AXI4S #(.AXI4S_DATA_BITS(AXI4S_DATA_WIDTH)) axis_rdma_wr ();
@@ -409,13 +409,13 @@ roce_stack_axis_to_aximm #(
   .s_rdma_rd_req_ready_o(rdma_rd_req.ready),
   .s_rdma_rd_req_vaddr_i(rdma_rd_req.data.vaddr),
   .s_rdma_rd_req_len_i(rdma_rd_req.data.len),
-  .s_rdma_rd_req_ctl_i(rdma_rd_req.data.ctl),
+  .s_rdma_rd_req_ctl_i(rdma_rd_req.data.last),
 
   .s_rdma_wr_req_valid_i(rdma_wr_req.valid),
   .s_rdma_wr_req_ready_o(rdma_wr_req.ready),
   .s_rdma_wr_req_vaddr_i(rdma_wr_req.data.vaddr),
   .s_rdma_wr_req_len_i(rdma_wr_req.data.len),
-  .s_rdma_wr_req_ctl_i(rdma_wr_req.data.ctl),
+  .s_rdma_wr_req_ctl_i(rdma_wr_req.data.last),
 
   .m_axis_rdma_rd_tdata_o(axis_rdma_rd.tdata),
   .m_axis_rdma_rd_tkeep_o(axis_rdma_rd.tkeep),
@@ -548,7 +548,7 @@ ip_handler_ip ip_handler_inst (
 ); 
 
 
-
+assign rdma_ack.ready = 1'b1;
 //TODO: definitions for AXI4S, metaIntf....
 roce_stack inst_roce_stack (
   .nclk(axis_aclk_i),

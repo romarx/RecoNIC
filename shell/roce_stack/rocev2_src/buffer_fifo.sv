@@ -93,4 +93,3 @@ module buffer_fifo(
     assign halffull = ((write_pointer + 8) == read_pointer);  
 
 endmodule
-

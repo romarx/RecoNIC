@@ -46,6 +46,7 @@ package roceTypes;
     // Data
     parameter integer PADDR_BITS = 64;
     parameter integer VADDR_BITS = 64;
+    parameter integer OFFS_BITS = 6;
     parameter integer ACCESDESC_BITS = 4;
     parameter integer BUFLEN_BITS = 48;
     parameter integer LEN_BITS = 28;
@@ -70,18 +71,23 @@ package roceTypes;
     parameter integer RC_RDMA_READ_RESP_ONLY = 5'h10;
     parameter integer RC_ACK = 5'h11;
 
+    parameter integer STRM_BITS = 2;
     parameter integer RDMA_IF_QPN_BITS = 24;
     parameter integer RDMA_NUM_QP = 256;
     parameter integer RDMA_QP_IDX_BITS = clog2s(RDMA_NUM_QP);
-    parameter integer RDMA_ACK_BITS = 40;
+    parameter integer RDMA_ACK_BITS = 64;
+    parameter integer RDMA_LEN_BITS = 32;
+    parameter integer RDMA_IMM_BITS = 32;
     parameter integer RDMA_ACK_QPN_BITS = 10;
     parameter integer RDMA_ACK_PSN_BITS = 24;
     parameter integer RDMA_ACK_MSN_BITS = 24;
-    parameter integer RDMA_BASE_REQ_BITS = 96;
-    parameter integer RDMA_REQ_BITS = 256;
+    parameter integer RDMA_REQ_BITS = 248;
     parameter integer RDMA_OPCODE_BITS = 5;
-    parameter integer RDMA_QPN_BITS = 10;
+    parameter integer RDMA_QPN_BITS = 16;
     parameter integer RDMA_MSG_BITS = 192;
+    parameter integer RDMA_N_RD_OUTSTANDING = 8;
+    parameter integer RDMA_N_WR_OUTSTANDING = 16;
+    parameter integer RDMA_BASE_REQ_BITS = 160;
     
 
     parameter integer RDMA_QP_INTF_BITS = 200;
@@ -106,16 +112,32 @@ package roceTypes;
     // Structs
     // -----------------------------------------------------------------
     typedef struct packed {
+        // Opcode
+        logic [RDMA_OPCODE_BITS-1:0] opcode;
+        logic [STRM_BITS-1:0] strm;
+        logic mode;
+        logic rdma;
+        logic remote;
+
+        // ID
+        logic [DEST_BITS-1:0] vfid; // rsrvd
+        logic [PID_BITS-1:0] pid;
+        logic [DEST_BITS-1:0] dest;
+        logic [RDMA_QPN_BITS-1:0] qpn;
+
+        // FLAGS
+        logic last;
+
+        // DESC
         logic [VADDR_BITS-1:0] vaddr;
         logic [LEN_BITS-1:0] len;
-        logic stream;
-        logic sync;
-        logic ctl;
-        logic host;
-        logic [DEST_BITS-1:0] dest;
-        logic [PID_BITS-1:0] pid;
-        logic [N_REGIONS_BITS-1:0] vfid;
-        logic [96-4-N_REGIONS_BITS-VADDR_BITS-LEN_BITS-DEST_BITS-PID_BITS-1:0] rsrvd;
+
+        // RSRVD
+        logic actv; // rsrvd
+        logic host; // rsrvd
+        logic [OFFS_BITS-1:0] offs; // rsrvd
+
+        logic [128-OFFS_BITS-2-VADDR_BITS-LEN_BITS-1-2*DEST_BITS-PID_BITS-3-STRM_BITS-RDMA_OPCODE_BITS-1:0] rsrvd;
     } req_t;
 
     typedef struct packed {
@@ -167,5 +189,70 @@ package roceTypes;
         logic [BUFLEN_BITS-1:0] buflen;
         logic [PADDR_BITS-1:0] paddr;
     }dma_req_t;
+
+    typedef struct packed {
+        logic [RDMA_OPCODE_BITS-1:0] opcode;
+        logic [STRM_BITS-1:0] strm;
+        logic remote;
+        logic host;
+        logic [DEST_BITS-1:0] dest;
+        logic [PID_BITS-1:0] pid;
+        logic [DEST_BITS-1:0] vfid;
+        logic [32-RDMA_OPCODE_BITS-STRM_BITS-2-DEST_BITS-PID_BITS-DEST_BITS-1:0] rsrvd;
+    } ack_t;
+
+    typedef struct packed {
+        ack_t ack;
+        logic last;
+    } dack_t;
+
+    typedef struct packed {
+        req_t req_1; // rd, local
+        req_t req_2; // wr, remote
+    } dreq_t;
+
+    typedef struct packed {
+        logic [63:0] vaddr;
+        logic [31:0] r_key;
+        logic [23:0] local_psn;
+        logic [23:0] remote_psn;
+        logic [23:0] qp_num;
+        logic [31:0] new_state;
+    } rdma_qp_ctx_t;
+
+    typedef struct packed {
+        logic [15:0] remote_udp_port;
+        logic [127:0] remote_ip_address;
+        logic [23:0] remote_qpn;
+        logic [15:0] local_qpn;
+    } rdma_qp_conn_t;
+
+
+    function logic is_opcode_rd_req;
+    input [RDMA_OPCODE_BITS-1:0] opcode;
+    begin
+        if (opcode == RC_RDMA_READ_REQUEST) begin
+            is_opcode_rd_req = 1'b1;
+        end
+        else begin
+            is_opcode_rd_req = 1'b0;
+        end
+    end
+    endfunction
+
+    function logic is_opcode_rd_resp;
+    input [RDMA_OPCODE_BITS-1:0] opcode;
+    begin
+        if (opcode == RC_RDMA_READ_RESP_FIRST ||
+            opcode == RC_RDMA_READ_RESP_MIDDLE ||
+            opcode == RC_RDMA_READ_RESP_LAST ||
+            opcode == RC_RDMA_READ_RESP_ONLY) begin
+            is_opcode_rd_resp = 1'b1;
+        end
+        else begin
+            is_opcode_rd_resp = 1'b0;
+        end
+    end
+    endfunction
 
 endpackage

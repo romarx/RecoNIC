@@ -46,7 +46,7 @@ logic ready;
 STYPE data;
 
 task tie_off_s ();
-	ready = 1'b0;
+	ready = 1'b1;
 endtask
 
 task tie_off_m ();

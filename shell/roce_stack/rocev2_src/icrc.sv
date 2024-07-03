@@ -732,71 +732,85 @@ always_ff @(posedge nclk) begin
                     stage_reinsertion_data[63:32] <= stage_join_crc; 
                     stage_reinsertion_data[511:64] <= 448'b0; 
                     stage_reinsertion_keep[7:0] <= 8'hff;
+                    stage_reinsertion_keep[63:8] <= 56'h0;
                 end else if(stage_join_keep == 8'hff) begin 
                     stage_reinsertion_data[63:0] <= stage_join_data[63:0]; 
                     stage_reinsertion_data[95:64] <= stage_join_crc; 
                     stage_reinsertion_data[511:96] <= 416'b0; 
                     stage_reinsertion_keep[11:0] <= 12'hfff;
+                    stage_reinsertion_keep[63:12] <= 52'h0;
                 end else if(stage_join_keep == 12'hfff) begin 
                     stage_reinsertion_data[95:0] <= stage_join_data[95:0]; 
                     stage_reinsertion_data[127:96] <= stage_join_crc; 
                     stage_reinsertion_data[511:128] <= 384'b0; 
                     stage_reinsertion_keep[15:0] <= 16'hffff;
+                    stage_reinsertion_keep[63:16] <= 48'h0;
                 end else if(stage_join_keep == 16'hffff) begin 
                     stage_reinsertion_data[127:0] <= stage_join_data[127:0]; 
                     stage_reinsertion_data[159:128] <= stage_join_crc; 
                     stage_reinsertion_data[511:160] <= 352'b0; 
                     stage_reinsertion_keep[19:0] <= 20'hfffff;
+                    stage_reinsertion_keep[63:20] <= 44'h0;
                 end else if(stage_join_keep == 20'hfffff) begin 
                     stage_reinsertion_data[159:0] <= stage_join_data[159:0]; 
                     stage_reinsertion_data[191:160] <= stage_join_crc; 
                     stage_reinsertion_data[511:192] <= 320'b0; 
                     stage_reinsertion_keep[23:0] <= 24'hffffff;
+                    stage_reinsertion_keep[63:24] <= 40'h0;
                 end else if(stage_join_keep == 24'hffffff) begin 
                     stage_reinsertion_data[191:0] <= stage_join_data[191:0]; 
                     stage_reinsertion_data[223:192] <= stage_join_crc; 
                     stage_reinsertion_data[511:224] <= 288'b0; 
                     stage_reinsertion_keep[27:0] <= 28'hfffffff;
+                    stage_reinsertion_keep[63:28] <= 36'h0;
                 end else if(stage_join_keep == 28'hfffffff) begin
                     stage_reinsertion_data[223:0] <= stage_join_data[223:0]; 
                     stage_reinsertion_data[255:224] <= stage_join_crc; 
                     stage_reinsertion_data[511:256] <= 256'b0; 
                     stage_reinsertion_keep[31:0] <= 32'hffffffff;
+                    stage_reinsertion_keep[63:32] <= 32'h0;
                 end else if(stage_join_keep == 32'hffffffff) begin 
                     stage_reinsertion_data[255:0] <= stage_join_data[255:0]; 
                     stage_reinsertion_data[287:256] <= stage_join_crc; 
                     stage_reinsertion_data[511:288] <= 224'b0; 
                     stage_reinsertion_keep[35:0] <= 36'hfffffffff;
+                    stage_reinsertion_keep[63:36] <= 28'h0;
                 end else if(stage_join_keep == 36'hfffffffff) begin
                     stage_reinsertion_data[287:0] <= stage_join_data[287:0]; 
                     stage_reinsertion_data[319:288] <= stage_join_crc; 
                     stage_reinsertion_data[511:320] <= 192'b0; 
                     stage_reinsertion_keep[39:0] <= 40'hffffffffff;
+                    stage_reinsertion_keep[63:40] <= 24'h0;
                 end else if(stage_join_keep == 40'hffffffffff) begin
                     stage_reinsertion_data[319:0] <= stage_join_data[319:0]; 
                     stage_reinsertion_data[351:320] <= stage_join_crc; 
                     stage_reinsertion_data[511:352] <= 160'b0; 
                     stage_reinsertion_keep[43:0] <= 44'hfffffffffff;
+                    stage_reinsertion_keep[63:44] <= 20'h0;
                 end else if(stage_join_keep == 44'hfffffffffff) begin 
                     stage_reinsertion_data[351:0] <= stage_join_data[351:0]; 
                     stage_reinsertion_data[383:352] <= stage_join_crc; 
                     stage_reinsertion_data[511:384] <= 128'b0; 
                     stage_reinsertion_keep[47:0] <= 48'hffffffffffff;
+                    stage_reinsertion_keep[63:48] <= 16'h0;
                 end else if(stage_join_keep == 48'hffffffffffff) begin 
                     stage_reinsertion_data[383:0] <= stage_join_data[383:0]; 
                     stage_reinsertion_data[415:384] <= stage_join_crc; 
                     stage_reinsertion_data[511:416] <= 96'b0; 
                     stage_reinsertion_keep[51:0] <= 52'hfffffffffffff;
+                    stage_reinsertion_keep[63:52] <= 12'h0;
                 end else if(stage_join_keep == 52'hfffffffffffff) begin
                     stage_reinsertion_data[415:0] <= stage_join_data[415:0]; 
                     stage_reinsertion_data[447:416] <= stage_join_crc; 
                     stage_reinsertion_data[511:448] <= 64'b0; 
                     stage_reinsertion_keep[55:0] <= 56'hffffffffffffff;
+                    stage_reinsertion_keep[63:56] <= 8'h0;
                 end else if(stage_join_keep == 56'hffffffffffffff) begin
                     stage_reinsertion_data[447:0] <= stage_join_data[447:0]; 
                     stage_reinsertion_data[479:448] <= stage_join_crc; 
                     stage_reinsertion_data[511:480] <= 32'b0; 
                     stage_reinsertion_keep[59:0] <= 60'hfffffffffffffff;
+                    stage_reinsertion_keep[63:60] <= 4'h0;
                 end else if(stage_join_keep == 60'hfffffffffffffff) begin
                     stage_reinsertion_data[479:0] <= stage_join_data[479:0]; 
                     stage_reinsertion_data[511:480] <= stage_join_crc; 
