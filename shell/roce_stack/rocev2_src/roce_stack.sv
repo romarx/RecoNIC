@@ -60,9 +60,25 @@ module roce_stack (
     input  logic [31:0]         local_ip_address,
 
     output logic                ibv_rx_pkg_count_valid,
-    output logic [31:0]         ibv_rx_pkg_count_data,    
+    output logic [31:0]         ibv_rx_pkg_count_data,
+   
+    output logic                ibv_rx_ack_count_valid,
+    output logic [15:0]         ibv_rx_ack_count_data,
+    output logic                ibv_rx_nack_count_valid,
+    output logic [15:0]         ibv_rx_nack_count_data,
+    output logic                ibv_rx_dat_count_valid,
+    output logic [15:0]         ibv_rx_dat_count_data, 
+
     output logic                ibv_tx_pkg_count_valid,
-    output logic [31:0]         ibv_tx_pkg_count_data,    
+    output logic [31:0]         ibv_tx_pkg_count_data,
+
+    output logic                ibv_tx_ack_count_valid,
+    output logic [15:0]         ibv_tx_ack_count_data,
+    output logic                ibv_tx_nack_count_valid,
+    output logic [15:0]         ibv_tx_nack_count_data,
+    output logic                ibv_tx_dat_count_valid,
+    output logic [15:0]         ibv_tx_dat_count_data, 
+
     output logic                crc_drop_pkg_count_valid,
     output logic [31:0]         crc_drop_pkg_count_data,
     output logic                psn_drop_pkg_count_valid,
@@ -471,8 +487,25 @@ rocev2_ip rocev2_inst(
     //DBG
     .regIbvCountRx(ibv_rx_pkg_count_data),
     .regIbvCountRx_ap_vld(ibv_rx_pkg_count_valid),
+
+    .regIbvCountRxAck(ibv_rx_ack_count_data),
+    .regIbvCountRxAck_ap_vld(ibv_rx_ack_count_valid),
+	.regIbvCountRxNAck(ibv_rx_nack_count_data),
+    .regIbvCountRxNAck_ap_vld(ibv_rx_nack_count_valid),
+	.regIbvCountRxDat(ibv_rx_dat_count_data),
+    .regIbvCountRxDat_ap_vld(ibv_rx_dat_count_valid),
+    
+
     .regIbvCountTx(ibv_tx_pkg_count_data),
     .regIbvCountTx_ap_vld(ibv_tx_pkg_count_valid),
+
+    .regIbvCountTxAck(ibv_tx_ack_count_data),
+    .regIbvCountTxAck_ap_vld(ibv_tx_ack_count_valid),
+	.regIbvCountTxNAck(ibv_tx_nack_count_data),
+    .regIbvCountTxNAck_ap_vld(ibv_tx_nack_count_valid),
+	.regIbvCountTxDat(ibv_tx_dat_count_data),
+    .regIbvCountTxDat_ap_vld(ibv_tx_dat_count_valid),
+
     .regCrcDropPkgCount(crc_drop_pkg_count_data),
     .regCrcDropPkgCount_ap_vld(crc_drop_pkg_count_valid),
     .regInvalidPsnDropCount(psn_drop_pkg_count_data),
@@ -547,8 +580,24 @@ rocev2_ip rocev2_inst(
 
     .regIbvCountRx_V(ibv_rx_pkg_count_data),
     .regIbvCountRx_V_ap_vld(ibv_rx_pkg_count_valid),
+    
+    .regIbvCountRxAck_V(ibv_rx_ack_count_data),
+    .regIbvCountRxAck_V_ap_vld(ibv_rx_ack_count_valid),
+	.regIbvCountRxNAck_V(ibv_rx_nack_count_data),
+    .regIbvCountRxNAck_V_ap_vld(ibv_rx_nack_count_valid),
+	.regIbvCountRxDat_V(ibv_rx_dat_count_data),
+    .regIbvCountRxDat_V_ap_vld(ibv_rx_dat_count_valid),
+    
     .regIbvCountTx_V(ibv_tx_pkg_count_data),
     .regIbvCountTx_V_ap_vld(ibv_tx_pkg_count_valid),
+
+    .regIbvCountTxAck_V(ibv_tx_ack_count_data),
+    .regIbvCountTxAck_V_ap_vld(ibv_tx_ack_count_valid),
+	.regIbvCountTxNAck_V(ibv_tx_nack_count_data),
+    .regIbvCountTxNAck_V_ap_vld(ibv_tx_nack_count_valid),
+	.regIbvCountTxDat_V(ibv_tx_dat_count_data),
+    .regIbvCountTxDat_V_ap_vld(ibv_tx_dat_count_valid),
+
     .regCrcDropPkgCount_V(crc_drop_pkg_count_data),
     .regCrcDropPkgCount_V_ap_vld(crc_drop_pkg_count_valid),
     .regInvalidPsnDropCount_V(psn_drop_pkg_count_data),
