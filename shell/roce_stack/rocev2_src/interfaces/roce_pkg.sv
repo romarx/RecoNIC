@@ -171,10 +171,11 @@ package roceTypes;
 
     typedef struct packed {
         logic [RDMA_QP_IDX_BITS-1:0]  sq_idx;
+        logic [PADDR_BITS-1:0]        cq_base_addr;
         logic [PADDR_BITS-1:0]        sq_base_addr;
         logic [AXIL_DATA_BITS-1:0]    sq_prod_idx; //AXI lite data bits for complete regs
         logic [VADDR_BITS-1:0]        pd_vaddr;
-    } SQdata_struct; //168 bits
+    } SQdata_struct; //232 bits
 
     typedef struct packed { 
         logic [RDMA_QP_IDX_BITS-1:0]  qp_idx;
@@ -214,8 +215,8 @@ package roceTypes;
     typedef struct packed {
         logic [63:0] vaddr;
         logic [31:0] r_key;
-        logic [23:0] local_psn;
         logic [23:0] remote_psn;
+        logic [23:0] local_psn;
         logic [23:0] qp_num;
         logic [31:0] new_state;
     } rdma_qp_ctx_t;

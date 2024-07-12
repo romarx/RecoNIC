@@ -5,7 +5,7 @@ module roce_stack_request_handler #(
   output logic          s_rdma_req_ready_o,
   input  logic  [63:0]  s_rdma_req_vaddr_i,
   input  logic  [27:0]  s_rdma_req_len_i,
-  input  logic          s_rdma_req_ctl_i,
+  input  logic          s_rdma_req_last_i,
 
   output logic          req_addr_valid_o,
   input  logic          req_addr_ready_i,
@@ -63,7 +63,7 @@ always_comb begin
       //A request can only be handled if an incoming request arrives and the request can be taken
       if (s_rdma_req_valid_i && req_addr_ready_i) begin 
         len_d = s_rdma_req_len_i;
-        first_d = s_rdma_req_ctl_i;
+        first_d = s_rdma_req_last_i;
         if(first_q) begin
           base_vaddr_d = s_rdma_req_vaddr_i;
           req_state_d = RQ_GETPADDR;

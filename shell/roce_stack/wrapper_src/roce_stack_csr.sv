@@ -71,15 +71,48 @@ module roce_stack_csr # (
   output logic [63:0]                     RQWPTRDBADDi_o,
   output logic [63:0]                     CQDBADDi_o,
   output logic [31:0]                     SQPIi_o,
-  input  logic [31:0]                     CQHEADi_i,
   output logic [31:0]                     QDEPTHi_o,
   output logic [23:0]                     SQPSNi_o,
   output logic [31:0]                     LSTRQREQi_o, // contains rq psn[23:0]
   output logic [23:0]                     DESTQPCONFi_o,
+
+  input  logic [7:0]                      MACADD_SEL_i,
   output logic [47:0]                     MACDESADDi_o,             
   output logic [31:0]                     IPDESADDR1i_o, //for IPv4 only
 
+  input  logic [7:0]                      C_SQidx_i,
+  output logic [31:0]                     SQ_QPCONFi_o,
+  output logic [23:0]                     SQ_SQPSNi_o,
+  output logic [31:0]                     SQ_LSTRQREQi_o,
 
+
+  //write back
+  output logic                            wb_ready_o,
+  input  logic                            wb_valid_i,
+  input  logic                            WB_CQHEADi_valid_i,
+  input  logic [39:0]                     WB_CQHEADi_i,
+  input  logic                            WB_SQPSNi_valid_i,
+  input  logic [39:0]                     WB_SQPSNi_i,
+  input  logic                            WB_LSTRQREQi_valid_i,
+  input  logic [39:0]                     WB_LSTRQREQi_i,
+
+
+  input  logic                            WB_INSRRPKTCNT_valid_i,
+  input  logic [31:0]                     WB_INSRRPKTCNT_i,
+  input  logic                            WB_INAMPKTCNT_valid_i,
+  input  logic [31:0]                     WB_INAMPKTCNT_i,
+  input  logic                            WB_INNCKPKTSTS_valid_i,
+  input  logic [31:0]                     WB_INNCKPKTSTS_i,
+  
+
+  input  logic                            WB_OUTAMPKTCNT_valid_i,
+  input  logic [31:0]                     WB_OUTAMPKTCNT_i,
+  input  logic                            WB_OUTNAKPKTCNT_valid_i,
+  input  logic [15:0]                     WB_OUTNAKPKTCNT_i,
+  input  logic                            WB_OUTIOPKTCNT_valid_i,
+  input  logic [31:0]                     WB_OUTIOPKTCNT_i,
+
+  //address translation
   input  logic                            rd_req_addr_valid_i,
   output logic                            rd_req_addr_ready_o,
   input  logic   [63:0]                   rd_req_addr_vaddr_i,
@@ -898,6 +931,7 @@ always_comb begin
   s_axil_awready_o = 1'b0;
   s_axil_bvalid_o = 1'b0;
   s_axil_wready_o = 1'b0;
+  wb_ready_o = 1'b0;
   writing = 1'b0;
   WAddrReg_d = WAddrReg_q;
   WDataReg_d = WDataReg_q;
@@ -1051,12 +1085,31 @@ always_comb begin
 
   case(w_state_q)
     W_IDLE: begin
+      //write requests from axil
       if(s_axil_awvalid_i && !reading) begin
         s_axil_awready_o = 1'b1;
         WAddrReg_d = s_axil_awaddr_i;
         writing = 1'b1;
         w_state_d = W_READY;
-      end
+      //write requests from logic
+      end else if(wb_valid_i && !reading) begin
+        writing = 1'b1;
+        
+        CQHEADi_d[WB_CQHEADi_i[39:32]]            = WB_CQHEADi_valid_i    ? WB_CQHEADi_i[31:0]              : CQHEADi_q[WB_CQHEADi_i[39:32]];
+        SQPSNi_d[WB_SQPSNi_i[31:24]][23:0]        = WB_SQPSNi_valid_i     ? WB_SQPSNi_i[23:0]               : SQPSNi_q[WB_SQPSNi_i[31:24]];
+        LSTRQREQi_d[WB_LSTRQREQi_i[31:24]][23:0]  = WB_LSTRQREQi_valid_i  ? (WB_LSTRQREQi_i[23:0] - 24'b1)  : LSTRQREQi_q[WB_LSTRQREQi_i[31:24]];
+
+        
+        INSRRPKTCNT_d         = WB_INSRRPKTCNT_valid_i  ? WB_INSRRPKTCNT_i  : INSRRPKTCNT_q;
+        INAMPKTCNT_d          = WB_INAMPKTCNT_valid_i   ? WB_INAMPKTCNT_i   : INAMPKTCNT_q;
+        INNCKPKTSTS_d         = WB_INNCKPKTSTS_valid_i  ? WB_INNCKPKTSTS_i  : INNCKPKTSTS_q;
+        INNAKPKTCNT_d[15:0]   = WB_INNCKPKTSTS_valid_i  ? WB_INNCKPKTSTS_i[31:16] : INNAKPKTCNT_q[15:0];
+        OUTAMPKTCNT_d         = WB_OUTAMPKTCNT_valid_i  ? WB_OUTAMPKTCNT_i  : OUTAMPKTCNT_q;
+        OUTNAKPKTCNT_d[15:0]  = WB_OUTNAKPKTCNT_valid_i ? WB_OUTNAKPKTCNT_i : OUTNAKPKTCNT_q[15:0];
+        OUTIOPKTCNT_d         = WB_OUTIOPKTCNT_valid_i  ? WB_OUTIOPKTCNT_i  : OUTIOPKTCNT_q;
+        
+        wb_ready_o = 1'b1;
+      end 
     end
     
     W_READY: begin
@@ -1418,6 +1471,12 @@ end
 
 always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
   if(!rstn_i) begin
+    pdidx_r <=  'd0;
+    pdidx_w <=  'd0;
+    qpidx_r <=  'd0;
+    qpidx_w <=  'd0;
+    mask    <=  'd0;
+    
     r_state_q <= R_IDLE;
     w_state_q <= W_IDLE;
     RAddrReg_q <= 'd0;
@@ -1784,23 +1843,13 @@ assign QDEPTHi_o = QDEPTHi_q[QPidx_q];
 assign SQPSNi_o = SQPSNi_q[QPidx_q][23:0];
 assign LSTRQREQi_o = LSTRQREQi_q[QPidx_q];
 assign DESTQPCONFi_o = DESTQPCONFi_q[QPidx_q][23:0];
-assign MACDESADDi_o = {MACDESADDMSBi_q[QPidx_q][15:0], MACDESADDLSBi_q[QPidx_q]};
+assign MACDESADDi_o = {MACDESADDMSBi_q[MACADD_SEL_i][15:0], MACDESADDLSBi_q[MACADD_SEL_i]};
 
 assign IPDESADDR1i_o = IPDESADDR1i_q[connidx_q];
 
-/*
-//read inputs from logic, async atm
-//TODO: maybe needs cdc or dc fifo + handshake
-always_comb begin
-  for(int i = 0; i < NUM_QP; i++) begin
-    CQHEADi_d[i] = CQHEADi_q[i];
-  end
-
-  if(!writing && !reading) begin
-    CQHEADi_d[QPidx_q] = CQHEADi_i;
-  end
-end
-*/
+assign SQ_QPCONFi_o = QPCONFi_q[C_SQidx_i];
+assign SQ_SQPSNi_o = SQPSNi_q[C_SQidx_i][23:0];
+assign SQ_LSTRQREQi_o = LSTRQREQi_q[C_SQidx_i];
 
 
 

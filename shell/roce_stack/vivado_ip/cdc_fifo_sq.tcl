@@ -2,8 +2,8 @@ create_ip -name fifo_generator -vendor xilinx.com -library ip -version 13.2 -mod
 set_property -dict {
     CONFIG.Fifo_Implementation {Independent_Clocks_Builtin_FIFO} 
     CONFIG.Performance_Options {Standard_FIFO} 
-    CONFIG.Input_Data_Width {168} 
-    CONFIG.Output_Data_Width {168} 
+    CONFIG.Input_Data_Width {232} 
+    CONFIG.Output_Data_Width {232} 
     CONFIG.Valid_Flag {true} 
     CONFIG.Write_Acknowledge_Flag {true} 
     CONFIG.Read_Clock_Frequency {100} 

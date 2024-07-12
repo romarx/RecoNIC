@@ -64,11 +64,11 @@ module roce_stack (
    
     output logic                ibv_rx_ack_count_valid,
     output logic [15:0]         ibv_rx_ack_count_data,
-    output logic                ibv_rx_nack_count_valid,
-    output logic [15:0]         ibv_rx_nack_count_data,
-    output logic                ibv_rx_dat_count_valid,
-    output logic [15:0]         ibv_rx_dat_count_data, 
-
+    output logic                ibv_rx_nack_sts_valid,
+    output logic [31:0]         ibv_rx_nack_sts_data,
+    output logic                ibv_rx_srr_count_valid,
+    output logic [31:0]         ibv_rx_srr_count_data,
+    
     output logic                ibv_tx_pkg_count_valid,
     output logic [31:0]         ibv_tx_pkg_count_data,
 
@@ -76,8 +76,15 @@ module roce_stack (
     output logic [15:0]         ibv_tx_ack_count_data,
     output logic                ibv_tx_nack_count_valid,
     output logic [15:0]         ibv_tx_nack_count_data,
-    output logic                ibv_tx_dat_count_valid,
-    output logic [15:0]         ibv_tx_dat_count_data, 
+    output logic                ibv_tx_srw_count_valid,
+    output logic [31:0]         ibv_tx_srw_count_data,
+    output logic                ibv_tx_rr_count_valid,
+    output logic [31:0]         ibv_tx_rr_count_data,
+
+    output logic                reg_epsn_valid,
+    output logic [39:0]         reg_epsn_data,
+    output logic                reg_npsn_valid,
+    output logic [39:0]         reg_npsn_data,
 
     output logic                crc_drop_pkg_count_valid,
     output logic [31:0]         crc_drop_pkg_count_data,
@@ -167,6 +174,7 @@ assign rdma_rd_req.data.remote            = 1'b0;
 
 assign rdma_rd_req.data.pid               = rd_cmd_data[32+:PID_BITS];
 assign rdma_rd_req.data.vfid              = rd_cmd_data[32+PID_BITS+:DEST_BITS];
+assign rdma_rd_req.data.qpn               = rd_cmd_data[32+:RDMA_QPN_BITS];
 
 assign rdma_rd_req.data.last              = rd_cmd_data[32+RDMA_QPN_BITS+0+:1];
 assign rdma_rd_req.data.vaddr             = rd_cmd_data[32+RDMA_QPN_BITS+1+:VADDR_BITS];
@@ -176,6 +184,7 @@ assign rdma_rd_req.data.len               = rd_cmd_data[32+RDMA_QPN_BITS+1+VADDR
 assign rdma_rd_req.data.actv              = rd_cmd_data[32+RDMA_QPN_BITS+1+VADDR_BITS+DEST_BITS+STRM_BITS+LEN_BITS+0+:1];
 assign rdma_rd_req.data.host              = rd_cmd_data[32+RDMA_QPN_BITS+1+VADDR_BITS+DEST_BITS+STRM_BITS+LEN_BITS+1+:1];
 assign rdma_rd_req.data.offs              = rd_cmd_data[32+RDMA_QPN_BITS+1+VADDR_BITS+DEST_BITS+STRM_BITS+LEN_BITS+2+:OFFS_BITS];
+assign rdma_rd_req.data.rsrvd             = 'd0;
 
 // WR
 assign rdma_wr_req.data.opcode            = wr_cmd_data[0+:RDMA_OPCODE_BITS];
@@ -185,6 +194,7 @@ assign rdma_wr_req.data.remote            = 1'b0;
 
 assign rdma_wr_req.data.pid               = wr_cmd_data[32+:PID_BITS];
 assign rdma_wr_req.data.vfid              = wr_cmd_data[32+PID_BITS+:DEST_BITS];
+assign rdma_wr_req.data.qpn               = wr_cmd_data[32+:RDMA_QPN_BITS];
 
 assign rdma_wr_req.data.last              = wr_cmd_data[32+RDMA_QPN_BITS+0+:1];
 assign rdma_wr_req.data.vaddr             = wr_cmd_data[32+RDMA_QPN_BITS+1+:VADDR_BITS];
@@ -194,7 +204,7 @@ assign rdma_wr_req.data.len               = wr_cmd_data[32+RDMA_QPN_BITS+1+VADDR
 assign rdma_wr_req.data.actv              = wr_cmd_data[32+RDMA_QPN_BITS+1+VADDR_BITS+DEST_BITS+STRM_BITS+LEN_BITS+0+:1];
 assign rdma_wr_req.data.host              = wr_cmd_data[32+RDMA_QPN_BITS+1+VADDR_BITS+DEST_BITS+STRM_BITS+LEN_BITS+1+:1];
 assign rdma_wr_req.data.offs              = wr_cmd_data[32+RDMA_QPN_BITS+1+VADDR_BITS+DEST_BITS+STRM_BITS+LEN_BITS+2+:OFFS_BITS];
-
+assign rdma_wr_req.data.rsrvd             = 'd0;
 /*
 // Retransmission mux (buffering)
 rdma_mux_retrans inst_mux_retrans (
@@ -490,10 +500,11 @@ rocev2_ip rocev2_inst(
 
     .regIbvCountRxAck(ibv_rx_ack_count_data),
     .regIbvCountRxAck_ap_vld(ibv_rx_ack_count_valid),
-	.regIbvCountRxNAck(ibv_rx_nack_count_data),
-    .regIbvCountRxNAck_ap_vld(ibv_rx_nack_count_valid),
-	.regIbvCountRxDat(ibv_rx_dat_count_data),
-    .regIbvCountRxDat_ap_vld(ibv_rx_dat_count_valid),
+	
+    .regIbvSTSRxNAck(ibv_rx_nack_sts_data),
+    .regIbvSTSRxNAck_ap_vld(ibv_rx_nack_sts_valid),
+	.regIbvCountRxSRR(ibv_rx_srr_count_data),
+    .regIbvCountRxSRR_ap_vld(ibv_rx_srr_count_valid),
     
 
     .regIbvCountTx(ibv_tx_pkg_count_data),
@@ -503,8 +514,16 @@ rocev2_ip rocev2_inst(
     .regIbvCountTxAck_ap_vld(ibv_tx_ack_count_valid),
 	.regIbvCountTxNAck(ibv_tx_nack_count_data),
     .regIbvCountTxNAck_ap_vld(ibv_tx_nack_count_valid),
-	.regIbvCountTxDat(ibv_tx_dat_count_data),
-    .regIbvCountTxDat_ap_vld(ibv_tx_dat_count_valid),
+	.regIbvCountTxSRW(ibv_tx_srw_count_data),
+    .regIbvCountTxSRW_ap_vld(ibv_tx_srw_count_valid),
+    .regIbvCountTxRR(ibv_tx_rr_count_data),
+    .regIbvCountTxRR_ap_vld(ibv_tx_rr_count_valid),
+
+    .reg_qp_npsn(reg_npsn_data),
+    .reg_qp_npsn_ap_vld(reg_npsn_valid),
+    .reg_qp_epsn(reg_epsn_data),
+    .reg_qp_epsn_ap_vld(reg_epsn_valid),
+
 
     .regCrcDropPkgCount(crc_drop_pkg_count_data),
     .regCrcDropPkgCount_ap_vld(crc_drop_pkg_count_valid),
@@ -580,13 +599,13 @@ rocev2_ip rocev2_inst(
 
     .regIbvCountRx_V(ibv_rx_pkg_count_data),
     .regIbvCountRx_V_ap_vld(ibv_rx_pkg_count_valid),
-    
+
     .regIbvCountRxAck_V(ibv_rx_ack_count_data),
     .regIbvCountRxAck_V_ap_vld(ibv_rx_ack_count_valid),
-	.regIbvCountRxNAck_V(ibv_rx_nack_count_data),
-    .regIbvCountRxNAck_V_ap_vld(ibv_rx_nack_count_valid),
-	.regIbvCountRxDat_V(ibv_rx_dat_count_data),
-    .regIbvCountRxDat_V_ap_vld(ibv_rx_dat_count_valid),
+    .regIbvSTSRxNAck_V(ibv_rx_nack_sts_data),
+    .regIbvSTSRxNAck_V_ap_vld(ibv_rx_nack_sts_valid),
+	.regIbvCountRxSRR_V(ibv_rx_srr_count_data),
+    .regIbvCountRxSRR_V_ap_vld(ibv_rx_srr_count_valid),
     
     .regIbvCountTx_V(ibv_tx_pkg_count_data),
     .regIbvCountTx_V_ap_vld(ibv_tx_pkg_count_valid),
@@ -595,8 +614,17 @@ rocev2_ip rocev2_inst(
     .regIbvCountTxAck_V_ap_vld(ibv_tx_ack_count_valid),
 	.regIbvCountTxNAck_V(ibv_tx_nack_count_data),
     .regIbvCountTxNAck_V_ap_vld(ibv_tx_nack_count_valid),
-	.regIbvCountTxDat_V(ibv_tx_dat_count_data),
-    .regIbvCountTxDat_V_ap_vld(ibv_tx_dat_count_valid),
+	.regIbvCountTxSRW_V(ibv_tx_srw_count_data),
+    .regIbvCountTxSRW_V_ap_vld(ibv_tx_srw_count_valid),
+    .regIbvCountTxRR_V(ibv_tx_rr_count_data),
+    .regIbvCountTxRR_ap_vld_V(ibv_tx_rr_count_valid),
+
+    .reg_qp_npsn_V(reg_npsn_data),
+    .reg_qp_npsn_ap_vld_V(reg_npsn_valid),
+    .reg_qp_epsn_V(reg_epsn_data),
+    .reg_qp_epsn_ap_vld_V(reg_epsn_valid),
+
+
 
     .regCrcDropPkgCount_V(crc_drop_pkg_count_data),
     .regCrcDropPkgCount_V_ap_vld(crc_drop_pkg_count_valid),
