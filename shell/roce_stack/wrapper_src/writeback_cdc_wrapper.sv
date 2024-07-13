@@ -22,6 +22,8 @@ module writeback_cdc_wrapper (
   input  logic [15:0] OUTNAKPKTCNT_wb_i,
   input  logic        OUTIOPKTCNT_wb_valid_i,
   input  logic [31:0] OUTIOPKTCNT_wb_i,
+  input  logic        OUTRDRSPPKTCNT_wb_valid_i,
+  input  logic [31:0] OUTRDRSPPKTCNT_wb_i,
 
   output logic        CQHEADi_wb_valid_o,
   output logic [39:0] CQHEADi_wb_o,
@@ -43,6 +45,8 @@ module writeback_cdc_wrapper (
   output logic [15:0] OUTNAKPKTCNT_wb_o,
   output logic        OUTIOPKTCNT_wb_valid_o,
   output logic [31:0] OUTIOPKTCNT_wb_o,
+  output logic        OUTRDRSPPKTCNT_wb_valid_o,
+  output logic [31:0] OUTRDRSPPKTCNT_wb_o,
   
   input  logic        in_clk_i,
   input  logic        out_clk_i,
@@ -193,9 +197,25 @@ simple_cdc #(
   .out_rstn_i(mod_rstn_i)
 );
 
+simple_cdc #(
+  .DATA_WIDTH(32)
+) inst_cdc_OUTRDRSPPKTCNT (
+  .in_valid_i(OUTRDRSPPKTCNT_wb_valid_i),
+  .in_data_i(OUTRDRSPPKTCNT_wb_i),
+
+  .out_ready_i(wb_ready_i),
+  .out_valid_o(OUTRDRSPPKTCNT_wb_valid_o),
+  .out_data_o(OUTRDRSPPKTCNT_wb_o),
+
+  .in_clk_i(in_clk_i),
+  .out_clk_i(out_clk_i),
+  .in_rstn_i(mod_rstn_i),
+  .out_rstn_i(mod_rstn_i)
+);
+
 
 
 assign wb_valid_o = CQHEADi_wb_valid_o | SQPSNi_wb_valid_o | LSTRQREQi_wb_valid_o | INSRRPKTCNT_wb_valid_o | INAMPKTCNT_wb_valid_o | INNCKPKTSTS_wb_valid_o | 
-                    OUTAMPKTCNT_wb_valid_o | OUTNAKPKTCNT_wb_valid_o | OUTIOPKTCNT_wb_valid_o;
+                    OUTAMPKTCNT_wb_valid_o | OUTNAKPKTCNT_wb_valid_o | OUTIOPKTCNT_wb_valid_o | OUTRDRSPPKTCNT_wb_valid_o;
 
 endmodule: writeback_cdc_wrapper

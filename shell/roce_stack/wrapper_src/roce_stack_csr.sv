@@ -111,18 +111,22 @@ module roce_stack_csr # (
   input  logic [15:0]                     WB_OUTNAKPKTCNT_i,
   input  logic                            WB_OUTIOPKTCNT_valid_i,
   input  logic [31:0]                     WB_OUTIOPKTCNT_i,
+  input  logic                            WB_OUTRDRSPPKTCNT_valid_i,
+  input  logic [31:0]                     WB_OUTRDRSPPKTCNT_i,
 
   //address translation
   input  logic                            rd_req_addr_valid_i,
   output logic                            rd_req_addr_ready_o,
-  input  logic   [63:0]                   rd_req_addr_vaddr_i,
+  input  logic [63:0]                     rd_req_addr_vaddr_i,
+  input  logic [15:0]                     rd_req_addr_qpn_i,
   output logic                            rd_resp_addr_valid_o,
   input  logic                            rd_resp_addr_ready_i,
   output dma_req_t                        rd_resp_addr_data_o,
 
   input  logic                            wr_req_addr_valid_i,
   output logic                            wr_req_addr_ready_o,
-  input  logic   [63:0]                   wr_req_addr_vaddr_i,
+  input  logic [63:0]                     wr_req_addr_vaddr_i,
+  input  logic [15:0]                     wr_req_addr_qpn_i,
   output logic                            wr_resp_addr_valid_o,
   input  logic                            wr_resp_addr_ready_i,
   output dma_req_t                        wr_resp_addr_data_o,
@@ -1100,13 +1104,14 @@ always_comb begin
         LSTRQREQi_d[WB_LSTRQREQi_i[31:24]][23:0]  = WB_LSTRQREQi_valid_i  ? (WB_LSTRQREQi_i[23:0] - 24'b1)  : LSTRQREQi_q[WB_LSTRQREQi_i[31:24]];
 
         
-        INSRRPKTCNT_d         = WB_INSRRPKTCNT_valid_i  ? WB_INSRRPKTCNT_i  : INSRRPKTCNT_q;
-        INAMPKTCNT_d          = WB_INAMPKTCNT_valid_i   ? WB_INAMPKTCNT_i   : INAMPKTCNT_q;
-        INNCKPKTSTS_d         = WB_INNCKPKTSTS_valid_i  ? WB_INNCKPKTSTS_i  : INNCKPKTSTS_q;
-        INNAKPKTCNT_d[15:0]   = WB_INNCKPKTSTS_valid_i  ? WB_INNCKPKTSTS_i[31:16] : INNAKPKTCNT_q[15:0];
-        OUTAMPKTCNT_d         = WB_OUTAMPKTCNT_valid_i  ? WB_OUTAMPKTCNT_i  : OUTAMPKTCNT_q;
-        OUTNAKPKTCNT_d[15:0]  = WB_OUTNAKPKTCNT_valid_i ? WB_OUTNAKPKTCNT_i : OUTNAKPKTCNT_q[15:0];
-        OUTIOPKTCNT_d         = WB_OUTIOPKTCNT_valid_i  ? WB_OUTIOPKTCNT_i  : OUTIOPKTCNT_q;
+        INSRRPKTCNT_d         = WB_INSRRPKTCNT_valid_i    ? WB_INSRRPKTCNT_i        : INSRRPKTCNT_q;
+        INAMPKTCNT_d          = WB_INAMPKTCNT_valid_i     ? WB_INAMPKTCNT_i         : INAMPKTCNT_q;
+        INNCKPKTSTS_d         = WB_INNCKPKTSTS_valid_i    ? WB_INNCKPKTSTS_i        : INNCKPKTSTS_q;
+        INNAKPKTCNT_d[15:0]   = WB_INNCKPKTSTS_valid_i    ? WB_INNCKPKTSTS_i[31:16] : INNAKPKTCNT_q[15:0];
+        OUTAMPKTCNT_d         = WB_OUTAMPKTCNT_valid_i    ? WB_OUTAMPKTCNT_i        : OUTAMPKTCNT_q;
+        OUTNAKPKTCNT_d[15:0]  = WB_OUTNAKPKTCNT_valid_i   ? WB_OUTNAKPKTCNT_i       : OUTNAKPKTCNT_q[15:0];
+        OUTIOPKTCNT_d         = WB_OUTIOPKTCNT_valid_i    ? WB_OUTIOPKTCNT_i        : OUTIOPKTCNT_q;
+        OUTRDRSPPKTCNT_d      = WB_OUTRDRSPPKTCNT_valid_i ? WB_OUTRDRSPPKTCNT_i     : OUTRDRSPPKTCNT_q;
         
         wb_ready_o = 1'b1;
       end 
@@ -1877,15 +1882,26 @@ always_comb begin
       //TODO: check if this can lead to problems
       if(rd_req_addr_valid_i && rd_req_addr_ready_o) begin
         rd_req_addr_ready_o = 1'b0;
-        rd_resp_addr_data_d.accesdesc = 'hF;
-        rd_resp_addr_data_d.buflen = 'hFFFFFFFFFFFF;
-        rd_resp_addr_data_d.paddr = 'hFFFFFFFFFFFFFFFF;
-        for(int i = 0; i < NUM_PD; i++) begin
-          if(rd_req_addr_vaddr_i == {VIRTADDRMSB_q[i], VIRTADDRLSB_q[i]}) begin
-            rd_resp_addr_data_d.accesdesc = ACCESSDESC_q[i][3:0];
-            rd_resp_addr_data_d.buflen = {ACCESSDESC_q[i][31:16], WRRDBUFLEN_q[i]}; 
-            rd_resp_addr_data_d.paddr = {BUFBASEADDRMSB_q[i], BUFBASEADDRLSB_q[i]};
+        rd_resp_addr_data_d.accesdesc = ~0;
+        rd_resp_addr_data_d.buflen = ~0;
+        rd_resp_addr_data_d.paddr = ~0;
+        if(rd_req_addr_vaddr_i == 'd0) begin 
+          rd_resp_addr_data_d.accesdesc = ~0; // R/W
+          rd_resp_addr_data_d.buflen = ~0;
+          rd_resp_addr_data_d.paddr = 'd0;
+        end else begin
+          if (rd_req_addr_vaddr_i == {VIRTADDRMSB_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]], VIRTADDRLSB_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]]}) begin
+            rd_resp_addr_data_d.accesdesc = ACCESSDESC_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]][3:0];
+            rd_resp_addr_data_d.buflen = {ACCESSDESC_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]][31:16], WRRDBUFLEN_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]]}; 
+            rd_resp_addr_data_d.paddr = {BUFBASEADDRMSB_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]], BUFBASEADDRLSB_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]]};
           end
+          //for(int i = 0; i < NUM_PD; i++) begin
+          //  if(rd_req_addr_vaddr_i == {VIRTADDRMSB_q[i], VIRTADDRLSB_q[i]}) begin
+          //    rd_resp_addr_data_d.accesdesc = ACCESSDESC_q[i][3:0];
+          //    rd_resp_addr_data_d.buflen = {ACCESSDESC_q[i][31:16], WRRDBUFLEN_q[i]}; 
+          //    rd_resp_addr_data_d.paddr = {BUFBASEADDRMSB_q[i], BUFBASEADDRLSB_q[i]};
+          //  end
+          //end
         end
         rd_vtp_st_d = VTP_VALID;
       end
@@ -1913,15 +1929,27 @@ always_comb begin
       //TODO: check if this can lead to problems
       if(wr_req_addr_valid_i && wr_req_addr_ready_o) begin
         wr_req_addr_ready_o = 1'b0;
-        wr_resp_addr_data_d.accesdesc = 'hF;
-        wr_resp_addr_data_d.buflen = 'hFFFFFFFFFFFF;
-        wr_resp_addr_data_d.paddr = 'hFFFFFFFFFFFFFFFF;
-        for(int i = 0; i < NUM_PD; i++) begin
-          if(wr_req_addr_vaddr_i == {VIRTADDRMSB_q[i], VIRTADDRLSB_q[i]}) begin
-            wr_resp_addr_data_d.accesdesc = ACCESSDESC_q[i][3:0];
-            wr_resp_addr_data_d.buflen = {ACCESSDESC_q[i][31:16], WRRDBUFLEN_q[i]}; 
-            wr_resp_addr_data_d.paddr = {BUFBASEADDRMSB_q[i], BUFBASEADDRLSB_q[i]};          
+        wr_resp_addr_data_d.accesdesc = ~0;
+        wr_resp_addr_data_d.buflen = ~0;
+        wr_resp_addr_data_d.paddr = ~0;
+        if(wr_req_addr_vaddr_i == 'd0) begin //TODO: where should it write to in case of send
+          wr_resp_addr_data_d.accesdesc = 4'b0010;
+          wr_resp_addr_data_d.buflen = ~0;
+          wr_resp_addr_data_d.paddr = {RQBAMSBi_q[wr_req_addr_qpn_i[7:0]], RQBAi_q[wr_req_addr_qpn_i[7:0]]};
+        end else begin
+          if (wr_req_addr_vaddr_i == {VIRTADDRMSB_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]], VIRTADDRLSB_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]]}) begin
+            wr_resp_addr_data_d.accesdesc = ACCESSDESC_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]][3:0];
+            wr_resp_addr_data_d.buflen = {ACCESSDESC_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]][31:16], WRRDBUFLEN_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]]}; 
+            wr_resp_addr_data_d.paddr = {BUFBASEADDRMSB_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]], BUFBASEADDRLSB_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]]};
           end
+          //for(int i = 0; i < NUM_PD; i++) begin
+          //  if(wr_req_addr_vaddr_i == {VIRTADDRMSB_q[i], VIRTADDRLSB_q[i]}) begin
+          //    wr_resp_addr_data_d.accesdesc = ACCESSDESC_q[i][3:0];
+          //    wr_resp_addr_data_d.buflen = {ACCESSDESC_q[i][31:16], WRRDBUFLEN_q[i]}; 
+          //    wr_resp_addr_data_d.paddr = {BUFBASEADDRMSB_q[i], BUFBASEADDRLSB_q[i]};          
+          //  end
+          //end
+        
         end
         wr_vtp_st_d = VTP_VALID;
       end

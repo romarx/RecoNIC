@@ -5,11 +5,13 @@ module roce_stack_request_handler #(
   output logic          s_rdma_req_ready_o,
   input  logic  [63:0]  s_rdma_req_vaddr_i,
   input  logic  [27:0]  s_rdma_req_len_i,
+  input  logic  [15:0]  s_rdma_req_qpn_i,
   input  logic          s_rdma_req_last_i,
 
   output logic          req_addr_valid_o,
   input  logic          req_addr_ready_i,
   output logic  [63:0]  req_addr_vaddr_o,
+  output logic  [15:0]  req_addr_qpn_o,
   input  logic          resp_addr_valid_i,
   output logic          resp_addr_ready_o,
   input  dma_req_t      resp_addr_data_i,
@@ -27,8 +29,8 @@ typedef enum {RQ_IDLE, RQ_GETPADDR, RQ_MIDDLE, RQ_SENDCMD} req_state;
 req_state req_state_d, req_state_q;
 
 logic [63:0] base_vaddr_d, base_vaddr_q;
-logic [63:0] vaddr_d, vaddr_q;
 logic [27:0] len_d, len_q;
+logic [15:0] qpn_d, qpn_q;
 
 logic [63:0] paddr_d, paddr_q;
 logic [47:0] buflen_d, buflen_q;
@@ -50,8 +52,8 @@ always_comb begin
   cmd_data_d = cmd_data_q;
   req_state_d = req_state_q;
   base_vaddr_d = base_vaddr_q;
-  vaddr_d = vaddr_q;
   len_d = len_q;
+  qpn_d = qpn_q;
   paddr_d = paddr_q;
   buflen_d = buflen_q;
   accessdesc_d = accessdesc_q;
@@ -64,11 +66,11 @@ always_comb begin
       if (s_rdma_req_valid_i && req_addr_ready_i) begin 
         len_d = s_rdma_req_len_i;
         first_d = s_rdma_req_last_i;
+        qpn_d = s_rdma_req_qpn_i;
         if(first_q) begin
           base_vaddr_d = s_rdma_req_vaddr_i;
           req_state_d = RQ_GETPADDR;
         end else begin
-          vaddr_d = s_rdma_req_vaddr_i;
           req_state_d = RQ_MIDDLE;
         end
       end
@@ -77,18 +79,19 @@ always_comb begin
       s_rdma_req_ready_o = 1'b0;
       req_addr_valid_o = 1'b1;
       if (resp_addr_valid_i) begin
-        paddr_d = resp_addr_data_i.paddr;
         buflen_d = resp_addr_data_i.buflen;
         accessdesc_d = resp_addr_data_i.accesdesc;
         //In this case, directly send cmd 4b reserved, 4b tag, 64b address, 1b dre realign, 1b EOF, 6b dre stream align, 1b type (fixed, incr), 22b len
         cmd_data_d = {8'b0, resp_addr_data_i.paddr, 1'b0, 1'b1, 6'b0, 1'b1, len_q[22:0]};
+        paddr_d = resp_addr_data_i.paddr + len_q;
         req_state_d = RQ_SENDCMD;
       end
     end
     RQ_MIDDLE: begin
       s_rdma_req_ready_o = 1'b0;
       resp_addr_ready_o = 1'b0;
-      cmd_data_d = {8'b0, (paddr_q + (vaddr_q - base_vaddr_q)), 1'b0, 1'b1, 6'b0, 1'b1, len_q[22:0]};
+      cmd_data_d = {8'b0, paddr_q, 1'b0, 1'b1, 6'b0, 1'b1, len_q[22:0]};
+      paddr_d = paddr_q + len_q;
       req_state_d = RQ_SENDCMD;
     end
     RQ_SENDCMD: begin
@@ -107,9 +110,9 @@ end
 always_ff @(posedge clk_i, negedge aresetn_i) begin
   if(!aresetn_i) begin
     req_state_q <= RQ_IDLE;
-    vaddr_q <= 'd0;
     base_vaddr_q <= 'd0;
     len_q <= 'd0;
+    qpn_q <= 'd0;
     paddr_q <= 'd0;
     buflen_q <= 'd0;
     accessdesc_q <= 'd0;
@@ -117,9 +120,9 @@ always_ff @(posedge clk_i, negedge aresetn_i) begin
     first_q = 1'b1;
   end else begin
     req_state_q <= req_state_d;
-    vaddr_q <= vaddr_d;
     base_vaddr_q <= base_vaddr_d;
     len_q <= len_d;
+    qpn_q <= qpn_d;
     paddr_q <= paddr_d;
     buflen_q <= buflen_d;
     accessdesc_q <= accessdesc_d;
@@ -129,6 +132,7 @@ always_ff @(posedge clk_i, negedge aresetn_i) begin
 end
 
 assign req_addr_vaddr_o = base_vaddr_q;
+assign req_addr_qpn_o = qpn_q;
 assign cmd_data_o = cmd_data_q;
 
 

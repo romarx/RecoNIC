@@ -2,7 +2,7 @@
 import roceTypes::*;
 
 module roce_stack_wrapper # (
-  parameter int NUM_QP = 8, //min: 8, max: 256
+  parameter int NUM_QP = 256, //min: 8, max: 256
   parameter int AXIL_ADDR_WIDTH = 32,
   parameter int AXIL_DATA_WIDTH = 32,
   parameter int AXI4S_DATA_WIDTH = 512
@@ -190,6 +190,8 @@ logic         OUTAMPKTCNT_wb_axis_valid, OUTAMPKTCNT_wb_axil_valid;
 logic [16:0]  OUTNAKPKTCNT_wb_axil;
 logic         OUTNAKPKTCNT_wb_axil_valid;
 
+logic [31:0]  OUTRDRSPPKTCNT_wb_axil;
+logic         OUTRDRSPPKTCNT_wb_axil_valid;
 
 
 metaIntf #(.STYPE(req_t)) rdma_rd_req ();
@@ -211,6 +213,7 @@ AXI4S #(.AXI4S_DATA_BITS(512)) axis_rx_handler_to_roce ();
 //address requests
 logic rd_req_addr_valid, rd_req_addr_ready, wr_req_addr_valid, wr_req_addr_ready;
 logic [63:0] rd_req_addr_vaddr, wr_req_addr_vaddr;
+logic [15:0] rd_req_addr_qpn, wr_req_addr_qpn;
 //address response
 logic rd_resp_addr_valid, rd_resp_addr_ready, wr_resp_addr_valid, wr_resp_addr_ready;
 dma_req_t rd_resp_addr_data, wr_resp_addr_data;
@@ -323,8 +326,6 @@ roce_stack_csr #(
   .conn_configured_o(conn_configured),
   .qp_configured_o(qp_configured),
   
-
-
   .QPCONFi_o(QPCONFi),
   .QPADVCONFi_o(),
   .RQBAi_o(),
@@ -365,6 +366,8 @@ roce_stack_csr #(
   .WB_OUTNAKPKTCNT_valid_i(OUTNAKPKTCNT_wb_axil_valid),
   .WB_OUTIOPKTCNT_i(OUTIOPKTCNT_wb_axil),
   .WB_OUTIOPKTCNT_valid_i(OUTIOPKTCNT_wb_axil_valid),
+  .WB_OUTRDRSPPKTCNT_i(OUTRDRSPPKTCNT_wb_axil),
+  .WB_OUTRDRSPPKTCNT_valid_i(OUTRDRSPPKTCNT_wb_axil_valid),
 
   .WB_SQPSNi_i(SQPSNi_wb_axil),
   .WB_SQPSNi_valid_i(SQPSNi_wb_axil_valid),
@@ -374,6 +377,7 @@ roce_stack_csr #(
   .rd_req_addr_valid_i(rd_req_addr_valid),
   .rd_req_addr_ready_o(rd_req_addr_ready),
   .rd_req_addr_vaddr_i(rd_req_addr_vaddr),
+  .rd_req_addr_qpn_i(rd_req_addr_qpn),
   .rd_resp_addr_valid_o(rd_resp_addr_valid),
   .rd_resp_addr_ready_i(rd_resp_addr_ready),
   .rd_resp_addr_data_o(rd_resp_addr_data),
@@ -381,6 +385,7 @@ roce_stack_csr #(
   .wr_req_addr_valid_i(wr_req_addr_valid),
   .wr_req_addr_ready_o(wr_req_addr_ready),
   .wr_req_addr_vaddr_i(wr_req_addr_vaddr),
+  .wr_req_addr_qpn_i(wr_req_addr_qpn),
   .wr_resp_addr_valid_o(wr_resp_addr_valid),
   .wr_resp_addr_ready_i(wr_resp_addr_ready),
   .wr_resp_addr_data_o(wr_resp_addr_data),
@@ -404,7 +409,6 @@ writeback_cdc_wrapper inst_wb_cdc_wrapper (
   .LSTRQREQi_wb_i(epsn_data),
   .LSTRQREQi_wb_valid_i(epsn_valid),
 
-
   .INSRRPKTCNT_wb_valid_i(rx_srr_valid),
   .INSRRPKTCNT_wb_i(rx_srr_data),
   .INAMPKTCNT_wb_valid_i(INAMPKTCNT_wb_axis_valid),
@@ -418,6 +422,8 @@ writeback_cdc_wrapper inst_wb_cdc_wrapper (
   .OUTNAKPKTCNT_wb_i(tx_nack_data),
   .OUTIOPKTCNT_wb_valid_i(tx_srw_valid),
   .OUTIOPKTCNT_wb_i(tx_srw_data),
+  .OUTRDRSPPKTCNT_wb_valid_i(tx_rr_valid),
+  .OUTRDRSPPKTCNT_wb_i(tx_rr_data),
 
   .CQHEADi_wb_valid_o(CQHEADi_wb_axil_valid),
   .CQHEADi_wb_o(CQHEADi_wb_axil),
@@ -439,7 +445,9 @@ writeback_cdc_wrapper inst_wb_cdc_wrapper (
   .OUTNAKPKTCNT_wb_o(OUTNAKPKTCNT_wb_axil),
   .OUTIOPKTCNT_wb_valid_o(OUTIOPKTCNT_wb_axil_valid),
   .OUTIOPKTCNT_wb_o(OUTIOPKTCNT_wb_axil),
-  
+  .OUTRDRSPPKTCNT_wb_valid_o(OUTRDRSPPKTCNT_wb_axil_valid),
+  .OUTRDRSPPKTCNT_wb_o(OUTRDRSPPKTCNT_wb_axil),
+
   .in_clk_i(axis_aclk_i),
   .out_clk_i(axil_aclk_i),
   .mod_rstn_i(mod_rstn_i)
@@ -544,12 +552,14 @@ roce_stack_axis_to_aximm #(
   .s_rdma_rd_req_ready_o(rdma_rd_req.ready),
   .s_rdma_rd_req_vaddr_i(rdma_rd_req.data.vaddr),
   .s_rdma_rd_req_len_i(rdma_rd_req.data.len),
+  .s_rdma_rd_req_qpn_i(rdma_rd_req.data.qpn),
   .s_rdma_rd_req_last_i(rdma_rd_req.data.last),
 
   .s_rdma_wr_req_valid_i(rdma_wr_req.valid),
   .s_rdma_wr_req_ready_o(rdma_wr_req.ready),
   .s_rdma_wr_req_vaddr_i(rdma_wr_req.data.vaddr),
   .s_rdma_wr_req_len_i(rdma_wr_req.data.len),
+  .s_rdma_wr_req_qpn_i(rdma_wr_req.data.qpn),
   .s_rdma_wr_req_last_i(rdma_wr_req.data.last),
 
   .m_axis_rdma_rd_tdata_o(axis_rdma_rd.tdata),
@@ -567,6 +577,7 @@ roce_stack_axis_to_aximm #(
   .rd_req_addr_valid_o(rd_req_addr_valid),
   .rd_req_addr_ready_i(rd_req_addr_ready),
   .rd_req_addr_vaddr_o(rd_req_addr_vaddr),
+  .rd_req_addr_qpn_o(rd_req_addr_qpn),
   .rd_resp_addr_valid_i(rd_resp_addr_valid),
   .rd_resp_addr_ready_o(rd_resp_addr_ready),
   .rd_resp_addr_data_i(rd_resp_addr_data),
@@ -574,6 +585,7 @@ roce_stack_axis_to_aximm #(
   .wr_req_addr_valid_o(wr_req_addr_valid),
   .wr_req_addr_ready_i(wr_req_addr_ready),
   .wr_req_addr_vaddr_o(wr_req_addr_vaddr),
+  .wr_req_addr_qpn_o(wr_req_addr_qpn),
   .wr_resp_addr_valid_i(wr_resp_addr_valid),
   .wr_resp_addr_ready_o(wr_resp_addr_ready),
   .wr_resp_addr_data_i(wr_resp_addr_data),
