@@ -410,9 +410,7 @@ set_property -dict [list CONFIG.C_PROBE16_WIDTH {32} CONFIG.C_PROBE15_WIDTH {40}
 metaIntf #(.STYPE(logic[103:0])) m_axis_dbg_0 ();
 metaIntf #(.STYPE(logic[103:0])) m_axis_dbg_1 ();
 metaIntf #(.STYPE(logic[103:0])) m_axis_dbg_2 ();
-assign m_axis_dbg_0.ready = 1'b1;
-assign m_axis_dbg_1.ready = 1'b1;
-assign m_axis_dbg_2.ready = 1'b1;
+
 
 rocev2_ip rocev2_inst(
     .ap_clk(nclk), // input aclk
@@ -536,6 +534,17 @@ rocev2_ip rocev2_inst(
 
     // Debug
 `ifdef DBG_IBV
+    .m_axis_dbg_0_TVALID(m_axis_dbg_0.valid),
+    .m_axis_dbg_0_TREADY(m_axis_dbg_0.ready),
+    .m_axis_dbg_0_TDATA(m_axis_dbg_0.data),
+    
+    .m_axis_dbg_1_TVALID(m_axis_dbg_1.valid),
+    .m_axis_dbg_1_TREADY(m_axis_dbg_1.ready),
+    .m_axis_dbg_1_TDATA(m_axis_dbg_1.data),
+    
+    .m_axis_dbg_2_TVALID(m_axis_dbg_2.valid),
+    .m_axis_dbg_2_TREADY(m_axis_dbg_2.ready),
+    .m_axis_dbg_2_TDATA(m_axis_dbg_2.data),
 `endif
 
     // RX
