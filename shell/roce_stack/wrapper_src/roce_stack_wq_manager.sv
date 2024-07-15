@@ -236,7 +236,7 @@ always_comb begin
         // only proceed if qp is enabled and mtu conf is valid
         if(qp_if_output_q.src_qp_conf[0] && qp_if_output_q.src_qp_conf[10:8] <= 3'b100) begin
           mtu_d = 'd256 << qp_if_output_q.src_qp_conf[10:8];
-          log_mtu_d = clog2s(mtu_d);
+          log_mtu_d = 'd8 + {1'b0, qp_if_output_q.src_qp_conf[10:8]};
           //Maybe WQEReg is not yet set but who cares, these values are pointless anyway.........
           qp_ctx_d.vaddr = WQEReg_q[223:160];
           qp_ctx_d.r_key = WQEReg_q[255:224];

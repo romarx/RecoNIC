@@ -1,8 +1,3 @@
-set_property  ip_repo_paths  ../build/hls/mac_ip_encode/mac_ip_encode_prj [current_project]
-set_property  ip_repo_paths  ../build/hls/ip_handler/ip_handler_prj [current_project]
-set_property  ip_repo_paths  ../build/hls/rocev2/rocev2_prj [current_project]
-update_ip_catalog
-
 set ips {
   rocev2_ip
   mac_ip_encode_ip
