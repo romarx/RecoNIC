@@ -123,7 +123,9 @@ module roce_stack_wrapper # (
 
   input logic                           axil_aclk_i,
   input logic                           axis_aclk_i,
-  input logic                           mod_rstn_i
+  input logic                           axil_rstn_i,
+  input logic                           axis_rstn_i
+
 );
 
 logic [7:0]   wr_ptr_wtc;
@@ -283,10 +285,10 @@ roce_stack_tx_axis_interconnect roce_stack_tx_axis_interconnect_inst (
   .S01_AXIS_ACLK(axis_aclk_i),
   .M00_AXIS_ACLK(axis_aclk_i),
   
-  .ARESETN(mod_rstn_i),
-  .S00_AXIS_ARESETN(mod_rstn_i),
-  .S01_AXIS_ARESETN(mod_rstn_i),
-  .M00_AXIS_ARESETN(mod_rstn_i)
+  .ARESETN(axis_rstn_i),
+  .S00_AXIS_ARESETN(axis_rstn_i),
+  .S01_AXIS_ARESETN(axis_rstn_i),
+  .M00_AXIS_ARESETN(axis_rstn_i)
 );
 
 
@@ -395,7 +397,8 @@ roce_stack_csr #(
 
   .axis_aclk_i(axis_aclk_i),
   .axil_aclk_i(axil_aclk_i),
-  .rstn_i(mod_rstn_i)
+  .axis_rstn_i(axis_rstn_i),
+  .axil_rstn_i(axil_rstn_i)
 );
 
 writeback_cdc_wrapper inst_wb_cdc_wrapper (
@@ -450,7 +453,8 @@ writeback_cdc_wrapper inst_wb_cdc_wrapper (
 
   .in_clk_i(axis_aclk_i),
   .out_clk_i(axil_aclk_i),
-  .mod_rstn_i(mod_rstn_i)
+  .in_rstn_i(axis_rstn_i),
+  .out_rstn_i(axil_rstn_i)
 );
 
 
@@ -541,7 +545,8 @@ roce_stack_wq_manager #(
 
   .axil_aclk_i(axil_aclk_i),
   .axis_aclk_i(axis_aclk_i),
-  .rstn_i(mod_rstn_i)
+  .axil_rstn_i(axil_rstn_i),
+  .axis_rstn_i(axis_rstn_i)
 );
 
 
@@ -625,7 +630,7 @@ roce_stack_axis_to_aximm #(
   .m_axi_data_bus_rready_o(m_axi_data_bus_rready_o),
 
   .axis_aclk_i(axis_aclk_i),
-  .aresetn_i(mod_rstn_i)
+  .aresetn_i(axis_rstn_i)
 
 );
 
@@ -647,7 +652,7 @@ mac_ip_encode_ip mac_ip_encode_inst (
     .theirMacAddress(MACDESADDi_net),
     
     .ap_clk(axis_aclk_i), // input aclk
-    .ap_rst_n(mod_rstn_i) // input aresetn
+    .ap_rst_n(axis_rstn_i) // input aresetn
 `else
     .s_axis_ip_TVALID(axis_tx_roce_to_eth.tvalid),
     .s_axis_ip_TREADY(axis_tx_roce_to_eth.tready),
@@ -665,7 +670,7 @@ mac_ip_encode_ip mac_ip_encode_inst (
     .theirMacAddress_V(MACDESADDi_net),
     
     .ap_clk(axis_aclk_i), // input aclk
-    .ap_rst_n(mod_rstn_i) // input aresetn
+    .ap_rst_n(axis_rstn_i) // input aresetn
 `endif
 );
 
@@ -691,7 +696,7 @@ ip_handler_ip ip_handler_inst (
 `endif
 
     .ap_clk(axis_aclk_i), // input aclk
-    .ap_rst_n(mod_rstn_i) // input aresetn
+    .ap_rst_n(axis_rstn_i) // input aresetn
 ); 
 
 
@@ -699,7 +704,7 @@ assign rdma_ack.ready = 1'b1;
 //TODO: definitions for AXI4S, metaIntf....
 roce_stack inst_roce_stack (
   .nclk(axis_aclk_i),
-  .nresetn(mod_rstn_i),
+  .nresetn(axis_rstn_i),
 
   // Network interface
   .s_axis_rx(axis_rx_handler_to_roce),

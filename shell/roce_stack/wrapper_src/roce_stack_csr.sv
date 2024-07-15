@@ -136,7 +136,9 @@ module roce_stack_csr # (
 
   input logic                             axis_aclk_i,
   input logic                             axil_aclk_i,
-  input logic                             rstn_i
+  input logic                             axis_rstn_i,
+  input logic                             axil_rstn_i
+
 );
 
 //assert (NUM_QP >= 8 && NUM_QP <=256) else begin $error("NUM_QP must be between 8 and 256") end;
@@ -1474,8 +1476,8 @@ end
 
 
 
-always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
-  if(!rstn_i) begin
+always_ff @(posedge axil_aclk_i, negedge axil_rstn_i) begin
+  if(!axil_rstn_i) begin
     pdidx_r <=  'd0;
     pdidx_w <=  'd0;
     qpidx_r <=  'd0;
@@ -1964,8 +1966,8 @@ always_comb begin
   endcase
 end
 
-always_ff @(posedge axis_aclk_i, negedge rstn_i) begin
-  if(!rstn_i) begin
+always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
+  if(!axis_rstn_i) begin
     rd_vtp_st_q <= VTP_IDLE;
     wr_vtp_st_q <= VTP_IDLE;
     rd_resp_addr_data_q <= 'd0;

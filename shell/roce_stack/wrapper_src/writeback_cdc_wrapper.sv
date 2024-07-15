@@ -50,7 +50,8 @@ module writeback_cdc_wrapper (
   
   input  logic        in_clk_i,
   input  logic        out_clk_i,
-  input  logic        mod_rstn_i
+  input  logic        in_rstn_i,
+  input  logic        out_rstn_i
 );
 
 simple_cdc #(
@@ -65,8 +66,8 @@ simple_cdc #(
 
   .in_clk_i(in_clk_i),
   .out_clk_i(out_clk_i),
-  .in_rstn_i(mod_rstn_i),
-  .out_rstn_i(mod_rstn_i)
+  .in_rstn_i(in_rstn_i),
+  .out_rstn_i(out_rstn_i)
 );
 
 simple_cdc #(
@@ -81,8 +82,8 @@ simple_cdc #(
 
   .in_clk_i(in_clk_i),
   .out_clk_i(out_clk_i),
-  .in_rstn_i(mod_rstn_i),
-  .out_rstn_i(mod_rstn_i)
+  .in_rstn_i(in_rstn_i),
+  .out_rstn_i(out_rstn_i)
 );
 
 simple_cdc #(
@@ -97,8 +98,8 @@ simple_cdc #(
 
   .in_clk_i(in_clk_i),
   .out_clk_i(out_clk_i),
-  .in_rstn_i(mod_rstn_i),
-  .out_rstn_i(mod_rstn_i)
+  .in_rstn_i(in_rstn_i),
+  .out_rstn_i(out_rstn_i)
 );
 
 simple_cdc #(
@@ -113,8 +114,8 @@ simple_cdc #(
 
   .in_clk_i(in_clk_i),
   .out_clk_i(out_clk_i),
-  .in_rstn_i(mod_rstn_i),
-  .out_rstn_i(mod_rstn_i)
+  .in_rstn_i(in_rstn_i),
+  .out_rstn_i(out_rstn_i)
 );
 
 simple_cdc #(
@@ -129,8 +130,8 @@ simple_cdc #(
 
   .in_clk_i(in_clk_i),
   .out_clk_i(out_clk_i),
-  .in_rstn_i(mod_rstn_i),
-  .out_rstn_i(mod_rstn_i)
+  .in_rstn_i(in_rstn_i),
+  .out_rstn_i(out_rstn_i)
 );
 
 simple_cdc #(
@@ -145,8 +146,8 @@ simple_cdc #(
 
   .in_clk_i(in_clk_i),
   .out_clk_i(out_clk_i),
-  .in_rstn_i(mod_rstn_i),
-  .out_rstn_i(mod_rstn_i)
+  .in_rstn_i(in_rstn_i),
+  .out_rstn_i(out_rstn_i)
 );
 
 simple_cdc #(
@@ -161,8 +162,8 @@ simple_cdc #(
 
   .in_clk_i(in_clk_i),
   .out_clk_i(out_clk_i),
-  .in_rstn_i(mod_rstn_i),
-  .out_rstn_i(mod_rstn_i)
+  .in_rstn_i(in_rstn_i),
+  .out_rstn_i(out_rstn_i)
 );
 
 simple_cdc #(
@@ -177,8 +178,8 @@ simple_cdc #(
 
   .in_clk_i(in_clk_i),
   .out_clk_i(out_clk_i),
-  .in_rstn_i(mod_rstn_i),
-  .out_rstn_i(mod_rstn_i)
+  .in_rstn_i(in_rstn_i),
+  .out_rstn_i(out_rstn_i)
 );
 
 simple_cdc #(
@@ -193,8 +194,8 @@ simple_cdc #(
 
   .in_clk_i(in_clk_i),
   .out_clk_i(out_clk_i),
-  .in_rstn_i(mod_rstn_i),
-  .out_rstn_i(mod_rstn_i)
+  .in_rstn_i(in_rstn_i),
+  .out_rstn_i(out_rstn_i)
 );
 
 simple_cdc #(
@@ -209,8 +210,8 @@ simple_cdc #(
 
   .in_clk_i(in_clk_i),
   .out_clk_i(out_clk_i),
-  .in_rstn_i(mod_rstn_i),
-  .out_rstn_i(mod_rstn_i)
+  .in_rstn_i(in_rstn_i),
+  .out_rstn_i(out_rstn_i)
 );
 
 

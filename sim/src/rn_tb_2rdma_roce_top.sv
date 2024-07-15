@@ -2662,7 +2662,8 @@ roce_stack_wrapper #(
 
   .axil_aclk_i(axil_clk),
   .axis_aclk_i(axis_clk),
-  .mod_rstn_i(axil_rstn)
+  .axil_rstn_i(axil_rstn),
+  .axis_rstn_i(axis_rstn)
 );
 
 // Configure the remote RDMA

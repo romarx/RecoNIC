@@ -396,7 +396,8 @@ roce_stack_wrapper #(
 
   .axil_aclk_i(axil_aclk),
   .axis_aclk_i(axis_aclk),
-  .mod_rstn_i(axil_rstn)
+  .axil_rstn_i(axil_rstn),
+  .axis_rstn_i(axis_rstn)
 );
 
 // reconic wrapper

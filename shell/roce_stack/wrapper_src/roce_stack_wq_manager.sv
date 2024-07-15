@@ -86,7 +86,8 @@ module roce_stack_wq_manager #(
 
     input  logic          axil_aclk_i,
     input  logic          axis_aclk_i,
-    input  logic          rstn_i
+    input  logic          axil_rstn_i,
+    input logic           axis_rstn_i
 );
 
 
@@ -324,7 +325,7 @@ cdc_fifo_sq cdc_fifo_sq_inst (
 
   .wr_clk(axil_aclk_i),
   .rd_clk(axis_aclk_i),
-  .srst(!rstn_i),
+  .srst(!axil_rstn_i),
   .wr_rst_busy(sq_fifo_wr_rst_busy),
   .rd_rst_busy(sq_fifo_rd_rst_busy)
 );
@@ -867,8 +868,8 @@ assign m_rdma_sq_interface_data_o = sq_req_q;
 
 
 
-always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
-  if(!rstn_i) begin
+always_ff @(posedge axil_aclk_i, negedge axil_rstn_i) begin
+  if(!axil_rstn_i) begin
     conn_if_input_q <= 'd0;
     qp_if_input_q <= 'd0;
     sq_if_input_q <= 'd0;
@@ -887,8 +888,8 @@ always_ff @(posedge axil_aclk_i, negedge rstn_i) begin
   end
 end
 
-always_ff @(posedge axis_aclk_i, negedge rstn_i) begin
-  if(!rstn_i) begin
+always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
+  if(!axis_rstn_i) begin
     conn_if_meta = 'd0;
     qp_if_meta = 'd0;
   end else begin
@@ -898,8 +899,8 @@ always_ff @(posedge axis_aclk_i, negedge rstn_i) begin
 end
 
 
-always_ff @(posedge axis_aclk_i, negedge rstn_i) begin
-  if(!rstn_i) begin
+always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
+  if(!axis_rstn_i) begin
     wqe_done = 1'b1;
     SQPIi_tmp <= 'd0;
     QPidx_tmp <= 'd0;
