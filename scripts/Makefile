@@ -20,9 +20,9 @@ RN_BUILD_DIR := $(BUILD_DIR)/reconic
 
 IMPL       ?= 1
 
-GEN_HLS    ?= 0
+GEN_HLS    ?= 1
 
-GEN_ROCEV2 ?= 0
+GEN_ROCEV2 ?= 1
 
 PYTHON_EXE ?= python
 
