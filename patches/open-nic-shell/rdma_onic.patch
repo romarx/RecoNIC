@@ -1,3 +1,66 @@
+From a8d2132f7f01f07287c1c35c681b13c521741d66 Mon Sep 17 00:00:00 2001
+From: Roman Marquart <maroman@student.ethz.ch>
+Date: Mon, 15 Jul 2024 15:40:52 +0200
+Subject: [PATCH] create patch
+
+---
+ constr/au250/general.xdc                      |    9 +-
+ script/build.tcl                              |    8 +-
+ src/open_nic_shell.sv                         | 2118 +++++++++++++++--
+ src/packet_adapter/packet_adapter_register.v  |    4 +-
+ src/qdma_subsystem/qdma_subsystem.sv          |  339 ++-
+ src/qdma_subsystem/qdma_subsystem_c2h.sv      |    8 +-
+ src/qdma_subsystem/qdma_subsystem_h2c.sv      |    3 +-
+ .../qdma_subsystem_qdma_wrapper.v             |  379 +++
+ src/qdma_subsystem/vivado_ip/axi_mm_bram.tcl  |   30 +
+ .../vivado_ip/qdma_no_sriov_au200.tcl         |    2 +-
+ .../vivado_ip/qdma_no_sriov_au250.tcl         |   31 +-
+ .../vivado_ip/qdma_no_sriov_au280.tcl         |    6 +-
+ .../vivado_ip/qdma_subsystem_axi_crossbar.tcl |    2 +-
+ .../vivado_ip/qdma_subsystem_axi_csr_cdc.tcl  |   34 +
+ .../vivado_ip/qdma_subsystem_c2h_ecc.tcl      |    2 +-
+ src/qdma_subsystem/vivado_ip/vivado_ip.tcl    |    2 +
+ src/rdma_subsystem/rdma_subsystem.sv          |  940 ++++++++
+ src/rdma_subsystem/rdma_subsystem_wrapper.sv  |  703 ++++++
+ src/rdma_subsystem/vivado_ip/rdma_core.tcl    |   28 +
+ src/rdma_subsystem/vivado_ip/vivado_ip.tcl    |   20 +
+ src/system_config/system_config.sv            |  113 +-
+ .../system_config_address_map.sv              |   92 +-
+ src/system_config/system_config_register.v    |   16 +-
+ .../vivado_ip/system_config_axi_crossbar.tcl  |   16 +-
+ .../vivado_ip/system_management_wiz.tcl       |   34 +-
+ .../axi_3to1_interconnect_to_dev_mem.sv       |  431 ++++
+ .../axi_5to2_interconnect_to_sys_mem.sv       |  756 ++++++
+ src/utility/axi_interconnect_to_dev_mem.sv    |  514 ++++
+ src/utility/axi_interconnect_to_sys_mem.sv    |  432 ++++
+ src/utility/axi_lite_slave.sv                 |    4 +-
+ src/utility/axi_stream_packet_buffer.sv       |   16 +-
+ .../vivado_ip/axi_clock_converter_for_ddr.tcl |   34 +
+ .../vivado_ip/dev_mem_3to1_axi_crossbar.tcl   |   42 +
+ .../vivado_ip/dev_mem_axi_crossbar.tcl        |   42 +
+ .../vivado_ip/dev_mem_ddr4_controller.tcl     |  170 ++
+ .../vivado_ip/sys_mem_5to2_axi_crossbar.tcl   |   49 +
+ .../vivado_ip/sys_mem_axi_crossbar.tcl        |   42 +
+ src/utility/vivado_ip/vivado_ip.tcl           |    6 +-
+ 38 files changed, 7173 insertions(+), 304 deletions(-)
+ create mode 100755 src/qdma_subsystem/vivado_ip/axi_mm_bram.tcl
+ create mode 100755 src/qdma_subsystem/vivado_ip/qdma_subsystem_axi_csr_cdc.tcl
+ create mode 100644 src/rdma_subsystem/rdma_subsystem.sv
+ create mode 100644 src/rdma_subsystem/rdma_subsystem_wrapper.sv
+ create mode 100644 src/rdma_subsystem/vivado_ip/rdma_core.tcl
+ create mode 100644 src/rdma_subsystem/vivado_ip/vivado_ip.tcl
+ create mode 100755 src/utility/axi_3to1_interconnect_to_dev_mem.sv
+ create mode 100755 src/utility/axi_5to2_interconnect_to_sys_mem.sv
+ create mode 100644 src/utility/axi_interconnect_to_dev_mem.sv
+ create mode 100644 src/utility/axi_interconnect_to_sys_mem.sv
+ mode change 100644 => 100755 src/utility/axi_stream_packet_buffer.sv
+ create mode 100755 src/utility/vivado_ip/axi_clock_converter_for_ddr.tcl
+ create mode 100755 src/utility/vivado_ip/dev_mem_3to1_axi_crossbar.tcl
+ create mode 100644 src/utility/vivado_ip/dev_mem_axi_crossbar.tcl
+ create mode 100755 src/utility/vivado_ip/dev_mem_ddr4_controller.tcl
+ create mode 100755 src/utility/vivado_ip/sys_mem_5to2_axi_crossbar.tcl
+ create mode 100644 src/utility/vivado_ip/sys_mem_axi_crossbar.tcl
+
 diff --git a/constr/au250/general.xdc b/constr/au250/general.xdc
 index 6269b52..daeab3c 100644
 --- a/constr/au250/general.xdc
@@ -30,10 +93,29 @@ index 6269b52..daeab3c 100644
 +set_property BITSTREAM.CONFIG.SPI_32BIT_ADDR Yes [current_design]
 \ No newline at end of file
 diff --git a/script/build.tcl b/script/build.tcl
-index c689eb6..a86c2c7 100644
+index c689eb6..8cb2a6e 100644
 --- a/script/build.tcl
 +++ b/script/build.tcl
-@@ -395,7 +395,8 @@ read_xdc ${build_dir}/run_params.xdc
+@@ -104,6 +104,7 @@ array set design_params {
+     -num_phys_func    1
+     -num_queue        512
+     -num_cmac_port    1
++    -ernic            1
+ }
+ set design_params(-build_timestamp) [clock format [clock seconds] -format %m%d%H%M]
+ 
+@@ -151,6 +152,10 @@ if {$num_cmac_port != 1 && $num_cmac_port != 2} {
+     puts "Invalid value for -num_cmac_port: allowed values are 1 and 2"
+     exit
+ }
++if {$ernic != 0 && $ernic != 1} {
++    puts "Invalid value for -ernic: allowed values are 0 and 1"
++    exit
++}
+ 
+ source ${script_dir}/board_settings/${board}.tcl
+ 
+@@ -395,7 +400,8 @@ read_xdc ${build_dir}/run_params.xdc
  # Implement design
  if {$impl} {
      update_compile_order -fileset sources_1
@@ -44,7 +126,7 @@ index c689eb6..a86c2c7 100644
  
  if {$post_impl} {
 diff --git a/src/open_nic_shell.sv b/src/open_nic_shell.sv
-index e2f6c3f..bedd7f8 100644
+index e2f6c3f..af25249 100644
 --- a/src/open_nic_shell.sv
 +++ b/src/open_nic_shell.sv
 @@ -1,6 +1,6 @@
@@ -55,7 +137,17 @@ index e2f6c3f..bedd7f8 100644
  //
  // Licensed under the Apache License, Version 2.0 (the "License");
  // you may not use this file except in compliance with the License.
-@@ -41,6 +41,23 @@ module open_nic_shell #(
+@@ -24,7 +24,8 @@ module open_nic_shell #(
+   parameter int    USE_PHYS_FUNC   = 1,
+   parameter int    NUM_PHYS_FUNC   = 1,
+   parameter int    NUM_QUEUE       = 512,
+-  parameter int    NUM_CMAC_PORT   = 1
++  parameter int    NUM_CMAC_PORT   = 1,
++  parameter int    ERNIC           = 1
+ ) (
+ `ifdef __synthesis__
+ `ifdef __au280__
+@@ -41,6 +42,23 @@ module open_nic_shell #(
    input                          pcie_refclk_n,
    input                          pcie_rstn,
  
@@ -79,7 +171,7 @@ index e2f6c3f..bedd7f8 100644
    input    [4*NUM_CMAC_PORT-1:0] qsfp_rxp,
    input    [4*NUM_CMAC_PORT-1:0] qsfp_rxn,
    output   [4*NUM_CMAC_PORT-1:0] qsfp_txp,
-@@ -147,27 +164,27 @@ module open_nic_shell #(
+@@ -147,27 +165,27 @@ module open_nic_shell #(
    end
  
  `ifdef __synthesis__
@@ -126,7 +218,7 @@ index e2f6c3f..bedd7f8 100644
  
    IBUF pcie_rstn_ibuf_inst (.I(pcie_rstn), .O(pcie_rstn_int));
  
-@@ -187,187 +204,729 @@ module open_nic_shell #(
+@@ -187,187 +205,729 @@ module open_nic_shell #(
  `endif
  `endif
  
@@ -1023,7 +1115,7 @@ index e2f6c3f..bedd7f8 100644
  
    // For each CMAC port, use the subsequent 4-bit: bit 0 for CMAC subsystem and
    // bit 1 for the corresponding adapter
-@@ -459,6 +1018,24 @@ module open_nic_shell #(
+@@ -459,6 +1019,24 @@ module open_nic_shell #(
      .m_axil_qdma_rresp   (axil_qdma_rresp),
      .m_axil_qdma_rready  (axil_qdma_rready),
  
@@ -1048,7 +1140,7 @@ index e2f6c3f..bedd7f8 100644
      .m_axil_adap_awvalid (axil_adap_awvalid),
      .m_axil_adap_awaddr  (axil_adap_awaddr),
      .m_axil_adap_awready (axil_adap_awready),
-@@ -493,6 +1070,23 @@ module open_nic_shell #(
+@@ -493,6 +1071,23 @@ module open_nic_shell #(
      .m_axil_cmac_rresp   (axil_cmac_rresp),
      .m_axil_cmac_rready  (axil_cmac_rready),
  
@@ -1072,7 +1164,7 @@ index e2f6c3f..bedd7f8 100644
      .m_axil_box0_awvalid (axil_box0_awvalid),
      .m_axil_box0_awaddr  (axil_box0_awaddr),
      .m_axil_box0_awready (axil_box0_awready),
-@@ -578,6 +1172,46 @@ module open_nic_shell #(
+@@ -578,6 +1173,46 @@ module open_nic_shell #(
      .s_axis_c2h_tuser_dst                 (axis_qdma_c2h_tuser_dst),
      .s_axis_c2h_tready                    (axis_qdma_c2h_tready),
  
@@ -1119,7 +1211,7 @@ index e2f6c3f..bedd7f8 100644
  `ifdef __synthesis__
      .pcie_rxp                             (pcie_rxp),
      .pcie_rxn                             (pcie_rxn),
-@@ -649,6 +1283,63 @@ module open_nic_shell #(
+@@ -649,6 +1284,63 @@ module open_nic_shell #(
      .m_axis_qdma_cpl_tready               (m_axis_qdma_cpl_sim_tready),
  `endif
  
@@ -1183,13 +1275,15 @@ index e2f6c3f..bedd7f8 100644
      .mod_rstn                             (qdma_rstn),
      .mod_rst_done                         (qdma_rst_done),
  
-@@ -786,6 +1477,925 @@ module open_nic_shell #(
+@@ -786,6 +1478,927 @@ module open_nic_shell #(
    end: cmac_port
    endgenerate
  
 +  // RDMA subsystem
 +  // TODO: retry buffer and hardware handshaking are not supported at the moment
-+  rdma_subsystem_wrapper rdma_subsystem_inst (
++  rdma_subsystem_wrapper #(
++    .ERNIC(ERNIC)
++  ) rdma_subsystem_inst (
 +    // AXIL interface for RDMA control register
 +    .s_axil_awaddr    (axil_rdma_awaddr),
 +    .s_axil_awvalid   (axil_rdma_awvalid),
@@ -2109,7 +2203,7 @@ index e2f6c3f..bedd7f8 100644
    box_250mhz #(
      .MIN_PKT_LEN   (MIN_PKT_LEN),
      .MAX_PKT_LEN   (MAX_PKT_LEN),
-@@ -846,14 +2456,104 @@ module open_nic_shell #(
+@@ -846,14 +2459,104 @@ module open_nic_shell #(
      .s_axis_adap_rx_250mhz_tuser_dst  (axis_adap_rx_250mhz_tuser_dst),
      .s_axis_adap_rx_250mhz_tready     (axis_adap_rx_250mhz_tready),
  
@@ -2222,7 +2316,7 @@ index e2f6c3f..bedd7f8 100644
    );
  
    box_322mhz #(
-@@ -914,4 +2614,25 @@ module open_nic_shell #(
+@@ -914,4 +2617,25 @@ module open_nic_shell #(
      .cmac_clk                        (cmac_clk)
    );
  
@@ -3383,10 +3477,10 @@ index 1159969..3f0c1b7 100644
  }
 diff --git a/src/rdma_subsystem/rdma_subsystem.sv b/src/rdma_subsystem/rdma_subsystem.sv
 new file mode 100644
-index 0000000..82ba064
+index 0000000..f787dc9
 --- /dev/null
 +++ b/src/rdma_subsystem/rdma_subsystem.sv
-@@ -0,0 +1,672 @@
+@@ -0,0 +1,940 @@
 +// *************************************************************************
 +//
 +// Copyright 2022 Xilinx, Inc.
@@ -3407,8 +3501,9 @@ index 0000000..82ba064
 +`timescale 1ns/1ps
 +
 +module rdma_subsystem #(
-+  parameter  C_AXIS_DATA_WIDTH = 512,
-+  parameter  C_AXIS_KEEP_WIDTH = 64,
++  parameter ERNIC = 1,
++  parameter C_AXIS_DATA_WIDTH = 512,
++  parameter C_AXIS_KEEP_WIDTH = 64,
 +  parameter C_AXIS_IMMDT_WIDTH = 64
 +) (
 +  // AXIL interface for RDMA control register
@@ -3733,6 +3828,8 @@ index 0000000..82ba064
 +  output rdma_resetn_done
 +);
 +
++if (ERNIC) begin
++
 +rdma_core rdma_inst (
 +  .s_axi_lite_aclk                   (axil_clk),
 +  .s_axi_lite_aresetn                (axil_rstn),
@@ -4056,15 +4153,280 @@ index 0000000..82ba064
 +  .ctl_tx_resend_pause               (ctl_tx_resend_pause),
 +  .o_global_dbg_cnt_en               (o_global_dbg_cnt_en),
 +  .o_global_dbg_cnt_clr              (o_global_dbg_cnt_clr)
++); 
++
++end else begin
++
++roce_stack_wrapper #(
++  .NUM_QP(256), //min: 8, max: 256
++  .AXIL_ADDR_WIDTH(32),
++  .AXIL_DATA_WIDTH(32),
++  .AXI4S_DATA_WIDTH(C_AXIS_DATA_WIDTH)
++) remote_peer_rdma_inst (
++  // AXIL interface for RDMA control register
++  .s_axil_awvalid_i (s_axil_awvalid),
++  .s_axil_awaddr_i  (s_axil_awaddr),
++  .s_axil_awready_o (s_axil_awready),
++  .s_axil_wvalid_i  (s_axil_wvalid),
++  .s_axil_wdata_i   (s_axil_wdata),
++  .s_axil_wstrb_i   (s_axil_wstrb),
++  .s_axil_wready_o  (s_axil_wready),
++  .s_axil_bvalid_o  (s_axil_bvalid),
++  .s_axil_bresp_o   (s_axil_bresp),
++  .s_axil_bready_i  (s_axil_bready),
++  .s_axil_arvalid_i (s_axil_arvalid),
++  .s_axil_araddr_i  (s_axil_araddr),
++  .s_axil_arready_o (s_axil_arready),
++  .s_axil_rvalid_o  (s_axil_rvalid),
++  .s_axil_rdata_o   (s_axil_rdata),
++  .s_axil_rresp_o   (s_axil_rresp),
++  .s_axil_rready_i  (s_axil_rready),
++
++  // RDMA TX interface (including roce and non-roce packets) to CMAC TX path
++  .m_rdma2cmac_axis_tdata_o  (m_rdma2cmac_axis_tdata),
++  .m_rdma2cmac_axis_tkeep_o  (m_rdma2cmac_axis_tkeep),
++  .m_rdma2cmac_axis_tvalid_o (m_rdma2cmac_axis_tvalid),
++  .m_rdma2cmac_axis_tlast_o  (m_rdma2cmac_axis_tlast),
++  .m_rdma2cmac_axis_tready_i (m_rdma2cmac_axis_tready),
++
++
++  // Non-RDMA packets from QDMA TX bypassing RDMA TX
++  .s_qdma2rdma_non_roce_axis_tdata_i    (s_qdma2rdma_non_roce_axis_tdata),
++  .s_qdma2rdma_non_roce_axis_tkeep_i    (s_qdma2rdma_non_roce_axis_tkeep),
++  .s_qdma2rdma_non_roce_axis_tvalid_i   (s_qdma2rdma_non_roce_axis_tvalid),
++  .s_qdma2rdma_non_roce_axis_tlast_i    (s_qdma2rdma_non_roce_axis_tlast),
++  .s_qdma2rdma_non_roce_axis_tready_o   (s_qdma2rdma_non_roce_axis_tready),
++
++  // RDMA RX interface from CMAC RX, no rx backpressure
++  .s_cmac2rdma_roce_axis_tdata_i        (s_cmac2rdma_roce_axis_tdata),
++  .s_cmac2rdma_roce_axis_tkeep_i        (s_cmac2rdma_roce_axis_tkeep),
++  .s_cmac2rdma_roce_axis_tvalid_i       (s_cmac2rdma_roce_axis_tvalid),
++  .s_cmac2rdma_roce_axis_tlast_i        (s_cmac2rdma_roce_axis_tlast),
++  .s_cmac2rdma_roce_axis_tuser_i        (s_cmac2rdma_roce_axis_tuser),
++  
++
++  //AXI Master to fetch WQEs and write completions
++  .m_axi_qp_get_wqe_awid_o    (m_axi_qp_get_wqe_awid),
++  .m_axi_qp_get_wqe_awaddr_o  (m_axi_qp_get_wqe_awaddr),
++  .m_axi_qp_get_wqe_awlen_o   (m_axi_qp_get_wqe_awlen),
++  .m_axi_qp_get_wqe_awsize_o  (m_axi_qp_get_wqe_awsize),
++  .m_axi_qp_get_wqe_awburst_o (m_axi_qp_get_wqe_awburst),
++  .m_axi_qp_get_wqe_awcache_o (m_axi_qp_get_wqe_awcache),
++  .m_axi_qp_get_wqe_awprot_o  (m_axi_qp_get_wqe_awprot),
++  .m_axi_qp_get_wqe_awvalid_o (m_axi_qp_get_wqe_awvalid),
++  .m_axi_qp_get_wqe_awready_i (m_axi_qp_get_wqe_awready),
++  .m_axi_qp_get_wqe_wdata_o   (m_axi_qp_get_wqe_wdata),
++  .m_axi_qp_get_wqe_wstrb_o   (m_axi_qp_get_wqe_wstrb),
++  .m_axi_qp_get_wqe_wlast_o   (m_axi_qp_get_wqe_wlast),
++  .m_axi_qp_get_wqe_wvalid_o  (m_axi_qp_get_wqe_wvalid),
++  .m_axi_qp_get_wqe_wready_i  (m_axi_qp_get_wqe_wready),
++  .m_axi_qp_get_wqe_awlock_o  (m_axi_qp_get_wqe_awlock),
++  .m_axi_qp_get_wqe_bid_i     (m_axi_qp_get_wqe_bid),
++  .m_axi_qp_get_wqe_bresp_i   (m_axi_qp_get_wqe_bresp),
++  .m_axi_qp_get_wqe_bvalid_i  (m_axi_qp_get_wqe_bvalid),
++  .m_axi_qp_get_wqe_bready_o  (m_axi_qp_get_wqe_bready),
++  .m_axi_qp_get_wqe_arid_o    (m_axi_qp_get_wqe_arid),
++  .m_axi_qp_get_wqe_araddr_o  (m_axi_qp_get_wqe_araddr),
++  .m_axi_qp_get_wqe_arlen_o   (m_axi_qp_get_wqe_arlen),
++  .m_axi_qp_get_wqe_arsize_o  (m_axi_qp_get_wqe_arsize),
++  .m_axi_qp_get_wqe_arburst_o (m_axi_qp_get_wqe_arburst),
++  .m_axi_qp_get_wqe_arcache_o (m_axi_qp_get_wqe_arcache),
++  .m_axi_qp_get_wqe_arprot_o  (m_axi_qp_get_wqe_arprot),
++  .m_axi_qp_get_wqe_arvalid_o (m_axi_qp_get_wqe_arvalid),
++  .m_axi_qp_get_wqe_arready_i (m_axi_qp_get_wqe_arready),
++  .m_axi_qp_get_wqe_arlock_o  (m_axi_qp_get_wqe_arlock),
++  .m_axi_qp_get_wqe_rid_i     (m_axi_qp_get_wqe_rid),
++  .m_axi_qp_get_wqe_rdata_i   (m_axi_qp_get_wqe_rdata),
++  .m_axi_qp_get_wqe_rresp_i   (m_axi_qp_get_wqe_rresp),
++  .m_axi_qp_get_wqe_rlast_i   (m_axi_qp_get_wqe_rlast),
++  .m_axi_qp_get_wqe_rvalid_i  (m_axi_qp_get_wqe_rvalid),
++  .m_axi_qp_get_wqe_rready_o  (m_axi_qp_get_wqe_rready),
++  
++  //AXI Master memory interface for writing send, write and reading read commands
++  .m_axi_data_bus_awid_o      (m_axi_rdma_send_write_payload_store_awid),
++  .m_axi_data_bus_awaddr_o    (m_axi_rdma_send_write_payload_store_awaddr),
++  .m_axi_data_bus_awlen_o     (m_axi_rdma_send_write_payload_store_awlen),
++  .m_axi_data_bus_awsize_o    (m_axi_rdma_send_write_payload_store_awsize),
++  .m_axi_data_bus_awburst_o   (m_axi_rdma_send_write_payload_store_awburst),
++  .m_axi_data_bus_awcache_o   (m_axi_rdma_send_write_payload_store_awcache),
++  .m_axi_data_bus_awprot_o    (m_axi_rdma_send_write_payload_store_awprot),
++  .m_axi_data_bus_awvalid_o   (m_axi_rdma_send_write_payload_store_awvalid),
++  .m_axi_data_bus_awready_i   (m_axi_rdma_send_write_payload_store_awready),
++  .m_axi_data_bus_wdata_o     (m_axi_rdma_send_write_payload_store_wdata),
++  .m_axi_data_bus_wstrb_o     (m_axi_rdma_send_write_payload_store_wstrb),
++  .m_axi_data_bus_wlast_o     (m_axi_rdma_send_write_payload_store_wlast),
++  .m_axi_data_bus_wvalid_o    (m_axi_rdma_send_write_payload_store_wvalid),
++  .m_axi_data_bus_wready_i    (m_axi_rdma_send_write_payload_store_wready),
++  .m_axi_data_bus_awlock_o    (m_axi_rdma_send_write_payload_store_awlock),
++  .m_axi_data_bus_bid_i       (m_axi_rdma_send_write_payload_store_bid),
++  .m_axi_data_bus_bresp_i     (m_axi_rdma_send_write_payload_store_bresp),
++  .m_axi_data_bus_bvalid_i    (m_axi_rdma_send_write_payload_store_bvalid),
++  .m_axi_data_bus_bready_o    (m_axi_rdma_send_write_payload_store_bready),
++  .m_axi_data_bus_arid_o      (m_axi_rdma_send_write_payload_store_arid),
++  .m_axi_data_bus_araddr_o    (m_axi_rdma_send_write_payload_store_araddr),
++  .m_axi_data_bus_arlen_o     (m_axi_rdma_send_write_payload_store_arlen),
++  .m_axi_data_bus_arsize_o    (m_axi_rdma_send_write_payload_store_arsize),
++  .m_axi_data_bus_arburst_o   (m_axi_rdma_send_write_payload_store_arburst),
++  .m_axi_data_bus_arcache_o   (m_axi_rdma_send_write_payload_store_arcache),
++  .m_axi_data_bus_arprot_o    (m_axi_rdma_send_write_payload_store_arprot),
++  .m_axi_data_bus_arvalid_o   (m_axi_rdma_send_write_payload_store_arvalid),
++  .m_axi_data_bus_arready_i   (m_axi_rdma_send_write_payload_store_arready),
++  .m_axi_data_bus_arlock_o    (m_axi_rdma_send_write_payload_store_arlock),
++  .m_axi_data_bus_rid_i       (m_axi_rdma_send_write_payload_store_rid),
++  .m_axi_data_bus_rdata_i     (m_axi_rdma_send_write_payload_store_rdata),
++  .m_axi_data_bus_rresp_i     (m_axi_rdma_send_write_payload_store_rresp),
++  .m_axi_data_bus_rlast_i     (m_axi_rdma_send_write_payload_store_rlast),
++  .m_axi_data_bus_rvalid_i    (m_axi_rdma_send_write_payload_store_rvalid),
++  .m_axi_data_bus_rready_o    (m_axi_rdma_send_write_payload_store_rready),
++
++  .axil_aclk_i(axil_clk),
++  .axis_aclk_i(axis_clk),
++  .axil_rstn_i(axil_rstn),
++  .axis_rstn_i(axis_rstn)
 +);
++
++assign m_axi_rdma_send_write_payload_store_awuser = 'd0;
++
++assign m_axi_rdma_rsp_payload_awid = 1'b0;
++assign m_axi_rdma_rsp_payload_awaddr = 'd0;
++assign m_axi_rdma_rsp_payload_awlen = 'd0;
++assign m_axi_rdma_rsp_payload_awsize = 'd0;
++assign m_axi_rdma_rsp_payload_awburst = 'd0;
++assign m_axi_rdma_rsp_payload_awcache = 'd0;
++assign m_axi_rdma_rsp_payload_awprot = 'd0;
++assign m_axi_rdma_rsp_payload_awvalid = 1'b0;
++assign m_axi_rdma_rsp_payload_wdata = 'd0;
++assign m_axi_rdma_rsp_payload_wstrb = 'd0;
++assign m_axi_rdma_rsp_payload_wlast = 1'b0;
++assign m_axi_rdma_rsp_payload_wvalid = 1'b0;
++assign m_axi_rdma_rsp_payload_awlock = 1'b0;
++assign m_axi_rdma_rsp_payload_bready = 1'b1;
++assign m_axi_rdma_rsp_payload_arid = 1'b0;
++assign m_axi_rdma_rsp_payload_araddr = 1'b0;
++assign m_axi_rdma_rsp_payload_arlen = 1'b0;
++assign m_axi_rdma_rsp_payload_arsize = 1'b0;
++assign m_axi_rdma_rsp_payload_arburst = 1'b0;
++assign m_axi_rdma_rsp_payload_arcache = 1'b0;
++assign m_axi_rdma_rsp_payload_arprot = 1'b0;
++assign m_axi_rdma_rsp_payload_arvalid = 1'b0;
++assign m_axi_rdma_rsp_payload_rready = 1'b0;
++assign m_axi_rdma_rsp_payload_arlock = 1'b0;
++
++assign m_axi_payload_to_retry_buf_awid = 'd0;
++assign m_axi_payload_to_retry_buf_awaddr = 'd0;
++assign m_axi_payload_to_retry_buf_awlen = 'd0;
++assign m_axi_payload_to_retry_buf_awsize = 'd0;
++assign m_axi_payload_to_retry_buf_awburst = 'd0;
++assign m_axi_payload_to_retry_buf_awcache = 'd0;
++assign m_axi_payload_to_retry_buf_awprot = 'd0;
++assign m_axi_payload_to_retry_buf_awvalid = 'd0;
++assign m_axi_payload_to_retry_buf_wdata = 'd0;
++assign m_axi_payload_to_retry_buf_wstrb = 'd0;
++assign m_axi_payload_to_retry_buf_wlast = 'd0;
++assign m_axi_payload_to_retry_buf_wvalid = 'd0;
++assign m_axi_payload_to_retry_buf_awlock = 'd0;
++assign m_axi_payload_to_retry_buf_bready = 'd1;
++assign m_axi_payload_to_retry_buf_arid = 'd0;
++assign m_axi_payload_to_retry_buf_araddr = 'd0;
++assign m_axi_payload_to_retry_buf_arlen = 'd0;
++assign m_axi_payload_to_retry_buf_arsize = 'd0;
++assign m_axi_payload_to_retry_buf_arburst = 'd0;
++assign m_axi_payload_to_retry_buf_arcache = 'd0;
++assign m_axi_payload_to_retry_buf_arprot = 'd0;
++assign m_axi_payload_to_retry_buf_arvalid = 'd0;
++assign m_axi_payload_to_retry_buf_rready = 'd0;
++assign m_axi_payload_to_retry_buf_arlock = 'd0;
++
++assign m_axi_pktgen_get_payload_awid = 'd0;
++assign m_axi_pktgen_get_payload_awaddr = 'd0;
++assign m_axi_pktgen_get_payload_awlen = 'd0;
++assign m_axi_pktgen_get_payload_awsize = 'd0;
++assign m_axi_pktgen_get_payload_awburst = 'd0;
++assign m_axi_pktgen_get_payload_awcache = 'd0;
++assign m_axi_pktgen_get_payload_awprot = 'd0;
++assign m_axi_pktgen_get_payload_awvalid = 'd0;
++assign m_axi_pktgen_get_payload_wdata = 'd0;
++assign m_axi_pktgen_get_payload_wstrb = 'd0;
++assign m_axi_pktgen_get_payload_wlast = 'd0;
++assign m_axi_pktgen_get_payload_wvalid = 'd0;
++assign m_axi_pktgen_get_payload_awlock = 'd0;
++assign m_axi_pktgen_get_payload_bready = 'd1;
++assign m_axi_pktgen_get_payload_arid = 'd0;
++assign m_axi_pktgen_get_payload_araddr = 'd0;
++assign m_axi_pktgen_get_payload_arlen = 'd0;
++assign m_axi_pktgen_get_payload_arsize = 'd0;
++assign m_axi_pktgen_get_payload_arburst = 'd0;
++assign m_axi_pktgen_get_payload_arcache = 'd0;
++assign m_axi_pktgen_get_payload_arprot = 'd0;
++assign m_axi_pktgen_get_payload_arvalid = 'd0;
++assign m_axi_pktgen_get_payload_rready = 'd0;
++assign m_axi_pktgen_get_payload_arlock = 'd0;
++
++assign m_axi_write_completion_awid = 'd0;
++assign m_axi_write_completion_awaddr = 'd0;
++assign m_axi_write_completion_awlen = 'd0;
++assign m_axi_write_completion_awsize = 'd0;
++assign m_axi_write_completion_awburst = 'd0;
++assign m_axi_write_completion_awcache = 'd0;
++assign m_axi_write_completion_awprot = 'd0;
++assign m_axi_write_completion_awvalid = 'd0;
++assign m_axi_write_completion_wdata = 'd0;
++assign m_axi_write_completion_wstrb = 'd0;
++assign m_axi_write_completion_wlast = 'd0;
++assign m_axi_write_completion_wvalid = 'd0;
++assign m_axi_write_completion_awlock = 'd0;
++assign m_axi_write_completion_bready = 'd1;
++assign m_axi_write_completion_arid = 'd0;
++assign m_axi_write_completion_araddr = 'd0;
++assign m_axi_write_completion_arlen = 'd0;
++assign m_axi_write_completion_arsize = 'd0;
++assign m_axi_write_completion_arburst = 'd0;
++assign m_axi_write_completion_arcache = 'd0;
++assign m_axi_write_completion_arprot = 'd0;
++assign m_axi_write_completion_arvalid = 'd0;
++assign m_axi_write_completion_rready = 'd0;
++assign m_axi_write_completion_arlock = 'd0;
++
++assign m_rdma2qdma_non_roce_axis_tdata = 'd0;
++assign m_rdma2qdma_non_roce_axis_tkeep = 'd0;
++assign m_rdma2qdma_non_roce_axis_tvalid = 'd0;
++assign m_rdma2qdma_non_roce_axis_tlast = 'd0;
++
++assign m_rdma2user_ieth_immdt_axis_tdata = 'd0;
++assign m_rdma2user_ieth_immdt_axis_tlast = 'd0;
++assign m_rdma2user_ieth_immdt_axis_tvalid = 'd0;
++
++assign resp_hndler_o_send_cq_db_cnt_valid = 'd0;
++assign resp_hndler_o_send_cq_db_addr = 'd0;
++assign resp_hndler_o_send_cq_db_cnt = 'd0;
++
++assign o_qp_sq_pidb_wr_rdy = 'd0;
++assign o_qp_rq_cidb_wr_rdy = 'd0;
++
++assign rx_pkt_hndler_o_rq_db_data = 'd0;
++assign rx_pkt_hndler_o_rq_db_addr = 'd0;
++assign rx_pkt_hndler_o_rq_db_data_valid = 'd0;
++
++assign rnic_intr = 'd0;
++assign ctl_tx_pause_req = 'd0;
++assign ctl_tx_resend_pause = 'd0;
++
++assign o_global_dbg_cnt_en = 1'b1;
++assign o_global_dbg_cnt_clr = 1'b0;
++
++assign rdma_resetn_done = 1'b1;
++
++
++
++end
 +
 +endmodule : rdma_subsystem
 diff --git a/src/rdma_subsystem/rdma_subsystem_wrapper.sv b/src/rdma_subsystem/rdma_subsystem_wrapper.sv
 new file mode 100644
-index 0000000..a927ab4
+index 0000000..6ad7872
 --- /dev/null
 +++ b/src/rdma_subsystem/rdma_subsystem_wrapper.sv
-@@ -0,0 +1,701 @@
+@@ -0,0 +1,703 @@
 +// *************************************************************************
 +//
 +// Copyright 2022 Xilinx, Inc.
@@ -4092,6 +4454,7 @@ index 0000000..a927ab4
 +`timescale 1ns/1ps
 +
 +module rdma_subsystem_wrapper #(
++  parameter ERNIC = 1,
 +  parameter C_AXIS_DATA_WIDTH  = 512,
 +  parameter C_AXIS_KEEP_WIDTH  = 64,
 +  parameter C_AXIS_IMMDT_WIDTH = 64
@@ -4435,6 +4798,7 @@ index 0000000..a927ab4
 +);
 +
 +rdma_subsystem #(
++  .ERNIC(ERNIC),
 +  .C_AXIS_DATA_WIDTH (C_AXIS_DATA_WIDTH),
 +  .C_AXIS_KEEP_WIDTH (C_AXIS_KEEP_WIDTH),
 +  .C_AXIS_IMMDT_WIDTH(C_AXIS_IMMDT_WIDTH)
@@ -7938,3 +8302,6 @@ index 62f583e..50f65ab 100644
 +    axi_clock_converter_for_ddr
 +    dev_mem_ddr4_controller
  }
+-- 
+2.25.1
+
