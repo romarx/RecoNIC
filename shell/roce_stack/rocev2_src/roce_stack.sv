@@ -419,7 +419,7 @@ rocev2_ip rocev2_inst(
 `ifdef VITIS_HLS
 
     // Debug
-`ifdef DBG_IBV
+
     .m_axis_dbg_0_TVALID(m_axis_dbg_0.valid),
     .m_axis_dbg_0_TREADY(m_axis_dbg_0.ready),
     .m_axis_dbg_0_TDATA(m_axis_dbg_0.data),
@@ -431,7 +431,7 @@ rocev2_ip rocev2_inst(
     .m_axis_dbg_2_TVALID(m_axis_dbg_2.valid),
     .m_axis_dbg_2_TREADY(m_axis_dbg_2.ready),
     .m_axis_dbg_2_TDATA(m_axis_dbg_2.data),
-`endif
+
 
     // RX
     .s_axis_rx_data_TVALID(s_axis_rx.tvalid),
