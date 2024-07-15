@@ -15,13 +15,14 @@ ROOT_DIR     := ..
 SHELL_DIR    := $(ROOT_DIR)/shell
 SCRIPT_DIR   := $(ROOT_DIR)/scripts
 BUILD_DIR    := $(ROOT_DIR)/build
+ROCE_BUILD_DIR := $(ROOT_DIR)/roce_build
 RN_BUILD_DIR := $(BUILD_DIR)/reconic
 
 IMPL       ?= 1
 
 GEN_HLS    ?= 0
 
-GEN_ROCEV2 ?= 1
+GEN_ROCEV2 ?= 0
 
 PYTHON_EXE ?= python
 
@@ -56,17 +57,23 @@ PLUGS_DIR         := $(SHELL_DIR)/plugs
 
 PLUGIN_DIR     := $(PLUGS_DIR)/rdma_onic_plugin
 SMARTNIC_DIR := $(ROOT_DIR)/base_nics/open-nic-shell/src/box_250mhz
+SMARTNIC_ROCE_DIR := $(ROOT_DIR)/base_nics/open-nic-shell/src/roce_stack
 SMARTNIC_SCRIPT_DIR := $(ROOT_DIR)/base_nics/open-nic-shell/script
 
 build_nic: build_reconic
 ifeq ($(IMPL), 1)
-	cd $(SMARTNIC_SCRIPT_DIR); vivado -mode batch -source build.tcl -tclargs -max_pkt_len 9600 -impl 1 -overwrite 1 -board_repo $(BOARD_REPO)
+	cd $(SMARTNIC_SCRIPT_DIR); vivado -mode batch -source build.tcl -tclargs -max_pkt_len 9600 -ernic 0 -impl 1 -overwrite 1 -board_repo $(BOARD_REPO)
 else
-	cd $(SMARTNIC_SCRIPT_DIR); vivado -mode batch -source build.tcl -tclargs -max_pkt_len 9600 -impl 0 -overwrite 1 -board_repo $(BOARD_REPO)
+	cd $(SMARTNIC_SCRIPT_DIR); vivado -mode batch -source build.tcl -tclargs -max_pkt_len 9600 -ernic 0 -impl 0 -overwrite 1 -board_repo $(BOARD_REPO)
 endif
 
 build_reconic: clean_build hls_build
 	mkdir -p $(BUILD_DIR)
+	mkdir -p $(ROCE_BUILD_DIR)
+	mkdir -p $(ROCE_BUILD_DIR)/build
+	mkdir -p $(ROCE_BUILD_DIR)/rocev2_src
+	mkdir -p $(ROCE_BUILD_DIR)/vivado_ip
+	mkdir -p $(SMARTNIC_ROCE_DIR)/
 	mkdir -p $(RN_BUILD_DIR)
 	mkdir -p $(RN_BUILD_DIR)/$(LC)
 	cp -rf $(PLUGIN_DIR)/* $(BUILD_DIR)/
@@ -78,6 +85,14 @@ build_reconic: clean_build hls_build
 	cp $(LOOKASIDE_COMP_DIR)/kernel/*.v $(RN_BUILD_DIR)/$(LC)/
 	cd $(BUILD_DIR); $(PYTHON_EXE) $(SCRIPT_DIR)/build_tcl.py -nic rdma-opennic
 	cp -rf $(BUILD_DIR)/* $(SMARTNIC_DIR)/
+	
+	cp -rf $(ROCE_DIR)/build/* $(ROCE_BUILD_DIR)/build/
+	cp -rf $(ROCE_DIR)/rocev2_src/* $(ROCE_BUILD_DIR)/rocev2_src/
+	cp -rf $(ROCE_DIR)/vivado_ip/* $(ROCE_BUILD_DIR)/vivado_ip/
+	cp -rf $(ROCE_DIR)/wrapper_src/* $(ROCE_BUILD_DIR)/wrapper_src/
+	cp -rf $(ROCE_DIR)/build.tcl $(ROCE_BUILD_DIR)/
+	cp -rf $(ROCE_BUILD_DIR)/* $(SMARTNIC_ROCE_DIR)/
+
 
 hls_build:
 ifeq ($(GEN_HLS), 1)
