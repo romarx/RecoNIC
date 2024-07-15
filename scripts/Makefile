@@ -73,6 +73,7 @@ build_reconic: clean_build hls_build
 	mkdir -p $(ROCE_BUILD_DIR)/build
 	mkdir -p $(ROCE_BUILD_DIR)/rocev2_src
 	mkdir -p $(ROCE_BUILD_DIR)/vivado_ip
+	mkdir -p $(ROCE_BUILD_DIR)/wrapper_src
 	mkdir -p $(SMARTNIC_ROCE_DIR)/
 	mkdir -p $(RN_BUILD_DIR)
 	mkdir -p $(RN_BUILD_DIR)/$(LC)
@@ -92,6 +93,8 @@ build_reconic: clean_build hls_build
 	cp -rf $(ROCE_DIR)/wrapper_src/* $(ROCE_BUILD_DIR)/wrapper_src/
 	cp -rf $(ROCE_DIR)/build.tcl $(ROCE_BUILD_DIR)/
 	cp -rf $(ROCE_BUILD_DIR)/* $(SMARTNIC_ROCE_DIR)/
+
+	rm -rf $(SMARTNIC_ROCE_DIR)/vivado_ip/sim_vivado_ip.tcl
 
 
 hls_build:
