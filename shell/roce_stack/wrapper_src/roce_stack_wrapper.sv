@@ -674,7 +674,8 @@ mac_ip_encode_ip mac_ip_encode_inst (
 `endif
 );
 
-
+AXI4S #(.AXI4S_DATA_BITS(512)) axis_ip_handler_droppedpkg_dbg ();
+assign axis_ip_handler_droppedpkg_dbg.tready = 1'b1;
 // IP handler
 ip_handler_ip ip_handler_inst ( 
     .s_axis_raw_TVALID(axis_rx.tvalid),
@@ -688,6 +689,12 @@ ip_handler_ip ip_handler_inst (
     .m_axis_roce_TDATA(axis_rx_handler_to_roce.tdata),
     .m_axis_roce_TKEEP(axis_rx_handler_to_roce.tkeep),
     .m_axis_roce_TLAST(axis_rx_handler_to_roce.tlast),
+
+    .tx_iph_droppedpackage_debug_TVALID(axis_ip_handler_droppedpkg_dbg.tvalid),
+    .tx_iph_droppedpackage_debug_TREADY(axis_ip_handler_droppedpkg_dbg.tready),
+    .tx_iph_droppedpackage_debug_TDATA(axis_ip_handler_droppedpkg_dbg.tdata),
+    .tx_iph_droppedpackage_debug_TKEEP(axis_ip_handler_droppedpkg_dbg.tkeep),
+    .tx_iph_droppedpackage_debug_TLAST(axis_ip_handler_droppedpkg_dbg.tlast),
 
 `ifdef VITIS_HLS
     .myIpAddress(IPv4ADD_net),

@@ -635,8 +635,6 @@ rocev2_ip rocev2_inst(
     .reg_qp_epsn_V(reg_epsn_data),
     .reg_qp_epsn_ap_vld_V(reg_epsn_valid),
 
-
-
     .regCrcDropPkgCount_V(crc_drop_pkg_count_data),
     .regCrcDropPkgCount_V_ap_vld(crc_drop_pkg_count_valid),
     .regInvalidPsnDropCount_V(psn_drop_pkg_count_data),
