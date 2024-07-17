@@ -47,14 +47,6 @@ module roce_stack_csr # (
   output logic [63:0]                     RESPERRSZ_o,
 
 
-  //Protection Domain registers
-  output logic [23:0]                     PDPDNUM_o,
-  output logic [63:0]                     VIRTADDR_o,
-  output logic [63:0]                     BUFBASEADDR_o,
-  output logic [7:0]                      BUFRKEY_o,
-  output logic [47:0]                     WRRDBUFLEN_o,
-  output logic [15:0]                     ACCESSDESC_o,
-
   //Per QP registers
   output logic [7:0]                      SQidx_o,
   output logic [7:0]                      QPidx_o,
@@ -1475,6 +1467,144 @@ always_comb begin
 end
 
 
+initial begin
+  CONF_q <= 'd0;
+  ADCONF_q <= 'd0;
+  BUF_THRESHOLD_ROCE_q <= 'd0;
+  PAUSE_CONF_q <= 'd0;
+  MACADDLSB_q <= 'd0;
+  MACADDMSB_q <= 'd0;
+  BUF_THRESHOLD_NON_ROCE_q <= 'd0;
+
+  IPv6ADD1_q <= 'd0;
+  IPv6ADD2_q <= 'd0;
+  IPv6ADD3_q <= 'd0;
+  IPv6ADD4_q <= 'd0;
+
+  ERRBUFBA_q <= 'd0;
+  ERRBUFBAMSB_q <= 'd0;
+  ERRBUFSZ_q <= 'd0;
+  ERRBUFWPTR_q <= 'd0;
+  IPv4ADD_q <= 'd0;
+
+  OPKTERRQBA_q <= 'd0;
+  OPKTERRQBAMSB_q <= 'd0;
+  OUTERRSTSQSZ_q <= 'd0;
+  OPTERRSTSQQPTRDB_q <= 'd0;
+  IPKTERRQBA_q <= 'd0;
+  IPKTERRQBAMSB_q <= 'd0;
+  IPKTERRQSZ_q <= 'd0;
+  IPKTERRQWPTR_q <= 'd0;
+
+  DATBUFBA_q <= 'd0;
+  DATBUFBAMSB_q <= 'd0;
+  DATBUFSZ_q <= 'd0;
+  CON_IO_CONF_q <= 'd0;
+  RESPERRPKTBA_q <= 'd0;
+  RESPERRPKTBAMSB_q <= 'd0;
+  RESPERRSZ_q <= 'd0;
+  RESPERRSZMSB_q <= 'd0;
+
+  //Global status regs
+  INSRRPKTCNT_q <= 'd0;
+  INAMPKTCNT_q <= 'd0;
+  OUTIOPKTCNT_q <= 'd0;
+  OUTAMPKTCNT_q <= 'd0;
+  LSTINPKT_q <= 'd0;
+  LSTOUTPKT_q <= 'd0;
+  ININVDUPCNT_q <= 'd0;
+  INNCKPKTSTS_q <= 'd0;
+  OUTRNRPKTSTS_q <= 'd0;
+  WQEPROCSTS_q <= 'd0;
+  QPMSTS_q <= 'd0;
+  INALLDRPPKTCNT_q <= 'd0;
+  INNAKPKTCNT_q <= 'd0;
+  OUTNAKPKTCNT_q <= 'd0;
+  RESPHNDSTS_q <= 'd0;
+  RETRYCNTSTS_q <= 'd0;
+
+  INCNPPKTCNT_q <= 'd0;
+  OUTCNPPKTCNT_q <= 'd0;
+  OUTRDRSPPKTCNT_q <= 'd0;
+  INTEN_q <= 'd0;
+  INTSTS_q <= 'd0;
+
+  RQINTSTS1_q <= 'd0;
+  RQINTSTS2_q <= 'd0;
+  RQINTSTS3_q <= 'd0;
+  RQINTSTS4_q <= 'd0;
+  RQINTSTS5_q <= 'd0;
+  RQINTSTS6_q <= 'd0;
+  RQINTSTS7_q <= 'd0;
+  RQINTSTS8_q <= 'd0;
+  CQINTSTS1_q <= 'd0;
+  CQINTSTS2_q <= 'd0;
+  CQINTSTS3_q <= 'd0;
+  CQINTSTS4_q <= 'd0;
+  CQINTSTS5_q <= 'd0;
+  CQINTSTS6_q <= 'd0;
+  CQINTSTS7_q <= 'd0;
+  CQINTSTS8_q <= 'd0;
+  CNPSCHDSTS1REG_q <= 'd0;
+  CNPSCHDSTS2REG_q <= 'd0;
+  CNPSCHDSTS3REG_q <= 'd0;
+  CNPSCHDSTS4REG_q <= 'd0;
+  CNPSCHDSTS5REG_q <= 'd0;
+  CNPSCHDSTS6REG_q <= 'd0;
+  CNPSCHDSTS7REG_q <= 'd0;
+  CNPSCHDSTS8REG_q <= 'd0;
+  
+  for(int i = 0; i < NUM_PD; i++) begin
+    PDPDNUM_q[i] <= 'd0;
+    VIRTADDRLSB_q[i] <= 'd0;
+    VIRTADDRMSB_q[i] <= 'd0;
+    BUFBASEADDRLSB_q[i] <= 'd0;
+    BUFBASEADDRMSB_q[i] <= 'd0;
+    BUFRKEY_q[i] <= 'd0;
+    WRRDBUFLEN_q[i] <= 'd0;
+    ACCESSDESC_q[i] <= 'd0;
+  end
+
+  for(int i = 0; i < NUM_QP; i++) begin
+    QPCONFi_q[i] <= 'd0;
+    QPADVCONFi_q[i] <= 'd0;
+    RQBAi_q[i] <= 'd0;
+    RQBAMSBi_q[i] <= 'd0;
+    SQBAi_q[i] <= 'd0;
+    SQBAMSBi_q[i] <= 'd0;
+    CQBAi_q[i] <= 'd0;
+    CQBAMSBi_q[i] <= 'd0;
+    RQWPTRDBADDi_q[i] <= 'd0;
+    RQWPTRDBADDMSBi_q[i] <= 'd0;
+    CQDBADDi_q[i] <= 'd0;
+    CQDBADDMSBi_q[i] <= 'd0;
+    CQHEADi_q[i] <= 'd0;
+    RQCIi_q[i] <= 'd0;
+    SQPIi_q[i] <= 'd0;
+    QDEPTHi_q[i] <= 'd0;
+    SQPSNi_q[i] <= 'd0;
+    LSTRQREQi_q[i] <= 'd0;
+    DESTQPCONFi_q[i] <= 'd0;
+    MACDESADDLSBi_q[i] <= 'd0;
+    MACDESADDMSBi_q[i] <= 'd0;
+    IPDESADDR1i_q[i] <= 'd0;
+    IPDESADDR2i_q[i] <= 'd0;
+    IPDESADDR3i_q[i] <= 'd0;
+    IPDESADDR4i_q[i] <= 'd0;
+    TIMEOUTCONFi_q[i] <= 'd0;
+    STATSSNi_q[i] <= 'd0;
+    STATMSNi_q[i] <= 'd0;
+    STATQPi_q[i] <= 'd0;
+    STATCURSQPTRi_q[i] <= 'd0;
+    STATRESPSNi_q[i] <= 'd0;
+    STATRQBUFCAi_q[i] <= 'd0;
+    STATRQBUFCAMSBi_q[i] <= 'd0;
+    STATWQEi_q[i] <= 'd0;
+    STATRQPIDBi_q[i] <= 'd0;
+    PDNUMi_q[i] <= 'd0;
+  end
+end
+
 
 always_ff @(posedge axil_aclk_i, negedge axil_rstn_i) begin
   if(!axil_rstn_i) begin
@@ -1825,13 +1955,6 @@ assign connidx_o = connidx_q;
 assign conn_configured_o = conn_configured_q;
 assign qp_configured_o = qp_configured_q;
 
-
-assign PDPDNUM_o = PDPDNUM_q[PDidx_q][23:0];
-assign VIRTADDR_o = {VIRTADDRMSB_q[PDidx_q], VIRTADDRLSB_q[PDidx_q]};
-assign BUFBASEADDR_o = {BUFBASEADDRMSB_q[PDidx_q], BUFBASEADDRLSB_q[PDidx_q]};
-assign BUFRKEY_o = BUFRKEY_q[PDidx_q];
-assign WRRDBUFLEN_o = {ACCESSDESC_q[PDidx_q][31:16], WRRDBUFLEN_q[PDidx_q]};
-assign ACCESSDESC_o = ACCESSDESC_q[PDidx_q][15:0];
 
 
 //That's a mux...
