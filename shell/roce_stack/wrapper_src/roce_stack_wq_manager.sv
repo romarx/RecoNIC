@@ -100,7 +100,7 @@ logic [31:0] SQPIi_tmp;
 logic [7:0]  QPidx_tmp;
 logic fetch_wqe;
 logic fetch_next_wqe;
-logic wqe_done;
+logic sq_done;
 
 
 
@@ -343,7 +343,7 @@ always_comb begin
 
   case(sq_if_state_q) 
     SQ_IF_IDLE: begin
-      if(wqe_done && !sq_fifo_empty && !sq_fifo_rd_rst_busy) begin
+      if(sq_done && !sq_fifo_empty && !sq_fifo_rd_rst_busy) begin
         sq_if_state_d = SQ_OUT_VALID;
       end
     end
@@ -351,7 +351,7 @@ always_comb begin
       sq_fifo_rd_en = 1'b1;
       if(sq_fifo_rd_valid) begin
         if(sq_if_output_d != sq_if_output_q) begin
-          wqe_done = 1'b0;
+          sq_done = 1'b0;
           sq_if_state_d = SQ_IF_VALID;
         end else begin
           sq_if_state_d = SQ_IF_IDLE;
@@ -393,6 +393,7 @@ always_comb begin
   curr_remote_vaddr_d = curr_remote_vaddr_q;
   exp_resp_ctr_d = exp_resp_ctr_q;
   resp_ctr_d = resp_ctr_q;
+  sq_state_d = sq_state_q;
   for(int i=0; i < NUM_QP; i++) begin
     localidx_d[i] = localidx_q[i];
   end
@@ -670,7 +671,7 @@ always_comb begin
       if(localidx_q[sq_if_output_q.sq_idx] < sq_if_output_q.sq_prod_idx) begin
           fetch_next_wqe = 1'b1;
         end else begin
-          wqe_done = 1'b1;
+          sq_done = 1'b1;
         end
       WB_CQHEADi_valid_o = 1'b1;
       sq_state_d = SQ_IDLE;
@@ -871,111 +872,111 @@ assign m_rdma_sq_interface_data_o = sq_req_q;
 always_ff @(posedge axil_aclk_i, negedge axil_rstn_i) begin
   if(!axil_rstn_i) begin
     conn_if_input_q <= 'd0;
-    qp_if_input_q <= 'd0;
-    sq_if_input_q <= 'd0;
+    qp_if_input_q   <= 'd0;
+    sq_if_input_q   <= 'd0;
     sq_fifo_state_q <= SQ_FIFO_IDLE;
     for(int i=0; i < NUM_QP; i++) begin
-      localpi_q[i] = 'd0;
+      localpi_q[i]  <= 'd0;
     end
   end else begin
     conn_if_input_q <= conn_if_input_d;
-    qp_if_input_q <= qp_if_input_d;
-    sq_if_input_q <= sq_if_input_d;
+    qp_if_input_q   <= qp_if_input_d;
+    sq_if_input_q   <= sq_if_input_d;
     sq_fifo_state_q <= sq_fifo_state_d;
     for(int i=0; i < NUM_QP; i++) begin
-      localpi_q[i] = localpi_d[i];
+      localpi_q[i]  <= localpi_d[i];
     end
   end
 end
 
 always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
   if(!axis_rstn_i) begin
-    conn_if_meta = 'd0;
-    qp_if_meta = 'd0;
+    conn_if_meta  <= 'd0;
+    qp_if_meta    <= 'd0;
   end else begin
-    conn_if_meta = conn_if_input_q;
-    qp_if_meta = qp_if_input_q;
+    conn_if_meta  <= conn_if_input_q;
+    qp_if_meta    <= qp_if_input_q;
   end
 end
 
 
 always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
   if(!axis_rstn_i) begin
-    wqe_done = 1'b1;
-    SQPIi_tmp <= 'd0;
-    QPidx_tmp <= 'd0;
+    sq_done             <= 1'b1;
+    SQPIi_tmp           <= 'd0;
+    QPidx_tmp           <= 'd0;
    
-    conn_state_q <= CONN_IDLE;
-    conn_if_output_q <= 'd0;
-    conn_ctx_q <= 'd0;
+    conn_state_q        <= CONN_IDLE;
+    conn_if_output_q    <= 'd0;
+    conn_ctx_q          <= 'd0;
     
-    mtu_q <= 'd0;
-    log_mtu_q <= 'd0;
-    qp_state_q <= QP_IDLE;
-    qp_if_output_q <= 'd0;
-    qp_ctx_q <= 'd0;
+    mtu_q               <= 'd0;
+    log_mtu_q           <= 'd0;
+    qp_state_q          <= QP_IDLE;
+    qp_if_output_q      <= 'd0;
+    qp_ctx_q            <= 'd0;
     
-    sq_if_state_q <= SQ_IF_IDLE;
-    sq_if_output_q <= 'd0;
-    sq_state_q <= SQ_IDLE;
-    sq_req_q = 'd0;
-    exp_resp_ctr_q <= 'd0;
-    resp_ctr_q <= 'd0;
+    sq_if_state_q       <= SQ_IF_IDLE;
+    sq_if_output_q      <= 'd0;
+    sq_state_q          <= SQ_IDLE;
+    sq_req_q            <= 'd0;
+    exp_resp_ctr_q      <= 'd0;
+    resp_ctr_q          <= 'd0;
     
-    AddrWr_State_q <= AW_IDLE;
-    WrAddrReg_q <= 'd0;
-    Write_State_q <= WR_IDLE;
-    CQReg_q <= 'd0;
+    AddrWr_State_q      <= AW_IDLE;
+    WrAddrReg_q         <= 'd0;
+    Write_State_q       <= WR_IDLE;
+    CQReg_q             <= 'd0;
 
-    AddrRd_State_q <= AR_IDLE;
-    RdAddrReg_q <= 'd0;
-    Read_State_q <= RD_IDLE;
-    WQEReg_q <= 'd0;
+    AddrRd_State_q      <= AR_IDLE;
+    RdAddrReg_q         <= 'd0;
+    Read_State_q        <= RD_IDLE;
+    WQEReg_q            <= 'd0;
     
-    curr_local_vaddr_q <= 'd0;
+    curr_local_vaddr_q  <= 'd0;
     curr_remote_vaddr_q <= 'd0;
-    transfer_length_q <= 'd0;
-    last_q <= 1'b0;
-    first_q <= 1'b1;
+    transfer_length_q   <= 'd0;
+    last_q              <= 1'b0;
+    first_q             <= 1'b1;
     for(int i = 0; i < NUM_QP; i++) begin
-      localidx_q[i] <= 'd0;
+      localidx_q[i]     <= 'd0;
     end
 
   end else begin
-    conn_state_q <= conn_state_d;
-    conn_if_output_q <= conn_if_output_d;
-    conn_ctx_q <= conn_ctx_d;
+    conn_state_q        <= conn_state_d;
+    conn_if_output_q    <= conn_if_output_d;
+    conn_ctx_q          <= conn_ctx_d;
     
-    mtu_q <= mtu_d;
-    log_mtu_q <= log_mtu_d;
-    qp_state_q <= qp_state_d;
-    qp_if_output_q <= qp_if_output_d;
-    qp_ctx_q = qp_ctx_d;
+    mtu_q               <= mtu_d;
+    log_mtu_q           <= log_mtu_d;
+    qp_state_q          <= qp_state_d;
+    qp_if_output_q      <= qp_if_output_d;
+    qp_ctx_q            <= qp_ctx_d;
     
-    sq_if_state_q <= sq_if_state_d;
-    sq_if_output_q <= sq_if_output_d;
-    sq_state_q <= sq_state_d;
-    sq_req_q = sq_req_d;
-    exp_resp_ctr_q <= exp_resp_ctr_d;
-    resp_ctr_q <= resp_ctr_d;
+    sq_if_state_q       <= sq_if_state_d;
+    sq_if_output_q      <= sq_if_output_d;
+    sq_state_q          <= sq_state_d;
+    sq_req_q            <= sq_req_d;
+    exp_resp_ctr_q      <= exp_resp_ctr_d;
+    resp_ctr_q          <= resp_ctr_d;
     
-    AddrWr_State_q <= AddrWr_State_d;
-    WrAddrReg_q <= WrAddrReg_d;
-    Write_State_q <= Write_State_d;
-    CQReg_q <= CQReg_d;
+    AddrWr_State_q      <= AddrWr_State_d;
+    WrAddrReg_q         <= WrAddrReg_d;
+    Write_State_q       <= Write_State_d;
+    CQReg_q             <= CQReg_d;
     
-    AddrRd_State_q <= AddrRd_State_d;
-    RdAddrReg_q <= RdAddrReg_d;
-    Read_State_q <= Read_State_d;
-    WQEReg_q <= WQEReg_d;
+    AddrRd_State_q      <= AddrRd_State_d;
+    RdAddrReg_q         <= RdAddrReg_d;
+    Read_State_q        <= Read_State_d;
+    WQEReg_q            <= WQEReg_d;
     
-    curr_local_vaddr_q <= curr_local_vaddr_d;
+    curr_local_vaddr_q  <= curr_local_vaddr_d;
     curr_remote_vaddr_q <= curr_remote_vaddr_d;
-    transfer_length_q <= transfer_length_d;
-    last_q <= last_d;
-    first_q <= first_d;
+    transfer_length_q   <= transfer_length_d;
+    last_q              <= last_d;
+    first_q             <= first_d;
     for(int i = 0; i < NUM_QP; i++) begin
-      localidx_q[i] <= localidx_d[i];
+      localidx_q[i]     <= localidx_d[i];
     end
   end
 end

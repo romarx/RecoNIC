@@ -9,5 +9,5 @@ set ips {
   ip_handler_ip
   roce_stack_axi_datamover
   roce_stack_tx_axis_interconnect
-  cdc_fifo_sq
+  cdc_fifo_sq_sim
 }

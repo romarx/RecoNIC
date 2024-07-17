@@ -109,25 +109,25 @@ end
 
 always_ff @(posedge clk_i, negedge aresetn_i) begin
   if(!aresetn_i) begin
-    req_state_q <= RQ_IDLE;
-    base_vaddr_q <= 'd0;
-    len_q <= 'd0;
-    qpn_q <= 'd0;
-    paddr_q <= 'd0;
-    buflen_q <= 'd0;
-    accessdesc_q <= 'd0;
-    cmd_data_q <= 'd0;
-    first_q = 1'b1;
+    req_state_q   <= RQ_IDLE;
+    base_vaddr_q  <= 'd0;
+    len_q         <= 'd0;
+    qpn_q         <= 'd0;
+    paddr_q       <= 'd0;
+    buflen_q      <= 'd0;
+    accessdesc_q  <= 'd0;
+    cmd_data_q    <= 'd0;
+    first_q       <= 1'b1;
   end else begin
-    req_state_q <= req_state_d;
-    base_vaddr_q <= base_vaddr_d;
-    len_q <= len_d;
-    qpn_q <= qpn_d;
-    paddr_q <= paddr_d;
-    buflen_q <= buflen_d;
-    accessdesc_q <= accessdesc_d;
-    cmd_data_q <= cmd_data_d;
-    first_q <= first_d;
+    req_state_q   <= req_state_d;
+    base_vaddr_q  <= base_vaddr_d;
+    len_q         <= len_d;
+    qpn_q         <= qpn_d;
+    paddr_q       <= paddr_d;
+    buflen_q      <= buflen_d;
+    accessdesc_q  <= accessdesc_d;
+    cmd_data_q    <= cmd_data_d;
+    first_q       <= first_d;
   end
 end
 

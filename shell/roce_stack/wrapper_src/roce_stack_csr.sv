@@ -1871,7 +1871,7 @@ typedef enum {VTP_IDLE, VTP_VALID} virt_to_phys_state;
 virt_to_phys_state rd_vtp_st_d, rd_vtp_st_q, wr_vtp_st_d, wr_vtp_st_q;
 dma_req_t rd_resp_addr_data_d, rd_resp_addr_data_q, wr_resp_addr_data_d, wr_resp_addr_data_q;
 
-
+//TODO: RKEY matching?
 always_comb begin
   rd_req_addr_ready_o = 1'b1;
   rd_resp_addr_valid_o = 1'b0;

@@ -768,14 +768,26 @@ roce_stack inst_roce_stack (
 );
 
 // a bit hacky but it works ;)
+logic ms_d, ms_q;
 always_comb begin
+  ms_d = ms_q;
   if(epsn_valid) begin
-    MACADD_SEL = epsn_data[31:24];
-  end
-  if(npsn_valid) begin
-    MACADD_SEL = npsn_data[31:24];
+    ms_d = 1'b0;
+  end else if(npsn_valid) begin
+    ms_d = 1'b1;
   end
 end
+
+always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
+  if(!axis_rstn_i) begin
+    ms_q <= 1'b0;
+  end else begin
+    ms_q <= ms_d;
+  end
+end
+
+
+assign MACADD_SEL = ms_q ? npsn_data[31:24] : epsn_data[31:24];
 
 assign INAMPKTCNT_wb_axis[15:0] = rx_ack_data;
 assign INAMPKTCNT_wb_axis[31:16] = 16'd0; //incoming MAD packets (unsupported)
