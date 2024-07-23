@@ -224,14 +224,14 @@ logic [LOG_NUM_QP-1:0] QPidx_d, QPidx_q;
 logic hold_rd_axis_d, hold_rd_axis_q;
 
 
-logic [NUM_PD_REGS-1:0] PD_REG_ENA_AXIS;
-logic [AXIL_DATA_WIDTH_BYTES-1:0] PD_REG_WEA_AXIS;
+logic [NUM_PD_REGS-1:0] PD_REG_ENB_AXIS;
+logic [AXIL_DATA_WIDTH_BYTES-1:0] PD_REG_WEB_AXIS;
 logic [LOG_NUM_PD-1:0] PD_ADDR_AXIS;
 logic [NUM_PD_REGS-1:0][REG_WIDTH-1:0] PD_RD_REG_AXIS, PD_RD_REG_AXIS_D, PD_RD_REG_AXIS_Q;
 logic [REG_WIDTH-1:0] PD_WR_REG_AXIS; //these are never written by the hardware
 
-logic [NUM_QP_REGS-1:0] QP_REG_ENA_AXIS;
-logic [AXIL_DATA_WIDTH_BYTES-1:0] QP_REG_WEA_AXIS;
+logic [NUM_QP_REGS-1:0] QP_REG_ENB_AXIS;
+logic [AXIL_DATA_WIDTH_BYTES-1:0] QP_REG_WEB_AXIS;
 logic [LOG_NUM_QP-1:0] QP_ADDR_AXIS;
 logic [NUM_QP_REGS-1:0][REG_WIDTH-1:0] QP_RD_REG_AXIS, QP_RD_REG_AXIS_D, QP_RD_REG_AXIS_Q;
 logic [NUM_QP_REGS-1:0][REG_WIDTH-1:0] QP_WR_REG_AXIS; //multidimensional for parallel writes
@@ -1091,11 +1091,11 @@ always_comb begin
   rd_qp_ready_o = 1'b0;
   find_pd_rd_ready = 1'b0;
   find_pd_wr_ready = 1'b0;
-  PD_REG_WEA_AXIS = 'd0;
-  QP_REG_WEA_AXIS = 'd0;
+  PD_REG_WEB_AXIS = 'd0;
+  PD_REG_ENB_AXIS = 'd0;
+  QP_REG_WEB_AXIS = 'd0;
+  QP_REG_ENB_AXIS = 'd0;
   GLB_REG_WEA_AXIS = 'd0;
-  PD_REG_ENA_AXIS = 'd0;
-  QP_REG_ENA_AXIS = 'd0;
   GLB_REG_ENA_AXIS = 'd0;
   
   CONF_d = CONF_q;
@@ -1172,11 +1172,11 @@ always_comb begin
         endcase
       end else if (l_rd_cmd_q.region == 2'b01) begin
         PD_ADDR_AXIS = l_rd_cmd_q.address;
-        PD_REG_ENA_AXIS[l_rd_cmd_q.bram_idx] = 1'b1;
+        PD_REG_ENB_AXIS[l_rd_cmd_q.bram_idx] = 1'b1;
         PD_RD_REG_AXIS_D[l_rd_cmd_q.bram_idx] = PD_RD_REG_AXIS[l_rd_cmd_q.bram_idx];
       end else if (l_rd_cmd_q.region == 2'b10) begin
         QP_ADDR_AXIS = l_rd_cmd_q.address;
-        QP_REG_ENA_AXIS[l_rd_cmd_q.bram_idx] = 1'b1;
+        QP_REG_ENB_AXIS[l_rd_cmd_q.bram_idx] = 1'b1;
         QP_RD_REG_AXIS_D[l_rd_cmd_q.bram_idx] = QP_RD_REG_AXIS[l_rd_cmd_q.bram_idx];
       end else begin
         l_reg_st_d = L_IDLE;
@@ -1194,12 +1194,12 @@ always_comb begin
     L_READ_MULTI: begin
       if (l_rd_cmd_q.region == 2'b01) begin
         PD_ADDR_AXIS = l_rd_cmd_q.address;
-        PD_REG_ENA_AXIS = ~0;
+        PD_REG_ENB_AXIS = ~0;
         PD_RD_REG_AXIS_D = PD_RD_REG_AXIS;
       end else if (l_rd_cmd_q.region == 2'b10) begin
         QPidx_d = l_rd_cmd_q.address;
         QP_ADDR_AXIS = l_rd_cmd_q.address;
-        QP_REG_ENA_AXIS = ~0;
+        QP_REG_ENB_AXIS = ~0;
         QP_RD_REG_AXIS_D = QP_RD_REG_AXIS;
       end else begin
         l_reg_st_d = L_IDLE;
@@ -1314,15 +1314,6 @@ end
 
 
 
-
-
-
-
-
-
-
-
-
 //////////////
 //          //
 //    IO    //
@@ -1400,8 +1391,8 @@ generate
       .addrb(PD_ADDR_AXIS),
       .dinb(PD_WR_REG_AXIS),
       .doutb(PD_RD_REG_AXIS[i]),
-      .enb(PD_REG_ENA_AXIS[i]),
-      .web(PD_REG_WEA_AXIS),
+      .enb(PD_REG_ENB_AXIS[i]),
+      .web(PD_REG_WEB_AXIS),
       .clkb(axis_aclk_i)
     );
   end
@@ -1438,8 +1429,8 @@ generate
       .addrb(QP_ADDR_AXIS),
       .dinb(QP_WR_REG_AXIS[i]),
       .doutb(QP_RD_REG_AXIS[i]),
-      .enb(QP_REG_ENA_AXIS[i]),
-      .web(QP_REG_WEA_AXIS),
+      .enb(QP_REG_ENB_AXIS[i]),
+      .web(QP_REG_WEB_AXIS),
       .clkb(axis_aclk_i)
     );
   end
@@ -1653,106 +1644,6 @@ assign wr_resp_addr_data_o = wr_resp_addr_data_q;
 
 
 
-
-/*
-//TODO: RKEY matching?
-always_comb begin
-  rd_req_addr_ready_o = 1'b1;
-  rd_resp_addr_valid_o = 1'b0;
-  rd_resp_addr_data_d = rd_resp_addr_data_q;
-  rd_vtp_st_d = rd_vtp_st_q;
-
-  case(rd_vtp_st_q)
-    VTP_IDLE: begin
-      //wait until read to regs are finished!
-      //TODO: check if this can lead to problems
-      if(rd_req_addr_valid_i && rd_req_addr_ready_o) begin
-        rd_req_addr_ready_o = 1'b0;
-        rd_resp_addr_data_d.accesdesc = ~0;
-        rd_resp_addr_data_d.buflen = ~0;
-        rd_resp_addr_data_d.paddr = ~0;
-        if(rd_req_addr_vaddr_i == 'd0) begin 
-          rd_resp_addr_data_d.accesdesc = ~0; // R/W
-          rd_resp_addr_data_d.buflen = ~0;
-          rd_resp_addr_data_d.paddr = 'd0;
-        end else begin
-          if (rd_req_addr_vaddr_i == {VIRTADDRMSB_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]], VIRTADDRLSB_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]]}) begin
-            rd_resp_addr_data_d.accesdesc = ACCESSDESC_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]][3:0];
-            rd_resp_addr_data_d.buflen = {ACCESSDESC_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]][31:16], WRRDBUFLEN_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]]}; 
-            rd_resp_addr_data_d.paddr = {BUFBASEADDRMSB_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]], BUFBASEADDRLSB_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]]};
-          end
-          //for(int i = 0; i < NUM_PD; i++) begin
-          //  if(rd_req_addr_vaddr_i == {VIRTADDRMSB_q[i], VIRTADDRLSB_q[i]}) begin
-          //    rd_resp_addr_data_d.accesdesc = ACCESSDESC_q[i][3:0];
-          //    rd_resp_addr_data_d.buflen = {ACCESSDESC_q[i][31:16], WRRDBUFLEN_q[i]}; 
-          //    rd_resp_addr_data_d.paddr = {BUFBASEADDRMSB_q[i], BUFBASEADDRLSB_q[i]};
-          //  end
-          //end
-        end
-        rd_vtp_st_d = VTP_VALID;
-      end
-    end
-    VTP_VALID: begin
-      rd_req_addr_ready_o = 1'b0;
-      rd_resp_addr_valid_o = 1'b1;
-      if(rd_resp_addr_ready_i) begin
-        rd_vtp_st_d = VTP_IDLE;
-      end
-    end
-  endcase
-end
-
-
-
-
-always_comb begin
-  wr_req_addr_ready_o = 1'b1;
-  wr_resp_addr_valid_o = 1'b0;
-  wr_resp_addr_data_d = wr_resp_addr_data_q;
-  wr_vtp_st_d = wr_vtp_st_q;
-
-  case(wr_vtp_st_q)
-    VTP_IDLE: begin
-      //wait until read to regs are finished!
-      //TODO: check if this can lead to problems
-      if(wr_req_addr_valid_i && wr_req_addr_ready_o) begin
-        wr_req_addr_ready_o = 1'b0;
-        wr_resp_addr_data_d.accesdesc = ~0;
-        wr_resp_addr_data_d.buflen = ~0;
-        wr_resp_addr_data_d.paddr = ~0;
-        if(wr_req_addr_vaddr_i == 'd0) begin //TODO: where should it write to in case of send
-          wr_resp_addr_data_d.accesdesc = 4'b0010;
-          wr_resp_addr_data_d.buflen = ~0;
-          wr_resp_addr_data_d.paddr = {RQBAMSBi_q[wr_req_addr_qpn_i[7:0]], RQBAi_q[wr_req_addr_qpn_i[7:0]]};
-        end else begin
-          if (wr_req_addr_vaddr_i == {VIRTADDRMSB_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]], VIRTADDRLSB_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]]}) begin
-            wr_resp_addr_data_d.accesdesc = ACCESSDESC_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]][3:0];
-            wr_resp_addr_data_d.buflen = {ACCESSDESC_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]][31:16], WRRDBUFLEN_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]]}; 
-            wr_resp_addr_data_d.paddr = {BUFBASEADDRMSB_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]], BUFBASEADDRLSB_q[PDNUMi_q[wr_req_addr_qpn_i[7:0]][7:0]]};
-          end
-          //for(int i = 0; i < NUM_PD; i++) begin
-          //  if(wr_req_addr_vaddr_i == {VIRTADDRMSB_q[i], VIRTADDRLSB_q[i]}) begin
-          //    wr_resp_addr_data_d.accesdesc = ACCESSDESC_q[i][3:0];
-          //    wr_resp_addr_data_d.buflen = {ACCESSDESC_q[i][31:16], WRRDBUFLEN_q[i]}; 
-          //    wr_resp_addr_data_d.paddr = {BUFBASEADDRMSB_q[i], BUFBASEADDRLSB_q[i]};          
-          //  end
-          //end
-        
-        end
-        wr_vtp_st_d = VTP_VALID;
-      end
-    end
-    VTP_VALID: begin
-      wr_req_addr_ready_o = 1'b0;
-      wr_resp_addr_valid_o = 1'b1;
-      if(wr_resp_addr_ready_i) begin
-        wr_vtp_st_d = VTP_IDLE;
-      end
-    end
-  endcase
-end
-
-*/
 
 
 

@@ -1,5 +1,4 @@
 create_ip -name fifo_generator -vendor xilinx.com -library ip -version 13.2 -module_name reg_cmd_cdc_fifo -dir ${ip_build_dir}
-
 set_property -dict {
         CONFIG.Fifo_Implementation {Independent_Clocks_Builtin_FIFO}
         CONFIG.Input_Data_Width {18}
