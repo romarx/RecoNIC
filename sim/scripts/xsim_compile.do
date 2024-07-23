@@ -287,8 +287,6 @@ xvlog $xvlog_opts -work reco -sv -L rocev2_ip -L axis_interconnect_v1_1_19 \
 "../../shell/roce_stack/rocev2_src/rdma_flow.sv" \
 "../../shell/roce_stack/rocev2_src/roce_stack.sv" \
 "../../shell/roce_stack/rocev2_src/sp_ram_nc.sv" \
-"../../shell/roce_stack/wrapper_src/simple_cdc.sv" \
-"../../shell/roce_stack/wrapper_src/writeback_cdc_wrapper.sv" \
 "../../shell/roce_stack/wrapper_src/roce_stack_request_handler.sv" \
 "../../shell/roce_stack/wrapper_src/roce_stack_axis_to_aximm.sv" \
 "../../shell/roce_stack/wrapper_src/roce_stack_csr.sv" \
@@ -322,7 +320,11 @@ xvlog $xvlog_opts -work reco -sv -L fifo_generator_v13_2_6 \
 "../build/ip/sys_mem_5to2_axi_crossbar/synth/sys_mem_5to2_axi_crossbar.v"
 
 xvlog $xvlog_opts -work reco -L fifo_generator_v13_2_6 \
-"../build/ip/cdc_fifo_sq/sim/cdc_fifo_sq.v"
+"../build/ip/reg_cmd_cdc_fifo/sim/reg_cmd_cdc_fifo.v"
+
+
+xvlog $xvlog_opts -work reco \
+"../build/ip/block_ram_1k/block_ram_1k_sim_netlist.v"
 
 xvlog $xvlog_opts -work reco \
 "$VIVADO_DATA_DIR/verilog/src/glbl.v"

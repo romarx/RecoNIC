@@ -190,8 +190,8 @@ endinterface
 // AXI4 lite
 // ----------------------------------------------------------------------------
 interface AXI4L #(
-	parameter AXI4L_ADDR_BITS = AXI_ADDR_BITS,
-	parameter AXI4L_DATA_BITS = AXIL_DATA_BITS
+	parameter AXI4L_ADDR_BITS = AXIL_ADDR_WIDTH,
+	parameter AXI4L_DATA_BITS = AXIL_DATA_WIDTH
 ) (
 	input  logic aclk
 );

@@ -3,12 +3,7 @@
 //TODO: set actual width for certain registers (by masking at write).
 //TODO: some individual bits are read only, these registers need special treatment.
 //TODO: check if some debug outputs of RoCE stack can be used
-module roce_stack_csr # (
-  parameter int NUM_QP = 8, // Max 256
-  parameter int NUM_PD = 256,
-  parameter int AXIL_ADDR_WIDTH = 32,
-  parameter int AXIL_DATA_WIDTH = 32
-) (
+module roce_stack_csr (
   input  logic                            s_axil_awvalid_i,
   input  logic   [AXIL_ADDR_WIDTH-1:0]    s_axil_awaddr_i,
   output logic                            s_axil_awready_o,
@@ -29,58 +24,54 @@ module roce_stack_csr # (
 
   //Configuration registers
   output logic [31:0]                     CONF_o,
-  output logic [31:0]                     ADCONF_o,
+  //output logic [31:0]                     ADCONF_o,
   output logic [47:0]                     MACADD_o,
   output logic [31:0]                     IPv4ADD_o,
-  output logic [31:0]                     INTEN_o, //INTERRUPT ENABLE NOT CONNECTED
+  //output logic [31:0]                     INTEN_o, //INTERRUPT ENABLE NOT CONNECTED
 
-  output logic [63:0]                     ERRBUFBA_o,
-  output logic [31:0]                     ERRBUFSZ_o,
+  //output logic [63:0]                     ERRBUFBA_o,
+  //output logic [31:0]                     ERRBUFSZ_o,
 
-  output logic [63:0]                     IPKTERRQBA_o,
-  output logic [31:0]                     IPKTERRQSZ_o,
+  //output logic [63:0]                     IPKTERRQBA_o,
+  //output logic [31:0]                     IPKTERRQSZ_o,
 
-  output logic [63:0]                     DATBUFBA_o,
-  output logic [31:0]                     DATBUFSZ_o,
+  //output logic [63:0]                     DATBUFBA_o,
+  //output logic [31:0]                     DATBUFSZ_o,
 
-  output logic [63:0]                     RESPERRPKTBA_o,
-  output logic [63:0]                     RESPERRSZ_o,
+  //output logic [63:0]                     RESPERRPKTBA_o,
+  //output logic [63:0]                     RESPERRSZ_o,
 
 
   //Per QP registers
-  output logic [7:0]                      SQidx_o,
   output logic [7:0]                      QPidx_o,
-  output logic [7:0]                      connidx_o,
   output logic                            conn_configured_o,
   output logic                            qp_configured_o, 
-
+  output logic                            sq_updated_o,
 
   output logic [31:0]                     QPCONFi_o,
-  output logic [31:0]                     QPADVCONFi_o,
+  //output logic [31:0]                     QPADVCONFi_o,
   output logic [63:0]                     RQBAi_o,
   output logic [63:0]                     SQBAi_o,
   output logic [63:0]                     CQBAi_o,
-  output logic [63:0]                     RQWPTRDBADDi_o,
-  output logic [63:0]                     CQDBADDi_o,
+  //output logic [63:0]                     RQWPTRDBADDi_o,
+  //output logic [63:0]                     CQDBADDi_o,
   output logic [31:0]                     SQPIi_o,
-  output logic [31:0]                     QDEPTHi_o,
+  output logic [31:0]                     CQHEADi_o,
+  //output logic [31:0]                     QDEPTHi_o,
   output logic [23:0]                     SQPSNi_o,
   output logic [31:0]                     LSTRQREQi_o, // contains rq psn[23:0]
   output logic [23:0]                     DESTQPCONFi_o,
 
-  input  logic [7:0]                      MACADD_SEL_i,
   output logic [47:0]                     MACDESADDi_o,             
   output logic [31:0]                     IPDESADDR1i_o, //for IPv4 only
 
-  input  logic [7:0]                      C_SQidx_i,
-  output logic [31:0]                     SQ_QPCONFi_o,
-  output logic [23:0]                     SQ_SQPSNi_o,
-  output logic [31:0]                     SQ_LSTRQREQi_o,
+  output logic [63:0]                     VIRTADDR_o,
 
+  input rd_cmd_t                          rd_qp_i,
+  input logic                             rd_qp_valid_i,
+  output logic                            rd_qp_ready_o,
 
   //write back
-  output logic                            wb_ready_o,
-  input  logic                            wb_valid_i,
   input  logic                            WB_CQHEADi_valid_i,
   input  logic [39:0]                     WB_CQHEADi_i,
   input  logic                            WB_SQPSNi_valid_i,
@@ -135,301 +126,69 @@ module roce_stack_csr # (
 
 //assert (NUM_QP >= 8 && NUM_QP <=256) else begin $error("NUM_QP must be between 8 and 256") end;
 
-localparam int AXIL_DATA_WIDTH_BYTES = AXIL_DATA_WIDTH/8;
-localparam int REG_WIDTH = 32;
 
-localparam int CSR_ADDRESS_SPACE = 262144; //256kb
-localparam int CSR_ADDRESS_WIDTH = $clog2(CSR_ADDRESS_SPACE);
+localparam int RD_LAT = 1;
 
 
 
 
-/////////////////
-//             //
-//  ADDRESSES  //
-//             //
-/////////////////
+rd_cmd_t cmd_fifo_in, cmd_fifo_out;
 
-// Protection domain regs: 0x0 - 0x10000, only compare lower bits
-localparam logic [7:0] ADDR_PDPDNUM         = 'h0;
-localparam logic [7:0] ADDR_VIRTADDRLSB     = 'h4;
-localparam logic [7:0] ADDR_VIRTADDRMSB     = 'h8;
-localparam logic [7:0] ADDR_BUFBASEADDRLSB  = 'hC;
-localparam logic [7:0] ADDR_BUFBASEADDRMSB  = 'h10;
-localparam logic [7:0] ADDR_BUFRKEY         = 'h14;
-localparam logic [7:0] ADDR_WRRDBUFLEN      = 'h18;
-localparam logic [7:0] ADDR_ACCESSDESC      = 'h1C;
+logic cmd_fifo_wr_en, cmd_fifo_rd_en;
+logic cmd_fifo_full, cmd_fifo_empty;
+logic cmd_fifo_out_valid, cmd_fifo_in_ack;
+logic cmd_fifo_wr_rst_busy, cmd_fifo_rd_rst_busy;
 
-// Configuration and status regs 0x20000 - 0x201F0
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_CONF                    = 'h20000;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_ADCONF                  = 'h20004;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_BUF_THRESHOLD_ROCE      = 'h20008;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_PAUSE_CONF              = 'h2000C;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_MACADDLSB               = 'h20010;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_MACADDMSB               = 'h20014;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_BUF_THRESHOLD_NON_ROCE  = 'h20018;
 
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_IPv6ADD1                = 'h20020; 
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_IPv6ADD2                = 'h20024; 
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_IPv6ADD3                = 'h20028; 
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_IPv6ADD4                = 'h2002C;  
+reg_cmd_cdc_fifo reg_cmd_cdc_fifo_inst (
+  //write
+  .full(cmd_fifo_full),
+  .din(cmd_fifo_in),
+  .wr_en(cmd_fifo_wr_en),
+  .wr_ack(cmd_fifo_in_ack),
+  //read
+  .empty(cmd_fifo_empty),
+  .dout(cmd_fifo_out),
+  .rd_en(cmd_fifo_rd_en),
+  .valid(cmd_fifo_out_valid),
 
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_ERRBUFBA                = 'h20060;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_ERRBUFBAMSB             = 'h20064;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_ERRBUFSZ                = 'h20068;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_ERRBUFWPTR              = 'h2006C;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_IPv4ADD                 = 'h20070;
+  .wr_clk(axil_aclk_i),
+  .rd_clk(axis_aclk_i),
+  .srst(!axil_rstn_i),
 
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_OPKTERRQBA              = 'h20078;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_OPKTERRQBAMSB           = 'h2007C;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_OUTERRSTSQSZ            = 'h20080;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_OPTERRSTSQQPTRDB        = 'h20084;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_IPKTERRQBA              = 'h20088;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_IPKTERRQBAMSB           = 'h2008C;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_IPKTERRQSZ              = 'h20090;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_IPKTERRQWPTR            = 'h20094;
+  .wr_rst_busy(cmd_fifo_wr_rst_busy),
+  .rd_rst_busy(cmd_fifo_rd_rst_busy)
+);
 
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_DATBUFBA                = 'h200A0;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_DATBUFBAMSB             = 'h200A4;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_DATBUFSZ                = 'h200A8;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_CON_IO_CONF             = 'h200AC;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_RESPERRPKTBA            = 'h200B0;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_RESPERRPKTBAMSB         = 'h200B4;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_RESPERRSZ               = 'h200B8;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_RESPERRSZMSB            = 'h200BC;
 
-//Global status regs
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_INSRRPKTCNT             = 'h20100;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_INAMPKTCNT              = 'h20104;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_OUTIOPKTCNT             = 'h20108;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_OUTAMPKTCNT             = 'h2010C;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_LSTINPKT                = 'h20110;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_LSTOUTPKT               = 'h20114;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_ININVDUPCNT             = 'h20118;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_INNCKPKTSTS             = 'h2011C;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_OUTRNRPKTSTS            = 'h20120;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_WQEPROCSTS              = 'h20124;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_QPMSTS                  = 'h2012C;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_INALLDRPPKTCNT          = 'h20130;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_INNAKPKTCNT             = 'h20134;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_OUTNAKPKTCNT            = 'h20138;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_RESPHNDSTS              = 'h2013C;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_RETRYCNTSTS             = 'h20140;
-
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_INCNPPKTCNT             = 'h20174;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_OUTCNPPKTCNT            = 'h20178;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_OUTRDRSPPKTCNT          = 'h2017C;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_INTEN                   = 'h20180;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_INTSTS                  = 'h20184;
-
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_RQINTSTS1               = 'h20190;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_RQINTSTS2               = 'h20194;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_RQINTSTS3               = 'h20198;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_RQINTSTS4               = 'h2019C;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_RQINTSTS5               = 'h201A0;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_RQINTSTS6               = 'h201A4;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_RQINTSTS7               = 'h201A8;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_RQINTSTS8               = 'h201AC;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_CQINTSTS1               = 'h201B0;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_CQINTSTS2               = 'h201B4;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_CQINTSTS3               = 'h201B8;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_CQINTSTS4               = 'h201BC;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_CQINTSTS5               = 'h201C0;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_CQINTSTS6               = 'h201C4;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_CQINTSTS7               = 'h201C8;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_CQINTSTS8               = 'h201CC;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_CNPSCHDSTS1REG          = 'h201D0;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_CNPSCHDSTS2REG          = 'h201D4;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_CNPSCHDSTS3REG          = 'h201D8;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_CNPSCHDSTS4REG          = 'h201DC;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_CNPSCHDSTS5REG          = 'h201E0;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_CNPSCHDSTS6REG          = 'h201E4;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_CNPSCHDSTS7REG          = 'h201E8;
-localparam logic [CSR_ADDRESS_WIDTH-1:0] ADDR_CNPSCHDSTS8REG          = 'h201EC;
-
-//Per QP registers (NUMQP min is 8, max is 256) (these actually start at 0x20200), only compare 8 lower bits, idx is upper 10 bits - 0x202
-localparam logic [7:0] ADDR_QPCONFi         = 'h0;
-localparam logic [7:0] ADDR_QPADVCONFi      = 'h4;
-localparam logic [7:0] ADDR_RQBAi           = 'h8;
-localparam logic [7:0] ADDR_RQBAMSBi        = 'hC0;
-localparam logic [7:0] ADDR_SQBAi           = 'h10;
-localparam logic [7:0] ADDR_SQBAMSBi        = 'hC8;
-localparam logic [7:0] ADDR_CQBAi           = 'h18;
-localparam logic [7:0] ADDR_CQBAMSBi        = 'hD0;
-localparam logic [7:0] ADDR_RQWPTRDBADDi    = 'h20;
-localparam logic [7:0] ADDR_RQWPTRDBADDMSBi = 'h24;
-localparam logic [7:0] ADDR_CQDBADDi        = 'h28;
-localparam logic [7:0] ADDR_CQDBADDMSBi     = 'h2C;
-localparam logic [7:0] ADDR_CQHEADi         = 'h30;
-localparam logic [7:0] ADDR_RQCIi           = 'h34;
-localparam logic [7:0] ADDR_SQPIi           = 'h38;
-localparam logic [7:0] ADDR_QDEPTHi         = 'h3C;
-localparam logic [7:0] ADDR_SQPSNi          = 'h40;
-localparam logic [7:0] ADDR_LSTRQREQi       = 'h44;
-localparam logic [7:0] ADDR_DESTQPCONFi     = 'h48;
-localparam logic [7:0] ADDR_MACDESADDLSBi   = 'h50;
-localparam logic [7:0] ADDR_MACDESADDMSBi   = 'h54;
-localparam logic [7:0] ADDR_IPDESADDR1i     = 'h60;
-localparam logic [7:0] ADDR_IPDESADDR2i     = 'h64;
-localparam logic [7:0] ADDR_IPDESADDR3i     = 'h68;
-localparam logic [7:0] ADDR_IPDESADDR4i     = 'h6C;
-localparam logic [7:0] ADDR_TIMEOUTCONFi    = 'h4C;
-localparam logic [7:0] ADDR_STATSSNi        = 'h80;
-localparam logic [7:0] ADDR_STATMSNi        = 'h84;
-localparam logic [7:0] ADDR_STATQPi         = 'h88;
-localparam logic [7:0] ADDR_STATCURSQPTRi   = 'h8C;
-localparam logic [7:0] ADDR_STATRESPSNi     = 'h90;
-localparam logic [7:0] ADDR_STATRQBUFCAi    = 'h94;
-localparam logic [7:0] ADDR_STATRQBUFCAMSBi = 'hD8;
-localparam logic [7:0] ADDR_STATWQEi        = 'h98;
-localparam logic [7:0] ADDR_STATRQPIDBi     = 'h9C;
-localparam logic [7:0] ADDR_PDNUMi          = 'hB0;
-
-////////////////////////////
-//                        //
-//  REGISTER DEFINITIONS  //
-//                        //
-////////////////////////////
 
 // Protection domain regs: 0x0 - 0x10000
-logic [REG_WIDTH-1:0] PDPDNUM_d[NUM_PD-1:0], PDPDNUM_q[NUM_PD-1:0];
-logic [REG_WIDTH-1:0] VIRTADDRLSB_d[NUM_PD-1:0], VIRTADDRLSB_q[NUM_PD-1:0];
-logic [REG_WIDTH-1:0] VIRTADDRMSB_d[NUM_PD-1:0], VIRTADDRMSB_q[NUM_PD-1:0];
-logic [REG_WIDTH-1:0] BUFBASEADDRLSB_d[NUM_PD-1:0], BUFBASEADDRLSB_q[NUM_PD-1:0];
-logic [REG_WIDTH-1:0] BUFBASEADDRMSB_d[NUM_PD-1:0], BUFBASEADDRMSB_q[NUM_PD-1:0];
-logic [REG_WIDTH-1:0] BUFRKEY_d[NUM_PD-1:0], BUFRKEY_q[NUM_PD-1:0];
-logic [REG_WIDTH-1:0] WRRDBUFLEN_d[NUM_PD-1:0], WRRDBUFLEN_q[NUM_PD-1:0];
-logic [REG_WIDTH-1:0] ACCESSDESC_d[NUM_PD-1:0], ACCESSDESC_q[NUM_PD-1:0];
+logic [NUM_PD_REGS-1:0] PD_REG_ENA_AXIL;
+logic [AXIL_DATA_WIDTH_BYTES-1:0] PD_REG_WEA_AXIL;
+logic [LOG_NUM_PD-1:0] PD_ADDR_AXIL;
+logic [NUM_PD_REGS-1:0][REG_WIDTH-1:0] PD_RD_REG_AXIL;
+logic [REG_WIDTH-1:0] PD_WR_REG_AXIL;
 
-// Configuration and status regs 0x20000 - 0x201F0
-logic [REG_WIDTH-1:0] CONF_d, CONF_q;
-logic [REG_WIDTH-1:0] ADCONF_d, ADCONF_q;
-logic [REG_WIDTH-1:0] BUF_THRESHOLD_ROCE_d, BUF_THRESHOLD_ROCE_q;
-logic [REG_WIDTH-1:0] PAUSE_CONF_d, PAUSE_CONF_q;
-logic [REG_WIDTH-1:0] MACADDLSB_d, MACADDLSB_q;
-logic [REG_WIDTH-1:0] MACADDMSB_d, MACADDMSB_q;
-logic [REG_WIDTH-1:0] BUF_THRESHOLD_NON_ROCE_d, BUF_THRESHOLD_NON_ROCE_q;
+logic [NUM_PD-1:0][23:0] pdnum_table; //huge table to lookup pdnum
 
-logic [REG_WIDTH-1:0] IPv6ADD1_d, IPv6ADD1_q;
-logic [REG_WIDTH-1:0] IPv6ADD2_d, IPv6ADD2_q;
-logic [REG_WIDTH-1:0] IPv6ADD3_d, IPv6ADD3_q;
-logic [REG_WIDTH-1:0] IPv6ADD4_d, IPv6ADD4_q;
-
-logic [REG_WIDTH-1:0] ERRBUFBA_d, ERRBUFBA_q;
-logic [REG_WIDTH-1:0] ERRBUFBAMSB_d, ERRBUFBAMSB_q;
-logic [REG_WIDTH-1:0] ERRBUFSZ_d, ERRBUFSZ_q;
-logic [REG_WIDTH-1:0] ERRBUFWPTR_d, ERRBUFWPTR_q; 
-logic [REG_WIDTH-1:0] IPv4ADD_d, IPv4ADD_q;
-
-logic [REG_WIDTH-1:0] OPKTERRQBA_d, OPKTERRQBA_q;
-logic [REG_WIDTH-1:0] OPKTERRQBAMSB_d, OPKTERRQBAMSB_q;
-logic [REG_WIDTH-1:0] OUTERRSTSQSZ_d, OUTERRSTSQSZ_q;
-logic [REG_WIDTH-1:0] OPTERRSTSQQPTRDB_d, OPTERRSTSQQPTRDB_q;
-logic [REG_WIDTH-1:0] IPKTERRQBA_d, IPKTERRQBA_q;
-logic [REG_WIDTH-1:0] IPKTERRQBAMSB_d, IPKTERRQBAMSB_q;
-logic [REG_WIDTH-1:0] IPKTERRQSZ_d, IPKTERRQSZ_q;
-logic [REG_WIDTH-1:0] IPKTERRQWPTR_d, IPKTERRQWPTR_q;
-
-logic [REG_WIDTH-1:0] DATBUFBA_d, DATBUFBA_q;
-logic [REG_WIDTH-1:0] DATBUFBAMSB_d, DATBUFBAMSB_q;
-logic [REG_WIDTH-1:0] DATBUFSZ_d, DATBUFSZ_q;
-logic [REG_WIDTH-1:0] CON_IO_CONF_d, CON_IO_CONF_q;
-logic [REG_WIDTH-1:0] RESPERRPKTBA_d, RESPERRPKTBA_q;
-logic [REG_WIDTH-1:0] RESPERRPKTBAMSB_d, RESPERRPKTBAMSB_q;
-logic [REG_WIDTH-1:0] RESPERRSZ_d, RESPERRSZ_q;
-logic [REG_WIDTH-1:0] RESPERRSZMSB_d, RESPERRSZMSB_q;
-
-//Global status regs
-logic [REG_WIDTH-1:0] INSRRPKTCNT_d, INSRRPKTCNT_q;
-logic [REG_WIDTH-1:0] INAMPKTCNT_d, INAMPKTCNT_q;
-logic [REG_WIDTH-1:0] OUTIOPKTCNT_d, OUTIOPKTCNT_q;
-logic [REG_WIDTH-1:0] OUTAMPKTCNT_d, OUTAMPKTCNT_q;
-logic [REG_WIDTH-1:0] LSTINPKT_d, LSTINPKT_q;
-logic [REG_WIDTH-1:0] LSTOUTPKT_d, LSTOUTPKT_q;
-logic [REG_WIDTH-1:0] ININVDUPCNT_d, ININVDUPCNT_q;
-logic [REG_WIDTH-1:0] INNCKPKTSTS_d, INNCKPKTSTS_q;
-logic [REG_WIDTH-1:0] OUTRNRPKTSTS_d, OUTRNRPKTSTS_q;
-logic [REG_WIDTH-1:0] WQEPROCSTS_d, WQEPROCSTS_q;
-logic [REG_WIDTH-1:0] QPMSTS_d, QPMSTS_q;
-logic [REG_WIDTH-1:0] INALLDRPPKTCNT_d, INALLDRPPKTCNT_q;
-logic [REG_WIDTH-1:0] INNAKPKTCNT_d, INNAKPKTCNT_q;
-logic [REG_WIDTH-1:0] OUTNAKPKTCNT_d, OUTNAKPKTCNT_q;
-logic [REG_WIDTH-1:0] RESPHNDSTS_d, RESPHNDSTS_q;
-logic [REG_WIDTH-1:0] RETRYCNTSTS_d, RETRYCNTSTS_q;
-
-logic [REG_WIDTH-1:0] INCNPPKTCNT_d, INCNPPKTCNT_q;
-logic [REG_WIDTH-1:0] OUTCNPPKTCNT_d, OUTCNPPKTCNT_q;
-logic [REG_WIDTH-1:0] OUTRDRSPPKTCNT_d, OUTRDRSPPKTCNT_q;
-logic [REG_WIDTH-1:0] INTEN_d, INTEN_q;
-logic [REG_WIDTH-1:0] INTSTS_d, INTSTS_q;
-
-logic [REG_WIDTH-1:0] RQINTSTS1_d, RQINTSTS1_q; 
-logic [REG_WIDTH-1:0] RQINTSTS2_d, RQINTSTS2_q;
-logic [REG_WIDTH-1:0] RQINTSTS3_d, RQINTSTS3_q;
-logic [REG_WIDTH-1:0] RQINTSTS4_d, RQINTSTS4_q;
-logic [REG_WIDTH-1:0] RQINTSTS5_d, RQINTSTS5_q;
-logic [REG_WIDTH-1:0] RQINTSTS6_d, RQINTSTS6_q;
-logic [REG_WIDTH-1:0] RQINTSTS7_d, RQINTSTS7_q;
-logic [REG_WIDTH-1:0] RQINTSTS8_d, RQINTSTS8_q;
-logic [REG_WIDTH-1:0] CQINTSTS1_d, CQINTSTS1_q;
-logic [REG_WIDTH-1:0] CQINTSTS2_d, CQINTSTS2_q;
-logic [REG_WIDTH-1:0] CQINTSTS3_d, CQINTSTS3_q;
-logic [REG_WIDTH-1:0] CQINTSTS4_d, CQINTSTS4_q;
-logic [REG_WIDTH-1:0] CQINTSTS5_d, CQINTSTS5_q;
-logic [REG_WIDTH-1:0] CQINTSTS6_d, CQINTSTS6_q;
-logic [REG_WIDTH-1:0] CQINTSTS7_d, CQINTSTS7_q;
-logic [REG_WIDTH-1:0] CQINTSTS8_d, CQINTSTS8_q;
-logic [REG_WIDTH-1:0] CNPSCHDSTS1REG_d, CNPSCHDSTS1REG_q;
-logic [REG_WIDTH-1:0] CNPSCHDSTS2REG_d, CNPSCHDSTS2REG_q;
-logic [REG_WIDTH-1:0] CNPSCHDSTS3REG_d, CNPSCHDSTS3REG_q;
-logic [REG_WIDTH-1:0] CNPSCHDSTS4REG_d, CNPSCHDSTS4REG_q;
-logic [REG_WIDTH-1:0] CNPSCHDSTS5REG_d, CNPSCHDSTS5REG_q;
-logic [REG_WIDTH-1:0] CNPSCHDSTS6REG_d, CNPSCHDSTS6REG_q;
-logic [REG_WIDTH-1:0] CNPSCHDSTS7REG_d, CNPSCHDSTS7REG_q;
-logic [REG_WIDTH-1:0] CNPSCHDSTS8REG_d, CNPSCHDSTS8REG_q;
 
 //Per QP registers (NUMQP min is 8, max is 256)
-logic [REG_WIDTH-1:0] QPCONFi_d[NUM_QP-1:0], QPCONFi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] QPADVCONFi_d[NUM_QP-1:0], QPADVCONFi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] RQBAi_d[NUM_QP-1:0], RQBAi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] RQBAMSBi_d[NUM_QP-1:0], RQBAMSBi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] SQBAi_d[NUM_QP-1:0], SQBAi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] SQBAMSBi_d[NUM_QP-1:0],SQBAMSBi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] CQBAi_d[NUM_QP-1:0], CQBAi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] CQBAMSBi_d[NUM_QP-1:0], CQBAMSBi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] RQWPTRDBADDi_d[NUM_QP-1:0], RQWPTRDBADDi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] RQWPTRDBADDMSBi_d[NUM_QP-1:0], RQWPTRDBADDMSBi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] CQDBADDi_d[NUM_QP-1:0], CQDBADDi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] CQDBADDMSBi_d[NUM_QP-1:0], CQDBADDMSBi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] CQHEADi_d[NUM_QP-1:0], CQHEADi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] RQCIi_d[NUM_QP-1:0],  RQCIi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] SQPIi_d[NUM_QP-1:0], SQPIi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] QDEPTHi_d[NUM_QP-1:0], QDEPTHi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] SQPSNi_d[NUM_QP-1:0], SQPSNi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] LSTRQREQi_d[NUM_QP-1:0], LSTRQREQi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] DESTQPCONFi_d[NUM_QP-1:0], DESTQPCONFi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] MACDESADDLSBi_d[NUM_QP-1:0], MACDESADDLSBi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] MACDESADDMSBi_d[NUM_QP-1:0], MACDESADDMSBi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] IPDESADDR1i_d[NUM_QP-1:0], IPDESADDR1i_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] IPDESADDR2i_d[NUM_QP-1:0], IPDESADDR2i_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] IPDESADDR3i_d[NUM_QP-1:0], IPDESADDR3i_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] IPDESADDR4i_d[NUM_QP-1:0], IPDESADDR4i_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] TIMEOUTCONFi_d[NUM_QP-1:0], TIMEOUTCONFi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] STATSSNi_d[NUM_QP-1:0], STATSSNi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] STATMSNi_d[NUM_QP-1:0], STATMSNi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] STATQPi_d[NUM_QP-1:0], STATQPi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] STATCURSQPTRi_d[NUM_QP-1:0], STATCURSQPTRi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] STATRESPSNi_d[NUM_QP-1:0], STATRESPSNi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] STATRQBUFCAi_d[NUM_QP-1:0], STATRQBUFCAi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] STATRQBUFCAMSBi_d[NUM_QP-1:0], STATRQBUFCAMSBi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] STATWQEi_d[NUM_QP-1:0], STATWQEi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] STATRQPIDBi_d[NUM_QP-1:0], STATRQPIDBi_q[NUM_QP-1:0];
-logic [REG_WIDTH-1:0] PDNUMi_d[NUM_QP-1:0], PDNUMi_q[NUM_QP-1:0];
+logic [NUM_QP_REGS-1:0] QP_REG_ENA_AXIL;
+logic [AXIL_DATA_WIDTH_BYTES-1:0] QP_REG_WEA_AXIL;
+logic [LOG_NUM_QP-1:0] QP_ADDR_AXIL;
+logic [NUM_QP_REGS-1:0][REG_WIDTH-1:0] QP_RD_REG_AXIL;
+logic [REG_WIDTH-1:0] QP_WR_REG_AXIL;
 
-logic [7:0] QPidx_d, QPidx_q;
-logic [7:0] SQidx_d, SQidx_q;
-logic [7:0] PDidx_d, PDidx_q;
-logic [7:0] connidx_d, connidx_q;
+
+// Configuration and status regs 0x20000 - 0x201F0
+
+logic GLB_REG_ENA_AXIL;
+logic [AXIL_DATA_WIDTH_BYTES-1:0] GLB_REG_WEA_AXIL;
+logic [7:0] GLB_ADDR_AXIL;
+logic [REG_WIDTH-1:0] GLB_RD_REG_AXIL;
+logic [REG_WIDTH-1:0] GLB_WR_REG_AXIL;
+
+
 
 ///////////////////////
 //                   //
@@ -440,13 +199,10 @@ logic [7:0] connidx_d, connidx_q;
 
 //AXI Lite clock domain
 logic reading, writing;
+logic[1:0] hold_rd_d, hold_rd_q;
+logic[1:0] hold_wr_d, hold_wr_q; //TODO: not sure if needed
 
-logic conn_configured_d, conn_configured_q;
-logic qp_configured_d, qp_configured_q;
 
-logic[7:0] pdidx_r, pdidx_w;
-logic[9:0] qpidx_r, qpidx_w;
-logic[AXIL_DATA_WIDTH_BYTES-1:0] mask;
 
 logic[CSR_ADDRESS_WIDTH-1:0]  RAddrReg_d, RAddrReg_q;
 logic[REG_WIDTH-1:0]          RDataReg_d, RDataReg_q;
@@ -463,8 +219,42 @@ logic[AXIL_DATA_WIDTH_BYTES-1:0] WStrbReg_d, WStrbReg_q;
 typedef enum {W_IDLE, W_READY, WRITE, B_RESP} write_state;
 write_state w_state_d, w_state_q;
 
+//AXIS clock domain
+logic [LOG_NUM_QP-1:0] QPidx_d, QPidx_q;
+logic hold_rd_axis_d, hold_rd_axis_q;
 
 
+logic [NUM_PD_REGS-1:0] PD_REG_ENA_AXIS;
+logic [AXIL_DATA_WIDTH_BYTES-1:0] PD_REG_WEA_AXIS;
+logic [LOG_NUM_PD-1:0] PD_ADDR_AXIS;
+logic [NUM_PD_REGS-1:0][REG_WIDTH-1:0] PD_RD_REG_AXIS, PD_RD_REG_AXIS_D, PD_RD_REG_AXIS_Q;
+logic [REG_WIDTH-1:0] PD_WR_REG_AXIS; //these are never written by the hardware
+
+logic [NUM_QP_REGS-1:0] QP_REG_ENA_AXIS;
+logic [AXIL_DATA_WIDTH_BYTES-1:0] QP_REG_WEA_AXIS;
+logic [LOG_NUM_QP-1:0] QP_ADDR_AXIS;
+logic [NUM_QP_REGS-1:0][REG_WIDTH-1:0] QP_RD_REG_AXIS, QP_RD_REG_AXIS_D, QP_RD_REG_AXIS_Q;
+logic [NUM_QP_REGS-1:0][REG_WIDTH-1:0] QP_WR_REG_AXIS; //multidimensional for parallel writes
+
+logic GLB_REG_ENA_AXIS;
+logic [AXIL_DATA_WIDTH_BYTES-1:0] GLB_REG_WEA_AXIS;
+logic [7:0] GLB_ADDR_AXIS;
+logic [REG_WIDTH-1:0] GLB_RD_REG_AXIS;
+logic [REG_WIDTH-1:0] GLB_WR_REG_AXIS;
+
+typedef enum {L_IDLE, L_READ_CMD, L_READ_SINGLE, L_READ_MULTI, L_READ_READY, L_READ_VADDR} logic_reg_state_t;
+logic_reg_state_t l_reg_st_d, l_reg_st_q;
+rd_cmd_t l_rd_cmd_d, l_rd_cmd_q;
+
+
+
+// lookup physical addresses
+typedef enum {VTP_IDLE, VTP_RD_PDN, VTP_RD_PDN_VLD, VTP_RD_PD, VTP_PREP_RESP, VTP_PREP_RESP_VLD, VTP_REQ_PD, VTP_VALID} virt_to_phys_state;
+virt_to_phys_state rd_vtp_st_d, rd_vtp_st_q, wr_vtp_st_d, wr_vtp_st_q;
+dma_req_t rd_resp_addr_data_d, rd_resp_addr_data_q, wr_resp_addr_data_d, wr_resp_addr_data_q;
+
+logic find_pd_rd_valid, find_pd_rd_ready, find_pd_wr_valid, find_pd_wr_ready;
+rd_cmd_t find_pd_rd_d, find_pd_rd_q, find_pd_wr_d, find_pd_wr_q;
 
 
 ////////////////
@@ -481,12 +271,16 @@ always_comb begin
   RDataReg_d = RDataReg_q;
   RRespReg_d = RRespReg_q; //OKAY
   r_state_d = r_state_q;
+  hold_rd_d = hold_rd_q;
 
   case(r_state_q)
     R_IDLE: begin
       if(s_axil_arvalid_i && !writing) begin
         RAddrReg_d = s_axil_araddr_i;
         s_axil_arready_o = 1'b1;
+        PD_REG_WEA_AXIL = 'd0;
+        QP_REG_WEA_AXIL = 'd0;
+        GLB_REG_WEA_AXIL = 'd0;
         r_state_d = R_GETDATA;
       end
     end
@@ -496,407 +290,223 @@ always_comb begin
       reading = 1'b1;
       //protection domain range
       if(!RAddrReg_q[17]) begin
-        pdidx_r = RAddrReg_q[15-:8];
+        PD_ADDR_AXIL = RAddrReg_q[15-:8];
         case(RAddrReg_q[7:0])
           ADDR_PDPDNUM: begin
-            RDataReg_d = PDPDNUM_q[pdidx_r];
+            PD_REG_ENA_AXIL[PDPDNUM_idx] = 1'b1;
+            RDataReg_d = PD_RD_REG_AXIL[PDPDNUM_idx];
           end
           ADDR_VIRTADDRLSB: begin
-            RDataReg_d = VIRTADDRLSB_q[pdidx_r];
+            PD_REG_ENA_AXIL[VIRTADDRLSB_idx] = 1'b1;
+            RDataReg_d = PD_RD_REG_AXIL[VIRTADDRLSB_idx];
           end
           ADDR_VIRTADDRMSB: begin
-            RDataReg_d = VIRTADDRMSB_q[pdidx_r];
+            PD_REG_ENA_AXIL[VIRTADDRMSB_idx] = 1'b1;
+            RDataReg_d = PD_RD_REG_AXIL[VIRTADDRMSB_idx];
           end
           ADDR_BUFBASEADDRLSB: begin
-            RDataReg_d = BUFBASEADDRLSB_q[pdidx_r];
+            PD_REG_ENA_AXIL[BUFBASEADDRLSB_idx] = 1'b1;
+            RDataReg_d = PD_RD_REG_AXIL[BUFBASEADDRLSB_idx];
           end
           ADDR_BUFBASEADDRMSB: begin
-            RDataReg_d = BUFBASEADDRMSB_q[pdidx_r];
+            PD_REG_ENA_AXIL[BUFBASEADDRMSB_idx] = 1'b1;
+            RDataReg_d = PD_RD_REG_AXIL[BUFBASEADDRMSB_idx];
           end
           ADDR_BUFRKEY: begin
-            RDataReg_d = BUFRKEY_q[pdidx_r];
+            PD_REG_ENA_AXIL[BUFRKEY_idx] = 1'b1;
+            RDataReg_d = PD_RD_REG_AXIL[BUFRKEY_idx];
           end
           ADDR_WRRDBUFLEN: begin
-            RDataReg_d = WRRDBUFLEN_q[pdidx_r];
+            PD_REG_ENA_AXIL[WRRDBUFLEN_idx] = 1'b1;
+            RDataReg_d = PD_RD_REG_AXIL[WRRDBUFLEN_idx];
           end
           ADDR_ACCESSDESC: begin
-            RDataReg_d = ACCESSDESC_q[pdidx_r];
+            PD_REG_ENA_AXIL[ACCESSDESC_idx] = 1'b1;
+            RDataReg_d = PD_RD_REG_AXIL[ACCESSDESC_idx];
           end
           default: begin
             RDataReg_d = 'd0;
-            RRespReg_d = 2'b10; //SLVERR
           end
         endcase
       end
       
       //Per QP range
       else if(RAddrReg_q[17-:10] >= 'h202) begin
-        qpidx_r = RAddrReg_q[17-:10] - 'h202;
-        if(qpidx_r >= NUM_QP) begin
+        QP_ADDR_AXIL = RAddrReg_q[17-:10] - 'h202;
+        if(QP_ADDR_AXIL >= NUM_QP) begin
           RDataReg_d = 'd0;
           RRespReg_d = 2'b10; //SLVERR
         end else begin
           case(RAddrReg_q[7:0])
             ADDR_QPCONFi: begin
-              RDataReg_d = QPCONFi_q[qpidx_r];
+              QP_REG_ENA_AXIL[QPCONFi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[QPCONFi_idx];
             end
             ADDR_QPADVCONFi: begin
-              RDataReg_d = QPADVCONFi_q[qpidx_r];
+              QP_REG_ENA_AXIL[QPADVCONFi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[QPADVCONFi_idx];
             end
             ADDR_RQBAi: begin
-              RDataReg_d = RQBAi_q[qpidx_r];
+              QP_REG_ENA_AXIL[RQBAi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[RQBAi_idx];
             end
             ADDR_RQBAMSBi: begin
-              RDataReg_d = RQBAMSBi_q[qpidx_r];
+              QP_REG_ENA_AXIL[RQBAMSBi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[RQBAMSBi_idx];
             end
             ADDR_SQBAi: begin
-              RDataReg_d = SQBAi_q[qpidx_r];
+              QP_REG_ENA_AXIL[SQBAi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[SQBAi_idx];
             end
             ADDR_SQBAMSBi: begin
-              RDataReg_d = SQBAMSBi_q[qpidx_r];
+              QP_REG_ENA_AXIL[SQBAMSBi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[SQBAMSBi_idx];
             end
             ADDR_CQBAi: begin
-              RDataReg_d = CQBAi_q[qpidx_r];
+              QP_REG_ENA_AXIL[CQBAi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[CQBAi_idx];
             end
             ADDR_CQBAMSBi: begin
-              RDataReg_d = CQBAMSBi_q[qpidx_r];
+              QP_REG_ENA_AXIL[CQBAMSBi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[CQBAMSBi_idx];
             end
             ADDR_RQWPTRDBADDi: begin
-              RDataReg_d = RQWPTRDBADDi_q[qpidx_r];
+              QP_REG_ENA_AXIL[RQWPTRDBADDi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[RQWPTRDBADDi_idx];
             end
             ADDR_RQWPTRDBADDMSBi: begin
-              RDataReg_d = RQWPTRDBADDMSBi_q[qpidx_r];
+              QP_REG_ENA_AXIL[RQWPTRDBADDMSBi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[RQWPTRDBADDMSBi_idx];
             end
             ADDR_CQDBADDi: begin
-              RDataReg_d = CQDBADDi_q[qpidx_r];
+              QP_REG_ENA_AXIL[CQDBADDi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[CQDBADDi_idx];
             end
             ADDR_CQDBADDMSBi: begin
-              RDataReg_d = CQDBADDMSBi_q[qpidx_r];
+              QP_REG_ENA_AXIL[CQDBADDMSBi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[CQDBADDMSBi_idx];
             end
             ADDR_CQHEADi: begin
-              RDataReg_d = CQHEADi_q[qpidx_r];
+              QP_REG_ENA_AXIL[CQHEADi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[CQHEADi_idx];
             end
             ADDR_RQCIi: begin
-              RDataReg_d = RQCIi_q[qpidx_r];
+              QP_REG_ENA_AXIL[RQCIi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[RQCIi_idx];
             end
             ADDR_SQPIi: begin
-              RDataReg_d = SQPIi_q[qpidx_r];
+              QP_REG_ENA_AXIL[SQPIi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[SQPIi_idx];
             end
             ADDR_QDEPTHi: begin
-              RDataReg_d = QDEPTHi_q[qpidx_r];
+              QP_REG_ENA_AXIL[QDEPTHi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[QDEPTHi_idx];
             end
             ADDR_SQPSNi: begin
-              RDataReg_d = SQPSNi_q[qpidx_r];
+              QP_REG_ENA_AXIL[SQPSNi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[SQPSNi_idx];
             end
             ADDR_LSTRQREQi: begin
-              RDataReg_d = LSTRQREQi_q[qpidx_r];
+              QP_REG_ENA_AXIL[LSTRQREQi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[LSTRQREQi_idx];
             end
             ADDR_DESTQPCONFi: begin
-              RDataReg_d = DESTQPCONFi_q[qpidx_r];
+              QP_REG_ENA_AXIL[DESTQPCONFi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[DESTQPCONFi_idx];
             end
             ADDR_MACDESADDLSBi: begin
-              RDataReg_d = MACDESADDLSBi_q[qpidx_r];
+              QP_REG_ENA_AXIL[MACDESADDLSBi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[MACDESADDLSBi_idx];
             end
             ADDR_MACDESADDMSBi: begin
-              RDataReg_d = MACDESADDMSBi_q[qpidx_r];
+              QP_REG_ENA_AXIL[MACDESADDMSBi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[MACDESADDMSBi_idx];
             end
             ADDR_IPDESADDR1i: begin
-              RDataReg_d = IPDESADDR1i_q[qpidx_r];
+              QP_REG_ENA_AXIL[IPDESADDR1i_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[IPDESADDR1i_idx];
             end
             ADDR_IPDESADDR2i: begin
-              RDataReg_d = IPDESADDR2i_q[qpidx_r];
+              QP_REG_ENA_AXIL[IPDESADDR2i_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[IPDESADDR2i_idx];
             end
             ADDR_IPDESADDR3i: begin
-              RDataReg_d = IPDESADDR3i_q[qpidx_r];
+              QP_REG_ENA_AXIL[IPDESADDR3i_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[IPDESADDR3i_idx];
             end
             ADDR_IPDESADDR4i: begin
-              RDataReg_d = IPDESADDR4i_q[qpidx_r];
+              QP_REG_ENA_AXIL[IPDESADDR4i_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[IPDESADDR4i_idx];
             end
             ADDR_TIMEOUTCONFi: begin
-              RDataReg_d = TIMEOUTCONFi_q[qpidx_r];
+              QP_REG_ENA_AXIL[TIMEOUTCONFi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[TIMEOUTCONFi_idx];
             end
             ADDR_STATSSNi: begin
-              RDataReg_d = STATSSNi_q[qpidx_r];
+              QP_REG_ENA_AXIL[STATSSNi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[STATSSNi_idx];
             end
             ADDR_STATMSNi: begin
-              RDataReg_d =STATMSNi_q[qpidx_r];
+              QP_REG_ENA_AXIL[STATMSNi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[STATMSNi_idx];
             end
             ADDR_STATQPi: begin
-              RDataReg_d = STATQPi_q[qpidx_r];
+              QP_REG_ENA_AXIL[STATQPi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[STATQPi_idx];
             end
             ADDR_STATCURSQPTRi: begin
-              RDataReg_d = STATCURSQPTRi_q[qpidx_r];
+              QP_REG_ENA_AXIL[STATCURSQPTRi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[STATCURSQPTRi_idx];
             end
             ADDR_STATRESPSNi: begin
-              RDataReg_d =STATRESPSNi_q[qpidx_r];
+              QP_REG_ENA_AXIL[STATRESPSNi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[STATRESPSNi_idx];
             end
             ADDR_STATRQBUFCAi: begin
-              RDataReg_d = STATRQBUFCAi_q[qpidx_r];
+              QP_REG_ENA_AXIL[STATRQBUFCAi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[STATRQBUFCAi_idx];
             end
             ADDR_STATRQBUFCAMSBi: begin
-              RDataReg_d = STATRQBUFCAMSBi_q[qpidx_r];
+              QP_REG_ENA_AXIL[STATRQBUFCAMSBi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[STATRQBUFCAMSBi_idx];
             end
             ADDR_STATWQEi: begin
-              RDataReg_d = STATWQEi_q[qpidx_r];
+              QP_REG_ENA_AXIL[STATWQEi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[STATWQEi_idx];
             end
             ADDR_STATRQPIDBi: begin
-              RDataReg_d = STATRQPIDBi_q[qpidx_r];
+              QP_REG_ENA_AXIL[STATRQPIDBi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[STATRQPIDBi_idx];
             end
             ADDR_PDNUMi: begin
-              RDataReg_d = PDNUMi_q[qpidx_r];
+              QP_REG_ENA_AXIL[PDNUMi_idx] = 1'b1;
+              RDataReg_d = QP_RD_REG_AXIL[PDNUMi_idx];
             end
             default: begin
               RDataReg_d = 'd0;
-              RRespReg_d = 2'b10; //SLVERR
             end
           endcase
         end
       end else begin
-        case(RAddrReg_q)
-          // Configuration and status regs 0x20000 - 0x201F0
-          ADDR_CONF: begin
-            RDataReg_d = CONF_q; 
-          end
-          ADDR_ADCONF: begin
-            RDataReg_d = ADCONF_q; 
-          end
-          ADDR_BUF_THRESHOLD_ROCE: begin
-            RDataReg_d = BUF_THRESHOLD_ROCE_q; 
-          end
-          ADDR_PAUSE_CONF: begin
-            RDataReg_d = PAUSE_CONF_q; 
-          end
-          ADDR_MACADDLSB: begin
-            RDataReg_d = MACADDLSB_q; 
-          end
-          ADDR_MACADDMSB: begin
-            RDataReg_d = MACADDMSB_q; 
-          end
-          ADDR_BUF_THRESHOLD_NON_ROCE: begin
-            RDataReg_d = BUF_THRESHOLD_NON_ROCE_q; 
-          end
-          ADDR_IPv6ADD1: begin
-            RDataReg_d = IPv6ADD1_q; 
-          end 
-          ADDR_IPv6ADD2: begin
-            RDataReg_d = IPv6ADD2_q; 
-          end 
-          ADDR_IPv6ADD3: begin
-            RDataReg_d = IPv6ADD3_q; 
-          end 
-          ADDR_IPv6ADD4: begin
-            RDataReg_d = IPv6ADD4_q; 
-          end  
-          ADDR_ERRBUFBA: begin
-            RDataReg_d = ERRBUFBA_q; 
-          end
-          ADDR_ERRBUFBAMSB: begin
-            RDataReg_d = ERRBUFBAMSB_q; 
-          end
-          ADDR_ERRBUFSZ: begin
-            RDataReg_d = ERRBUFSZ_q; 
-          end
-          ADDR_ERRBUFWPTR: begin
-            RDataReg_d = ERRBUFWPTR_q; 
-          end
-          ADDR_IPv4ADD: begin
-            RDataReg_d = IPv4ADD_q; 
-          end
-          ADDR_OPKTERRQBA: begin
-            RDataReg_d = OPKTERRQBA_q; 
-          end
-          ADDR_OPKTERRQBAMSB: begin
-            RDataReg_d = OPKTERRQBAMSB_q; 
-          end
-          ADDR_OUTERRSTSQSZ: begin
-            RDataReg_d = OUTERRSTSQSZ_q; 
-          end
-          ADDR_OPTERRSTSQQPTRDB: begin
-            RDataReg_d = OPTERRSTSQQPTRDB_q; 
-          end
-          ADDR_IPKTERRQBA: begin
-            RDataReg_d = IPKTERRQBA_q; 
-          end
-          ADDR_IPKTERRQBAMSB: begin
-            RDataReg_d = IPKTERRQBAMSB_q; 
-          end
-          ADDR_IPKTERRQSZ: begin
-            RDataReg_d = IPKTERRQSZ_q; 
-          end
-          ADDR_IPKTERRQWPTR: begin
-            RDataReg_d = IPKTERRQWPTR_q; 
-          end
-          ADDR_DATBUFBA: begin
-            RDataReg_d = DATBUFBA_q; 
-          end
-          ADDR_DATBUFBAMSB: begin
-            RDataReg_d = DATBUFBAMSB_q; 
-          end
-          ADDR_DATBUFSZ: begin
-            RDataReg_d = DATBUFSZ_q; 
-          end
-          ADDR_CON_IO_CONF: begin
-            RDataReg_d = CON_IO_CONF_q; 
-          end
-          ADDR_RESPERRPKTBA: begin
-            RDataReg_d = RESPERRPKTBA_q; 
-          end
-          ADDR_RESPERRPKTBAMSB: begin
-            RDataReg_d = RESPERRPKTBAMSB_q; 
-          end
-          ADDR_RESPERRSZ: begin
-            RDataReg_d = RESPERRSZ_q; 
-          end
-          ADDR_RESPERRSZMSB: begin
-            RDataReg_d = RESPERRSZMSB_q; 
-          end
-          //Global status regs
-          ADDR_INSRRPKTCNT: begin
-            RDataReg_d = INSRRPKTCNT_q;
-          end
-          ADDR_INAMPKTCNT: begin
-            RDataReg_d = INAMPKTCNT_q;
-          end
-          ADDR_OUTIOPKTCNT: begin
-            RDataReg_d = OUTIOPKTCNT_q;
-          end
-          ADDR_OUTAMPKTCNT: begin
-            RDataReg_d = OUTAMPKTCNT_q;
-          end
-          ADDR_LSTINPKT: begin
-            RDataReg_d = LSTINPKT_q;
-          end
-          ADDR_LSTOUTPKT: begin
-            RDataReg_d = LSTOUTPKT_q;
-          end
-          ADDR_ININVDUPCNT: begin
-            RDataReg_d = ININVDUPCNT_q;
-          end
-          ADDR_INNCKPKTSTS: begin
-            RDataReg_d = INNCKPKTSTS_q;
-          end
-          ADDR_OUTRNRPKTSTS: begin
-            RDataReg_d = OUTRNRPKTSTS_q;
-          end
-          ADDR_WQEPROCSTS: begin
-            RDataReg_d = WQEPROCSTS_q;
-          end
-          ADDR_QPMSTS: begin
-            RDataReg_d = QPMSTS_q;
-          end
-          ADDR_INALLDRPPKTCNT: begin
-            RDataReg_d = INALLDRPPKTCNT_q;
-          end
-          ADDR_INNAKPKTCNT: begin
-            RDataReg_d = INNAKPKTCNT_q;
-          end
-          ADDR_OUTNAKPKTCNT: begin
-            RDataReg_d = OUTNAKPKTCNT_q;
-          end
-          ADDR_RESPHNDSTS: begin
-            RDataReg_d = RESPHNDSTS_q;
-          end
-          ADDR_RETRYCNTSTS: begin
-            RDataReg_d = RETRYCNTSTS_q;
-          end
-          ADDR_INCNPPKTCNT: begin
-            RDataReg_d = INCNPPKTCNT_q;
-          end
-          ADDR_OUTCNPPKTCNT: begin
-            RDataReg_d = OUTCNPPKTCNT_q;
-          end
-          ADDR_OUTRDRSPPKTCNT: begin
-            RDataReg_d = OUTRDRSPPKTCNT_q;
-          end
-          ADDR_INTEN: begin
-            RDataReg_d = INTEN_q;
-          end
-          ADDR_INTSTS: begin
-            RDataReg_d = INTSTS_q;
-          end
-          ADDR_RQINTSTS1: begin
-            RDataReg_d = RQINTSTS1_q;
-          end
-          ADDR_RQINTSTS2: begin
-            RDataReg_d = RQINTSTS2_q;
-          end
-          ADDR_RQINTSTS3: begin
-            RDataReg_d = RQINTSTS3_q;
-          end
-          ADDR_RQINTSTS4: begin
-            RDataReg_d = RQINTSTS4_q;
-          end
-          ADDR_RQINTSTS5: begin
-            RDataReg_d = RQINTSTS5_q;
-          end
-          ADDR_RQINTSTS6: begin
-            RDataReg_d = RQINTSTS6_q;
-          end
-          ADDR_RQINTSTS7: begin
-            RDataReg_d = RQINTSTS7_q;
-          end
-          ADDR_RQINTSTS8: begin
-            RDataReg_d = RQINTSTS8_q;
-          end
-          ADDR_CQINTSTS1: begin
-            RDataReg_d = CQINTSTS1_q;
-          end
-          ADDR_CQINTSTS2: begin
-            RDataReg_d = CQINTSTS2_q;
-          end
-          ADDR_CQINTSTS3: begin
-            RDataReg_d = CQINTSTS3_q;
-          end
-          ADDR_CQINTSTS4: begin
-            RDataReg_d = CQINTSTS4_q;
-          end
-          ADDR_CQINTSTS5: begin
-            RDataReg_d = CQINTSTS5_q;
-          end
-          ADDR_CQINTSTS6: begin
-            RDataReg_d = CQINTSTS6_q;
-          end
-          ADDR_CQINTSTS7: begin
-            RDataReg_d = CQINTSTS7_q;
-          end
-          ADDR_CQINTSTS8: begin
-            RDataReg_d = CQINTSTS8_q;
-          end
-          ADDR_CNPSCHDSTS1REG: begin
-            RDataReg_d = CNPSCHDSTS1REG_q;
-          end
-          ADDR_CNPSCHDSTS2REG: begin
-            RDataReg_d = CNPSCHDSTS2REG_q;
-          end
-          ADDR_CNPSCHDSTS3REG: begin
-            RDataReg_d = CNPSCHDSTS3REG_q;
-          end
-          ADDR_CNPSCHDSTS4REG: begin
-            RDataReg_d = CNPSCHDSTS4REG_q;
-          end
-          ADDR_CNPSCHDSTS5REG: begin
-            RDataReg_d = CNPSCHDSTS5REG_q;
-          end
-          ADDR_CNPSCHDSTS6REG: begin
-            RDataReg_d = CNPSCHDSTS6REG_q;
-          end
-          ADDR_CNPSCHDSTS7REG: begin
-            RDataReg_d = CNPSCHDSTS7REG_q;
-          end
-          ADDR_CNPSCHDSTS8REG: begin
-            RDataReg_d = CNPSCHDSTS8REG_q;
-          end
-          default: begin
-            RDataReg_d = 'd0;
-            RRespReg_d = 2'b10; //SLVERR
-          end
-        endcase
+        GLB_ADDR_AXIL = RAddrReg_q >> 2; //TODO: does this actually work??
+        GLB_REG_ENA_AXIL = 1'b1;
+        RDataReg_d = GLB_RD_REG_AXIL;
       end
-      r_state_d = R_VALID;
+      //hold this state for rd latency
+      if(hold_rd_q == RD_LAT) begin
+        r_state_d = R_VALID;
+        hold_rd_d = 'd0;
+      end else begin
+        r_state_d = R_GETDATA;
+        hold_rd_d = hold_rd_q + 1;
+      end
     end
 
     R_VALID: begin
       reading = 1'b1;
+      PD_REG_ENA_AXIL = 'd0;
+      QP_REG_ENA_AXIL = 'd0;
+      GLB_REG_ENA_AXIL = 1'b0;
       s_axil_rvalid_o = 1'b1;
       if(s_axil_rready_i) begin
         r_state_d = R_IDLE;
@@ -912,174 +522,20 @@ end
 /////////////////
 
 
-//function to write the regs with strb mask
-function [AXIL_DATA_WIDTH-1:0]	apply_wstrb;
-	input logic	[AXIL_DATA_WIDTH-1:0] old_data;
-	input logic	[AXIL_DATA_WIDTH-1:0] new_data;
-	input logic	[AXIL_DATA_WIDTH_BYTES-1:0] wstrb;
-	
-	for(int i=0; i<AXIL_DATA_WIDTH_BYTES; i++) begin
-		apply_wstrb[i*8 +: 8] = wstrb[i] ? new_data[i*8 +: 8] : old_data[i*8 +: 8];
-	end
-endfunction
-
-
-
 always_comb begin
   s_axil_awready_o = 1'b0;
   s_axil_bvalid_o = 1'b0;
   s_axil_wready_o = 1'b0;
-  wb_ready_o = 1'b0;
   writing = 1'b0;
+  cmd_fifo_wr_en = 1'b0;
   WAddrReg_d = WAddrReg_q;
   WDataReg_d = WDataReg_q;
   WRespReg_d = WRespReg_q;
   WStrbReg_d = WStrbReg_q;
+  hold_wr_d = hold_wr_q;
   
   w_state_d = w_state_q;
 
-  conn_configured_d = 1'b0;
-  qp_configured_d = 1'b0;
-
-  QPidx_d = QPidx_q;
-  SQidx_d = SQidx_q;
-  connidx_d = connidx_q;
-  
-  CONF_d = CONF_q;
-  ADCONF_d = ADCONF_q;
-  BUF_THRESHOLD_ROCE_d = BUF_THRESHOLD_ROCE_q;
-  PAUSE_CONF_d = PAUSE_CONF_q;
-  MACADDLSB_d = MACADDLSB_q;
-  MACADDMSB_d = MACADDMSB_q;
-  BUF_THRESHOLD_NON_ROCE_d = BUF_THRESHOLD_NON_ROCE_q;
-
-  IPv6ADD1_d = IPv6ADD1_q;
-  IPv6ADD2_d = IPv6ADD2_q;
-  IPv6ADD3_d = IPv6ADD3_q;
-  IPv6ADD4_d = IPv6ADD4_q;
-
-  ERRBUFBA_d = ERRBUFBA_q;
-  ERRBUFBAMSB_d = ERRBUFBAMSB_q;
-  ERRBUFSZ_d = ERRBUFSZ_q;
-  ERRBUFWPTR_d = ERRBUFWPTR_q; 
-  IPv4ADD_d = IPv4ADD_q;
-
-  OPKTERRQBA_d = OPKTERRQBA_q;
-  OPKTERRQBAMSB_d = OPKTERRQBAMSB_q;
-  OUTERRSTSQSZ_d = OUTERRSTSQSZ_q;
-  OPTERRSTSQQPTRDB_d = OPTERRSTSQQPTRDB_q;
-  IPKTERRQBA_d = IPKTERRQBA_q;
-  IPKTERRQBAMSB_d = IPKTERRQBAMSB_q;
-  IPKTERRQSZ_d = IPKTERRQSZ_q;
-  IPKTERRQWPTR_d = IPKTERRQWPTR_q;
-
-  DATBUFBA_d = DATBUFBA_q;
-  DATBUFBAMSB_d = DATBUFBAMSB_q;
-  DATBUFSZ_d = DATBUFSZ_q;
-  CON_IO_CONF_d = CON_IO_CONF_q;
-  RESPERRPKTBA_d = RESPERRPKTBA_q;
-  RESPERRPKTBAMSB_d = RESPERRPKTBAMSB_q;
-  RESPERRSZ_d = RESPERRSZ_q;
-  RESPERRSZMSB_d = RESPERRSZMSB_q;
-
-  //Global status regs
-  INSRRPKTCNT_d = INSRRPKTCNT_q;
-  INAMPKTCNT_d = INAMPKTCNT_q;
-  OUTIOPKTCNT_d = OUTIOPKTCNT_q;
-  OUTAMPKTCNT_d = OUTAMPKTCNT_q;
-  LSTINPKT_d = LSTINPKT_q;
-  LSTOUTPKT_d = LSTOUTPKT_q;
-  ININVDUPCNT_d = ININVDUPCNT_q;
-  INNCKPKTSTS_d = INNCKPKTSTS_q;
-  OUTRNRPKTSTS_d = OUTRNRPKTSTS_q;
-  WQEPROCSTS_d = WQEPROCSTS_q;
-  QPMSTS_d = QPMSTS_q;
-  INALLDRPPKTCNT_d = INALLDRPPKTCNT_q;
-  INNAKPKTCNT_d = INNAKPKTCNT_q;
-  OUTNAKPKTCNT_d = OUTNAKPKTCNT_q;
-  RESPHNDSTS_d = RESPHNDSTS_q;
-  RETRYCNTSTS_d = RETRYCNTSTS_q;
-
-  INCNPPKTCNT_d = INCNPPKTCNT_q;
-  OUTCNPPKTCNT_d = OUTCNPPKTCNT_q;
-  OUTRDRSPPKTCNT_d = OUTRDRSPPKTCNT_q;
-  INTEN_d = INTEN_q;
-  INTSTS_d = INTSTS_q;
-
-  RQINTSTS1_d = RQINTSTS1_q; 
-  RQINTSTS2_d = RQINTSTS2_q;
-  RQINTSTS3_d = RQINTSTS3_q;
-  RQINTSTS4_d = RQINTSTS4_q;
-  RQINTSTS5_d = RQINTSTS5_q;
-  RQINTSTS6_d = RQINTSTS6_q;
-  RQINTSTS7_d = RQINTSTS7_q;
-  RQINTSTS8_d = RQINTSTS8_q;
-  CQINTSTS1_d = CQINTSTS1_q;
-  CQINTSTS2_d = CQINTSTS2_q;
-  CQINTSTS3_d = CQINTSTS3_q;
-  CQINTSTS4_d = CQINTSTS4_q;
-  CQINTSTS5_d = CQINTSTS5_q;
-  CQINTSTS6_d = CQINTSTS6_q;
-  CQINTSTS7_d = CQINTSTS7_q;
-  CQINTSTS8_d = CQINTSTS8_q;
-  CNPSCHDSTS1REG_d = CNPSCHDSTS1REG_q;
-  CNPSCHDSTS2REG_d = CNPSCHDSTS2REG_q;
-  CNPSCHDSTS3REG_d = CNPSCHDSTS3REG_q;
-  CNPSCHDSTS4REG_d = CNPSCHDSTS4REG_q;
-  CNPSCHDSTS5REG_d = CNPSCHDSTS5REG_q;
-  CNPSCHDSTS6REG_d = CNPSCHDSTS6REG_q;
-  CNPSCHDSTS7REG_d = CNPSCHDSTS7REG_q;
-  CNPSCHDSTS8REG_d = CNPSCHDSTS8REG_q;
-  
-  for(int i = 0; i < NUM_PD; i++) begin
-    PDPDNUM_d[i] = PDPDNUM_q[i];
-    VIRTADDRLSB_d[i] = VIRTADDRLSB_q[i];
-    VIRTADDRMSB_d[i] = VIRTADDRMSB_q[i];
-    BUFBASEADDRLSB_d[i] = BUFBASEADDRLSB_q[i];
-    BUFBASEADDRMSB_d[i] = BUFBASEADDRMSB_q[i];
-    BUFRKEY_d[i] = BUFRKEY_q[i];
-    WRRDBUFLEN_d[i] = WRRDBUFLEN_q[i];
-    ACCESSDESC_d[i] = ACCESSDESC_q[i];
-  end
-
-  for(int i = 0; i < NUM_QP; i++) begin
-    QPCONFi_d[i] = QPCONFi_q[i];
-    QPADVCONFi_d[i] = QPADVCONFi_q[i];
-    RQBAi_d[i] = RQBAi_q[i];
-    RQBAMSBi_d[i] = RQBAMSBi_q[i];
-    SQBAi_d[i] = SQBAi_q[i];
-    SQBAMSBi_d[i] = SQBAMSBi_q[i];
-    CQBAi_d[i] = CQBAi_q[i];
-    CQBAMSBi_d[i] = CQBAMSBi_q[i];
-    RQWPTRDBADDi_d[i] = RQWPTRDBADDi_q[i];
-    RQWPTRDBADDMSBi_d[i] = RQWPTRDBADDMSBi_q[i];
-    CQDBADDi_d[i] = CQDBADDi_q[i];
-    CQDBADDMSBi_d[i] = CQDBADDMSBi_q[i];
-    CQHEADi_d[i] = CQHEADi_q[i];
-    RQCIi_d[i] =  RQCIi_q[i];
-    SQPIi_d[i] = SQPIi_q[i];
-    QDEPTHi_d[i] = QDEPTHi_q[i];
-    SQPSNi_d[i] = SQPSNi_q[i];
-    LSTRQREQi_d[i] = LSTRQREQi_q[i];
-    DESTQPCONFi_d[i] = DESTQPCONFi_q[i];
-    MACDESADDLSBi_d[i] = MACDESADDLSBi_q[i];
-    MACDESADDMSBi_d[i] = MACDESADDMSBi_q[i];
-    IPDESADDR1i_d[i] = IPDESADDR1i_q[i];
-    IPDESADDR2i_d[i] = IPDESADDR2i_q[i];
-    IPDESADDR3i_d[i] = IPDESADDR3i_q[i];
-    IPDESADDR4i_d[i] = IPDESADDR4i_q[i];
-    TIMEOUTCONFi_d[i] = TIMEOUTCONFi_q[i];
-    STATSSNi_d[i] = STATSSNi_q[i];
-    STATMSNi_d[i] = STATMSNi_q[i];
-    STATQPi_d[i] = STATQPi_q[i];
-    STATCURSQPTRi_d[i] = STATCURSQPTRi_q[i];
-    STATRESPSNi_d[i] = STATRESPSNi_q[i];
-    STATRQBUFCAi_d[i] = STATRQBUFCAi_q[i];
-    STATRQBUFCAMSBi_d[i] = STATRQBUFCAMSBi_q[i];
-    STATWQEi_d[i] = STATWQEi_q[i];
-    STATRQPIDBi_d[i] = STATRQPIDBi_q[i];
-    PDNUMi_d[i] = PDNUMi_q[i];
-  end
 
   case(w_state_q)
     W_IDLE: begin
@@ -1089,26 +545,7 @@ always_comb begin
         WAddrReg_d = s_axil_awaddr_i;
         writing = 1'b1;
         w_state_d = W_READY;
-      //write requests from logic
-      end else if(wb_valid_i && !reading) begin
-        writing = 1'b1;
-        
-        CQHEADi_d[WB_CQHEADi_i[39:32]]            = WB_CQHEADi_valid_i    ? WB_CQHEADi_i[31:0]              : CQHEADi_q[WB_CQHEADi_i[39:32]];
-        SQPSNi_d[WB_SQPSNi_i[31:24]][23:0]        = WB_SQPSNi_valid_i     ? WB_SQPSNi_i[23:0]               : SQPSNi_q[WB_SQPSNi_i[31:24]];
-        LSTRQREQi_d[WB_LSTRQREQi_i[31:24]][23:0]  = WB_LSTRQREQi_valid_i  ? (WB_LSTRQREQi_i[23:0] - 24'b1)  : LSTRQREQi_q[WB_LSTRQREQi_i[31:24]];
-
-        
-        INSRRPKTCNT_d         = WB_INSRRPKTCNT_valid_i    ? WB_INSRRPKTCNT_i        : INSRRPKTCNT_q;
-        INAMPKTCNT_d          = WB_INAMPKTCNT_valid_i     ? WB_INAMPKTCNT_i         : INAMPKTCNT_q;
-        INNCKPKTSTS_d         = WB_INNCKPKTSTS_valid_i    ? WB_INNCKPKTSTS_i        : INNCKPKTSTS_q;
-        INNAKPKTCNT_d[15:0]   = WB_INNCKPKTSTS_valid_i    ? WB_INNCKPKTSTS_i[31:16] : INNAKPKTCNT_q[15:0];
-        OUTAMPKTCNT_d         = WB_OUTAMPKTCNT_valid_i    ? WB_OUTAMPKTCNT_i        : OUTAMPKTCNT_q;
-        OUTNAKPKTCNT_d[15:0]  = WB_OUTNAKPKTCNT_valid_i   ? WB_OUTNAKPKTCNT_i       : OUTNAKPKTCNT_q[15:0];
-        OUTIOPKTCNT_d         = WB_OUTIOPKTCNT_valid_i    ? WB_OUTIOPKTCNT_i        : OUTIOPKTCNT_q;
-        OUTRDRSPPKTCNT_d      = WB_OUTRDRSPPKTCNT_valid_i ? WB_OUTRDRSPPKTCNT_i     : OUTRDRSPPKTCNT_q;
-        
-        wb_ready_o = 1'b1;
-      end 
+      end
     end
     
     W_READY: begin
@@ -1124,137 +561,181 @@ always_comb begin
     WRITE: begin
       WRespReg_d = 2'b0;
       writing = 1'b1;
-      mask = WStrbReg_q;
-      
       if(~WAddrReg_q[17]) begin
-        pdidx_w = WAddrReg_q[15-:8];
+        PD_ADDR_AXIL = WAddrReg_q[15-:8];
+        cmd_fifo_in.region = 'd1;
+        cmd_fifo_in.address = PD_ADDR_AXIL;
+        PD_REG_WEA_AXIL = WStrbReg_q;
         case(WAddrReg_q[7:0])
           ADDR_PDPDNUM: begin
-            mask = WStrbReg_q & 4'b0111; 
-            PDPDNUM_d[pdidx_w] = apply_wstrb(PDPDNUM_q[pdidx_w], WDataReg_q, mask);
-            PDPDNUM_d[pdidx_w][24] = 1'b1; //valid bit for idx determination
+            PD_REG_ENA_AXIL[PDPDNUM_idx] = 1'b1;
+            PD_WR_REG_AXIL = WDataReg_q;
+            cmd_fifo_in.read_all = 1'b0;
+            cmd_fifo_in.bram_idx = PDPDNUM_idx;
+            cmd_fifo_wr_en = 1'b1; 
           end
           ADDR_VIRTADDRLSB: begin
-            VIRTADDRLSB_d[pdidx_w] = apply_wstrb(VIRTADDRLSB_q[pdidx_w], WDataReg_q, mask);
+            PD_REG_ENA_AXIL[VIRTADDRLSB_idx] = 1'b1;
+            PD_WR_REG_AXIL = WDataReg_q;
           end
           ADDR_VIRTADDRMSB: begin
-            VIRTADDRMSB_d[pdidx_w] = apply_wstrb(VIRTADDRMSB_q[pdidx_w], WDataReg_q, mask);
+            PD_REG_ENA_AXIL[VIRTADDRMSB_idx] = 1'b1;
+            PD_WR_REG_AXIL = WDataReg_q;
           end
           ADDR_BUFBASEADDRLSB: begin
-            BUFBASEADDRLSB_d[pdidx_w] = apply_wstrb(BUFBASEADDRLSB_q[pdidx_w], WDataReg_q, mask);
+            PD_REG_ENA_AXIL[BUFBASEADDRLSB_idx] = 1'b1;
+            PD_WR_REG_AXIL = WDataReg_q;
           end
           ADDR_BUFBASEADDRMSB: begin
-            BUFBASEADDRMSB_d[pdidx_w] = apply_wstrb(BUFBASEADDRMSB_q[pdidx_w], WDataReg_q, mask);
+            PD_REG_ENA_AXIL[BUFBASEADDRMSB_idx] = 1'b1;
+            PD_WR_REG_AXIL = WDataReg_q;
           end
           ADDR_BUFRKEY: begin
-            BUFRKEY_d[pdidx_w] = apply_wstrb(BUFRKEY_q[pdidx_w], WDataReg_q, mask);
+            PD_REG_ENA_AXIL[BUFRKEY_idx] = 1'b1;
+            PD_WR_REG_AXIL = WDataReg_q;
           end
           ADDR_WRRDBUFLEN: begin
-            WRRDBUFLEN_d[pdidx_w] = apply_wstrb(WRRDBUFLEN_q[pdidx_w], WDataReg_q, mask);
+            PD_REG_ENA_AXIL[WRRDBUFLEN_idx] = 1'b1;
+            PD_WR_REG_AXIL = WDataReg_q;
           end
           ADDR_ACCESSDESC: begin
-            ACCESSDESC_d[pdidx_w] = apply_wstrb(ACCESSDESC_q[pdidx_w], WDataReg_q, mask);
+            PD_REG_ENA_AXIL[ACCESSDESC_idx] = 1'b1;
+            PD_WR_REG_AXIL = WDataReg_q;
           end
           default: begin
             WRespReg_d = 2'b10; //SLVERR
           end
         endcase
       end else if (WAddrReg_q[17-:10] >= 'h202) begin
-        qpidx_w = WAddrReg_q[17-:10] - 'h202;
-        if(qpidx_w >= NUM_QP) begin
+        QP_ADDR_AXIL = WAddrReg_q[17-:10] - 'h202;
+        if(QP_ADDR_AXIL >= NUM_QP) begin
           WRespReg_d = 2'b10; //SLVERR
         end else begin
+          QP_REG_WEA_AXIL = WStrbReg_q;
+          cmd_fifo_in.region = 'd2;
+          cmd_fifo_in.address = QP_ADDR_AXIL;
           case(WAddrReg_q[7:0])
             ADDR_QPCONFi: begin
-              QPCONFi_d[qpidx_w] = apply_wstrb(QPCONFi_q[qpidx_w], WDataReg_q, mask);
-              QPidx_d = qpidx_w[7:0];
-              qp_configured_d = 1'b1;
+              QP_REG_ENA_AXIL[QPCONFi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
+              cmd_fifo_in.read_all = 1'b1;
+              cmd_fifo_in.bram_idx = QPCONFi_idx;
+              cmd_fifo_wr_en = 1'b1; 
             end
             ADDR_QPADVCONFi: begin
-              QPADVCONFi_d[qpidx_w] = apply_wstrb(QPADVCONFi_q[qpidx_w], WDataReg_q, mask);
+              QP_REG_ENA_AXIL[QPADVCONFi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
             end
             ADDR_RQBAi: begin
-              RQBAi_d[qpidx_w] = apply_wstrb(RQBAi_q[qpidx_w], WDataReg_q, mask);
+              QP_REG_ENA_AXIL[RQBAi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
             end
             ADDR_RQBAMSBi: begin
-              RQBAMSBi_d[qpidx_w] = apply_wstrb(RQBAMSBi_q[qpidx_w], WDataReg_q, mask);
+              QP_REG_ENA_AXIL[RQBAMSBi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
             end
             ADDR_SQBAi: begin
-              SQBAi_d[qpidx_w] = apply_wstrb(SQBAi_q[qpidx_w], WDataReg_q, mask);
+              QP_REG_ENA_AXIL[SQBAi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
             end
             ADDR_SQBAMSBi: begin
-              SQBAMSBi_d[qpidx_w] = apply_wstrb(SQBAMSBi_q[qpidx_w], WDataReg_q, mask);
+              QP_REG_ENA_AXIL[SQBAMSBi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
             end
             ADDR_CQBAi: begin
-              CQBAi_d[qpidx_w] = apply_wstrb(CQBAi_q[qpidx_w], WDataReg_q, mask);
+              QP_REG_ENA_AXIL[CQBAi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
             end
             ADDR_CQBAMSBi: begin
-              CQBAMSBi_d[qpidx_w] = apply_wstrb(CQBAMSBi_q[qpidx_w], WDataReg_q, mask);
+              QP_REG_ENA_AXIL[CQBAMSBi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
             end
             ADDR_RQWPTRDBADDi: begin
-              RQWPTRDBADDi_d[qpidx_w] = apply_wstrb(RQWPTRDBADDi_q[qpidx_w], WDataReg_q, mask);
+              QP_REG_ENA_AXIL[RQWPTRDBADDi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
             end
             ADDR_RQWPTRDBADDMSBi: begin
-              RQWPTRDBADDMSBi_d[qpidx_w] = apply_wstrb(RQWPTRDBADDMSBi_q[qpidx_w], WDataReg_q, mask);
+              QP_REG_ENA_AXIL[RQWPTRDBADDMSBi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
             end
             ADDR_CQDBADDi: begin
-              CQDBADDi_d[qpidx_w] = apply_wstrb(CQDBADDi_q[qpidx_w], WDataReg_q, mask);
+              QP_REG_ENA_AXIL[CQDBADDi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
             end
             ADDR_CQDBADDMSBi: begin
-              CQDBADDMSBi_d[qpidx_w] = apply_wstrb(CQDBADDMSBi_q[qpidx_w], WDataReg_q, mask);
+              QP_REG_ENA_AXIL[CQDBADDMSBi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
             end
             ADDR_RQCIi: begin
-              RQCIi_d[qpidx_w] = apply_wstrb(RQCIi_q[qpidx_w], WDataReg_q, mask);
+              QP_REG_ENA_AXIL[RQCIi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
             end
             ADDR_SQPIi: begin
-              SQPIi_d[qpidx_w] = apply_wstrb(SQPIi_q[qpidx_w], WDataReg_q, mask);
-              SQidx_d = qpidx_w[7:0];
+              QP_REG_ENA_AXIL[SQPIi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
+              cmd_fifo_in.read_all = 1'b1;
+              cmd_fifo_in.bram_idx = SQPIi_idx;
+              cmd_fifo_wr_en = 1'b1; 
             end
             ADDR_QDEPTHi: begin
-              QDEPTHi_d[qpidx_w] = apply_wstrb(QDEPTHi_q[qpidx_w], WDataReg_q, mask);
+              QP_REG_ENA_AXIL[QDEPTHi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
             end
             ADDR_SQPSNi: begin
-              SQPSNi_d[qpidx_w] = apply_wstrb(SQPSNi_q[qpidx_w], WDataReg_q, mask);
-              QPidx_d = qpidx_w[7:0];
-              qp_configured_d = 1'b1;
+              QP_REG_ENA_AXIL[SQPSNi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
+              cmd_fifo_in.read_all = 1'b1;
+              cmd_fifo_in.bram_idx = SQPSNi_idx;
+              cmd_fifo_wr_en = 1'b1; 
             end
             ADDR_LSTRQREQi: begin
-              LSTRQREQi_d[qpidx_w] = apply_wstrb(LSTRQREQi_q[qpidx_w], WDataReg_q, mask);
-              QPidx_d = qpidx_w[7:0];
-              qp_configured_d = 1'b1;
+              QP_REG_ENA_AXIL[LSTRQREQi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
+              cmd_fifo_in.read_all = 1'b1;
+              cmd_fifo_in.bram_idx = LSTRQREQi_idx;
+              cmd_fifo_wr_en = 1'b1; 
             end
             ADDR_DESTQPCONFi: begin
-              DESTQPCONFi_d[qpidx_w] = apply_wstrb(DESTQPCONFi_q[qpidx_w], WDataReg_q, mask);
-              connidx_d = qpidx_w[7:0];
-              QPidx_d = qpidx_w[7:0];
-              qp_configured_d = 1'b1;
-              conn_configured_d = 1'b1;
+              QP_REG_ENA_AXIL[DESTQPCONFi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
+              cmd_fifo_in.read_all = 1'b1;
+              cmd_fifo_in.bram_idx = DESTQPCONFi_idx;
+              cmd_fifo_wr_en = 1'b1; 
             end
             ADDR_MACDESADDLSBi: begin
-              MACDESADDLSBi_d[qpidx_w] = apply_wstrb(MACDESADDLSBi_q[qpidx_w], WDataReg_q, mask);
+              QP_REG_ENA_AXIL[MACDESADDLSBi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
             end
             ADDR_MACDESADDMSBi: begin
-              MACDESADDMSBi_d[qpidx_w] = apply_wstrb(MACDESADDMSBi_q[qpidx_w], WDataReg_q, mask);
+              QP_REG_ENA_AXIL[MACDESADDMSBi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
             end
             ADDR_IPDESADDR1i: begin
-              IPDESADDR1i_d[qpidx_w] = apply_wstrb(IPDESADDR1i_q[qpidx_w], WDataReg_q, mask);
-              connidx_d = qpidx_w[7:0];
-              conn_configured_d = 1'b1;
+              QP_REG_ENA_AXIL[IPDESADDR1i_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
+              cmd_fifo_in.read_all = 1'b1;
+              cmd_fifo_in.bram_idx = IPDESADDR1i_idx;
+              cmd_fifo_wr_en = 1'b1;             
             end
             ADDR_IPDESADDR2i: begin
-              IPDESADDR2i_d[qpidx_w] = apply_wstrb(IPDESADDR2i_q[qpidx_w], WDataReg_q, mask);
+              QP_REG_ENA_AXIL[IPDESADDR2i_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
             end
             ADDR_IPDESADDR3i: begin
-              IPDESADDR3i_d[qpidx_w] = apply_wstrb(IPDESADDR3i_q[qpidx_w], WDataReg_q, mask);
+              QP_REG_ENA_AXIL[IPDESADDR3i_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
             end
             ADDR_IPDESADDR4i: begin
-              IPDESADDR4i_d[qpidx_w] = apply_wstrb(IPDESADDR4i_q[qpidx_w], WDataReg_q, mask);
+              QP_REG_ENA_AXIL[IPDESADDR4i_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
             end
             ADDR_TIMEOUTCONFi: begin
-              TIMEOUTCONFi_d[qpidx_w] = apply_wstrb(TIMEOUTCONFi_q[qpidx_w], WDataReg_q, mask);
+              QP_REG_ENA_AXIL[TIMEOUTCONFi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
             end
             ADDR_PDNUMi: begin
-              PDNUMi_d[qpidx_w] = apply_wstrb(PDNUMi_q[qpidx_w], WDataReg_q, mask);
+              QP_REG_ENA_AXIL[PDNUMi_idx] = 1'b1;
+              QP_WR_REG_AXIL = WDataReg_q;
             end
             default: begin
               WRespReg_d = 2'b10; //SLVERR
@@ -1262,189 +743,175 @@ always_comb begin
           endcase
         end
       end else begin
-        case (WAddrReg_q) 
+        GLB_REG_WEA_AXIL = WStrbReg_q;
+        GLB_ADDR_AXIL = WAddrReg_q >> 2;
+        cmd_fifo_in.region = 'd0;
+        cmd_fifo_in.read_all = 1'b0;
+        cmd_fifo_in.bram_idx = 1'b0;
+        case (WAddrReg_q[8:0]) 
           ADDR_CONF: begin
-            CONF_d = apply_wstrb(CONF_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
+            cmd_fifo_in.address = GLB_ADDR_AXIL;
+            cmd_fifo_wr_en = 1'b1; 
           end 
           ADDR_ADCONF: begin
-            ADCONF_d = apply_wstrb(ADCONF_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_BUF_THRESHOLD_ROCE: begin
-            BUF_THRESHOLD_ROCE_d = apply_wstrb(BUF_THRESHOLD_ROCE_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_PAUSE_CONF: begin
-            PAUSE_CONF_d = apply_wstrb(PAUSE_CONF_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_MACADDLSB: begin
-            MACADDLSB_d = apply_wstrb(MACADDLSB_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
+            cmd_fifo_in.address = GLB_ADDR_AXIL;
+            cmd_fifo_wr_en = 1'b1; 
           end 
           ADDR_MACADDMSB: begin
-            MACADDMSB_d = apply_wstrb(MACADDMSB_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
+            cmd_fifo_in.address = GLB_ADDR_AXIL;
+            cmd_fifo_wr_en = 1'b1; 
           end 
           ADDR_BUF_THRESHOLD_NON_ROCE: begin
-            BUF_THRESHOLD_NON_ROCE_d = apply_wstrb(BUF_THRESHOLD_NON_ROCE_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_IPv6ADD1: begin
-            IPv6ADD1_d = apply_wstrb(IPv6ADD1_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end  
           ADDR_IPv6ADD2: begin
-            IPv6ADD2_d = apply_wstrb(IPv6ADD2_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end  
           ADDR_IPv6ADD3: begin
-            IPv6ADD3_d = apply_wstrb(IPv6ADD3_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end  
           ADDR_IPv6ADD4: begin
-            IPv6ADD4_d = apply_wstrb(IPv6ADD4_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end   
           ADDR_ERRBUFBA: begin
-            ERRBUFBA_d = apply_wstrb(ERRBUFBA_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_ERRBUFBAMSB: begin
-            ERRBUFBAMSB_d = apply_wstrb(ERRBUFBAMSB_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_ERRBUFSZ: begin
-            ERRBUFSZ_d = apply_wstrb(ERRBUFSZ_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_IPv4ADD: begin
-            IPv4ADD_d = apply_wstrb(IPv4ADD_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
+            cmd_fifo_in.address = GLB_ADDR_AXIL;
+            cmd_fifo_wr_en = 1'b1; 
           end 
           ADDR_OPKTERRQBA: begin
-            OPKTERRQBA_d = apply_wstrb(OPKTERRQBA_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_OPKTERRQBAMSB: begin
-            OPKTERRQBAMSB_d = apply_wstrb(OPKTERRQBAMSB_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_OUTERRSTSQSZ: begin
-            OUTERRSTSQSZ_d = apply_wstrb(OUTERRSTSQSZ_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_OPTERRSTSQQPTRDB: begin
-            OPTERRSTSQQPTRDB_d = apply_wstrb(OPTERRSTSQQPTRDB_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_IPKTERRQBA: begin
-            IPKTERRQBA_d = apply_wstrb(IPKTERRQBA_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_IPKTERRQBAMSB: begin
-            IPKTERRQBAMSB_d = apply_wstrb(IPKTERRQBAMSB_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_IPKTERRQSZ: begin
-            IPKTERRQSZ_d = apply_wstrb(IPKTERRQSZ_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_DATBUFBA: begin
-            DATBUFBA_d = apply_wstrb(DATBUFBA_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_DATBUFBAMSB: begin
-            DATBUFBAMSB_d = apply_wstrb(DATBUFBAMSB_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_DATBUFSZ: begin
-            DATBUFSZ_d = apply_wstrb(DATBUFSZ_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_CON_IO_CONF: begin
-            CON_IO_CONF_d = apply_wstrb(CON_IO_CONF_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_RESPERRPKTBA: begin
-            RESPERRPKTBA_d = apply_wstrb(RESPERRPKTBA_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_RESPERRPKTBAMSB: begin
-            RESPERRPKTBAMSB_d = apply_wstrb(RESPERRPKTBAMSB_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_RESPERRSZ: begin
-            RESPERRSZ_d = apply_wstrb(RESPERRSZ_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_RESPERRSZMSB: begin
-            RESPERRSZMSB_d = apply_wstrb(RESPERRSZMSB_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           ADDR_INTEN: begin
-            INTEN_d = apply_wstrb(INTEN_q, WDataReg_q, mask);
+            GLB_REG_ENA_AXIL = 1'b1;
+            GLB_WR_REG_AXIL = WDataReg_q;
           end 
           //W1C
-          ADDR_RQINTSTS1: begin
-            if(WDataReg_q == 'd1 && mask[0]) begin 
-              RQINTSTS1_d = 'd0; 
-            end 
-          end 
-          ADDR_RQINTSTS2: begin
-            if(WDataReg_q == 'd1 && mask[0]) begin 
-              RQINTSTS2_d = 'd0; 
-            end 
-          end
-          ADDR_RQINTSTS3: begin
-            if(WDataReg_q == 'd1 && mask[0]) begin 
-              RQINTSTS3_d = 'd0; 
-            end 
-          end
-          ADDR_RQINTSTS4: begin
-            if(WDataReg_q == 'd1 && mask[0]) begin 
-              RQINTSTS4_d = 'd0; 
-            end 
-          end
-          ADDR_RQINTSTS5: begin
-            if(WDataReg_q == 'd1 && mask[0]) begin 
-              RQINTSTS5_d = 'd0; 
-            end 
-          end
-          ADDR_RQINTSTS6: begin
-            if(WDataReg_q == 'd1 && mask[0]) begin 
-              RQINTSTS6_d = 'd0; 
-            end 
-          end
-          ADDR_RQINTSTS7: begin
-            if(WDataReg_q == 'd1 && mask[0]) begin 
-              RQINTSTS7_d = 'd0; 
-            end 
-          end
-          ADDR_RQINTSTS8: begin
-            if(WDataReg_q == 'd1 && mask[0]) begin 
-              RQINTSTS8_d = 'd0; 
-            end 
-          end
-          ADDR_CQINTSTS1: begin
-            if(WDataReg_q == 'd1 && mask[0]) begin 
-              CQINTSTS1_d = 'd0; 
-            end 
-          end
-          ADDR_CQINTSTS2: begin
-            if(WDataReg_q == 'd1 && mask[0]) begin 
-              CQINTSTS2_d = 'd0; 
-            end 
-          end
-          ADDR_CQINTSTS3: begin
-            if(WDataReg_q == 'd1 && mask[0]) begin 
-              CQINTSTS3_d = 'd0; 
-            end 
-          end
-          ADDR_CQINTSTS4: begin
-            if(WDataReg_q == 'd1 && mask[0]) begin 
-              CQINTSTS4_d = 'd0; 
-            end 
-          end
-          ADDR_CQINTSTS5: begin
-            if(WDataReg_q == 'd1 && mask[0]) begin 
-              CQINTSTS5_d = 'd0; 
-            end 
-          end
-          ADDR_CQINTSTS6: begin
-            if(WDataReg_q == 'd1 && mask[0]) begin 
-              CQINTSTS6_d = 'd0; 
-            end 
-          end
-          ADDR_CQINTSTS7: begin
-            if(WDataReg_q == 'd1 && mask[0]) begin 
-              CQINTSTS7_d = 'd0; 
-            end 
-          end
-          ADDR_CQINTSTS8: begin
-            if(WDataReg_q == 'd1 && mask[0]) begin 
-              CQINTSTS8_d = 'd0; 
-            end 
-          end
           default: begin
-            WRespReg_d = 2'b10;
+            if(WAddrReg_q >= ADDR_INTSTS && WAddrReg_q <= ADDR_CQINTSTS8) begin
+              if(WDataReg_q == 'd1 && GLB_REG_WEA_AXIL[0]) begin
+                GLB_REG_ENA_AXIL = 1'b1;
+                GLB_WR_REG_AXIL = 'd0;
+              end
+            end else begin
+              WRespReg_d = 2'b10;
+            end
           end
+          
         endcase
       end
-      w_state_d = B_RESP;
+      
+      //TODO: not sure if needed
+      if(hold_wr_q == 'd1) begin
+        w_state_d = B_RESP;
+        hold_wr_d = 'd0;
+      end else begin
+        w_state_d =  WRITE;
+        hold_wr_d = hold_wr_q + 1;
+      end
+      if(cmd_fifo_in_ack) begin
+        cmd_fifo_wr_en = 1'b0;
+      end
     end
     B_RESP: begin
+      PD_REG_ENA_AXIL = 'd0;
+      QP_REG_ENA_AXIL = 'd0;
+      GLB_REG_ENA_AXIL = 'd0;
       writing = 1'b1;
       s_axil_bvalid_o = 1'b1;
       if(s_axil_bready_i) begin
@@ -1454,475 +921,406 @@ always_comb begin
   endcase
 end
 
-//find PD associated to current QP
-always_comb begin
-  PDidx_d = PDidx_q;
-  if(SQidx_q != SQidx_d || SQPIi_d[SQidx_q] != SQPIi_q[SQidx_q]) begin
-    for(int i=0; i < NUM_PD; i++) begin
-      if(PDPDNUM_q[i][24:0] == {1'b1, PDNUMi_q[SQidx_q][23:0]}) begin
-        PDidx_d = i;
-      end
-    end
-  end
-end
-
-
-initial begin
-  CONF_q <= 'd0;
-  ADCONF_q <= 'd0;
-  BUF_THRESHOLD_ROCE_q <= 'd0;
-  PAUSE_CONF_q <= 'd0;
-  MACADDLSB_q <= 'd0;
-  MACADDMSB_q <= 'd0;
-  BUF_THRESHOLD_NON_ROCE_q <= 'd0;
-
-  IPv6ADD1_q <= 'd0;
-  IPv6ADD2_q <= 'd0;
-  IPv6ADD3_q <= 'd0;
-  IPv6ADD4_q <= 'd0;
-
-  ERRBUFBA_q <= 'd0;
-  ERRBUFBAMSB_q <= 'd0;
-  ERRBUFSZ_q <= 'd0;
-  ERRBUFWPTR_q <= 'd0;
-  IPv4ADD_q <= 'd0;
-
-  OPKTERRQBA_q <= 'd0;
-  OPKTERRQBAMSB_q <= 'd0;
-  OUTERRSTSQSZ_q <= 'd0;
-  OPTERRSTSQQPTRDB_q <= 'd0;
-  IPKTERRQBA_q <= 'd0;
-  IPKTERRQBAMSB_q <= 'd0;
-  IPKTERRQSZ_q <= 'd0;
-  IPKTERRQWPTR_q <= 'd0;
-
-  DATBUFBA_q <= 'd0;
-  DATBUFBAMSB_q <= 'd0;
-  DATBUFSZ_q <= 'd0;
-  CON_IO_CONF_q <= 'd0;
-  RESPERRPKTBA_q <= 'd0;
-  RESPERRPKTBAMSB_q <= 'd0;
-  RESPERRSZ_q <= 'd0;
-  RESPERRSZMSB_q <= 'd0;
-
-  //Global status regs
-  INSRRPKTCNT_q <= 'd0;
-  INAMPKTCNT_q <= 'd0;
-  OUTIOPKTCNT_q <= 'd0;
-  OUTAMPKTCNT_q <= 'd0;
-  LSTINPKT_q <= 'd0;
-  LSTOUTPKT_q <= 'd0;
-  ININVDUPCNT_q <= 'd0;
-  INNCKPKTSTS_q <= 'd0;
-  OUTRNRPKTSTS_q <= 'd0;
-  WQEPROCSTS_q <= 'd0;
-  QPMSTS_q <= 'd0;
-  INALLDRPPKTCNT_q <= 'd0;
-  INNAKPKTCNT_q <= 'd0;
-  OUTNAKPKTCNT_q <= 'd0;
-  RESPHNDSTS_q <= 'd0;
-  RETRYCNTSTS_q <= 'd0;
-
-  INCNPPKTCNT_q <= 'd0;
-  OUTCNPPKTCNT_q <= 'd0;
-  OUTRDRSPPKTCNT_q <= 'd0;
-  INTEN_q <= 'd0;
-  INTSTS_q <= 'd0;
-
-  RQINTSTS1_q <= 'd0;
-  RQINTSTS2_q <= 'd0;
-  RQINTSTS3_q <= 'd0;
-  RQINTSTS4_q <= 'd0;
-  RQINTSTS5_q <= 'd0;
-  RQINTSTS6_q <= 'd0;
-  RQINTSTS7_q <= 'd0;
-  RQINTSTS8_q <= 'd0;
-  CQINTSTS1_q <= 'd0;
-  CQINTSTS2_q <= 'd0;
-  CQINTSTS3_q <= 'd0;
-  CQINTSTS4_q <= 'd0;
-  CQINTSTS5_q <= 'd0;
-  CQINTSTS6_q <= 'd0;
-  CQINTSTS7_q <= 'd0;
-  CQINTSTS8_q <= 'd0;
-  CNPSCHDSTS1REG_q <= 'd0;
-  CNPSCHDSTS2REG_q <= 'd0;
-  CNPSCHDSTS3REG_q <= 'd0;
-  CNPSCHDSTS4REG_q <= 'd0;
-  CNPSCHDSTS5REG_q <= 'd0;
-  CNPSCHDSTS6REG_q <= 'd0;
-  CNPSCHDSTS7REG_q <= 'd0;
-  CNPSCHDSTS8REG_q <= 'd0;
-  
-  for(int i = 0; i < NUM_PD; i++) begin
-    PDPDNUM_q[i] <= 'd0;
-    VIRTADDRLSB_q[i] <= 'd0;
-    VIRTADDRMSB_q[i] <= 'd0;
-    BUFBASEADDRLSB_q[i] <= 'd0;
-    BUFBASEADDRMSB_q[i] <= 'd0;
-    BUFRKEY_q[i] <= 'd0;
-    WRRDBUFLEN_q[i] <= 'd0;
-    ACCESSDESC_q[i] <= 'd0;
-  end
-
-  for(int i = 0; i < NUM_QP; i++) begin
-    QPCONFi_q[i] <= 'd0;
-    QPADVCONFi_q[i] <= 'd0;
-    RQBAi_q[i] <= 'd0;
-    RQBAMSBi_q[i] <= 'd0;
-    SQBAi_q[i] <= 'd0;
-    SQBAMSBi_q[i] <= 'd0;
-    CQBAi_q[i] <= 'd0;
-    CQBAMSBi_q[i] <= 'd0;
-    RQWPTRDBADDi_q[i] <= 'd0;
-    RQWPTRDBADDMSBi_q[i] <= 'd0;
-    CQDBADDi_q[i] <= 'd0;
-    CQDBADDMSBi_q[i] <= 'd0;
-    CQHEADi_q[i] <= 'd0;
-    RQCIi_q[i] <= 'd0;
-    SQPIi_q[i] <= 'd0;
-    QDEPTHi_q[i] <= 'd0;
-    SQPSNi_q[i] <= 'd0;
-    LSTRQREQi_q[i] <= 'd0;
-    DESTQPCONFi_q[i] <= 'd0;
-    MACDESADDLSBi_q[i] <= 'd0;
-    MACDESADDMSBi_q[i] <= 'd0;
-    IPDESADDR1i_q[i] <= 'd0;
-    IPDESADDR2i_q[i] <= 'd0;
-    IPDESADDR3i_q[i] <= 'd0;
-    IPDESADDR4i_q[i] <= 'd0;
-    TIMEOUTCONFi_q[i] <= 'd0;
-    STATSSNi_q[i] <= 'd0;
-    STATMSNi_q[i] <= 'd0;
-    STATQPi_q[i] <= 'd0;
-    STATCURSQPTRi_q[i] <= 'd0;
-    STATRESPSNi_q[i] <= 'd0;
-    STATRQBUFCAi_q[i] <= 'd0;
-    STATRQBUFCAMSBi_q[i] <= 'd0;
-    STATWQEi_q[i] <= 'd0;
-    STATRQPIDBi_q[i] <= 'd0;
-    PDNUMi_q[i] <= 'd0;
-  end
-end
 
 
 always_ff @(posedge axil_aclk_i, negedge axil_rstn_i) begin
-  if(!axil_rstn_i) begin
-    pdidx_r <=  'd0;
-    pdidx_w <=  'd0;
-    qpidx_r <=  'd0;
-    qpidx_w <=  'd0;
-    mask    <=  'd0;
+  if(!axil_rstn_i) begin    
+    PD_ADDR_AXIL <= 'd0;
+    PD_REG_ENA_AXIL <= 'd0;
+    PD_REG_WEA_AXIL <= 'd0;
+    PD_WR_REG_AXIL  <= 'd0;
+    
+    QP_ADDR_AXIL <= 'd0;
+    QP_REG_ENA_AXIL <= 'd0;
+    QP_REG_WEA_AXIL <= 'd0;
+    QP_WR_REG_AXIL  <= 'd0;
+
+    GLB_ADDR_AXIL <= 'd0;
+    GLB_REG_ENA_AXIL <= 'd0;
+    GLB_REG_WEA_AXIL <= 'd0;
+    GLB_WR_REG_AXIL <= 'd0;
+
+    cmd_fifo_in <= 'd0;
     
     r_state_q <= R_IDLE;
     w_state_q <= W_IDLE;
     RAddrReg_q <= 'd0;
     RDataReg_q <= 'd0;
     RRespReg_q <= 'd0;
+    hold_rd_q <= 'd0;
+    
     WAddrReg_q <= 'd0;
     WDataReg_q <= 'd0;
     WRespReg_q <= 'd0;
     WStrbReg_q <= 'd0;
-
-    conn_configured_q <= 1'b0;
-    qp_configured_q <= 1'b0;
-
-    CONF_q <= 'd0;
-    ADCONF_q <= 'd0;
-    BUF_THRESHOLD_ROCE_q <= 'd0;
-    PAUSE_CONF_q <= 'd0;
-    MACADDLSB_q <= 'd0;
-    MACADDMSB_q <= 'd0;
-    BUF_THRESHOLD_NON_ROCE_q <= 'd0;
-
-    IPv6ADD1_q <= 'd0;
-    IPv6ADD2_q <= 'd0;
-    IPv6ADD3_q <= 'd0;
-    IPv6ADD4_q <= 'd0;
-
-    ERRBUFBA_q <= 'd0;
-    ERRBUFBAMSB_q <= 'd0;
-    ERRBUFSZ_q <= 'd0;
-    ERRBUFWPTR_q <= 'd0;
-    IPv4ADD_q <= 'd0;
-
-    OPKTERRQBA_q <= 'd0;
-    OPKTERRQBAMSB_q <= 'd0;
-    OUTERRSTSQSZ_q <= 'd0;
-    OPTERRSTSQQPTRDB_q <= 'd0;
-    IPKTERRQBA_q <= 'd0;
-    IPKTERRQBAMSB_q <= 'd0;
-    IPKTERRQSZ_q <= 'd0;
-    IPKTERRQWPTR_q <= 'd0;
-
-    DATBUFBA_q <= 'd0;
-    DATBUFBAMSB_q <= 'd0;
-    DATBUFSZ_q <= 'd0;
-    CON_IO_CONF_q <= 'd0;
-    RESPERRPKTBA_q <= 'd0;
-    RESPERRPKTBAMSB_q <= 'd0;
-    RESPERRSZ_q <= 'd0;
-    RESPERRSZMSB_q <= 'd0;
-
-    //Global status regs
-    INSRRPKTCNT_q <= 'd0;
-    INAMPKTCNT_q <= 'd0;
-    OUTIOPKTCNT_q <= 'd0;
-    OUTAMPKTCNT_q <= 'd0;
-    LSTINPKT_q <= 'd0;
-    LSTOUTPKT_q <= 'd0;
-    ININVDUPCNT_q <= 'd0;
-    INNCKPKTSTS_q <= 'd0;
-    OUTRNRPKTSTS_q <= 'd0;
-    WQEPROCSTS_q <= 'd0;
-    QPMSTS_q <= 'd0;
-    INALLDRPPKTCNT_q <= 'd0;
-    INNAKPKTCNT_q <= 'd0;
-    OUTNAKPKTCNT_q <= 'd0;
-    RESPHNDSTS_q <= 'd0;
-    RETRYCNTSTS_q <= 'd0;
-
-    INCNPPKTCNT_q <= 'd0;
-    OUTCNPPKTCNT_q <= 'd0;
-    OUTRDRSPPKTCNT_q <= 'd0;
-    INTEN_q <= 'd0;
-    INTSTS_q <= 'd0;
-
-    RQINTSTS1_q <= 'd0;
-    RQINTSTS2_q <= 'd0;
-    RQINTSTS3_q <= 'd0;
-    RQINTSTS4_q <= 'd0;
-    RQINTSTS5_q <= 'd0;
-    RQINTSTS6_q <= 'd0;
-    RQINTSTS7_q <= 'd0;
-    RQINTSTS8_q <= 'd0;
-    CQINTSTS1_q <= 'd0;
-    CQINTSTS2_q <= 'd0;
-    CQINTSTS3_q <= 'd0;
-    CQINTSTS4_q <= 'd0;
-    CQINTSTS5_q <= 'd0;
-    CQINTSTS6_q <= 'd0;
-    CQINTSTS7_q <= 'd0;
-    CQINTSTS8_q <= 'd0;
-    CNPSCHDSTS1REG_q <= 'd0;
-    CNPSCHDSTS2REG_q <= 'd0;
-    CNPSCHDSTS3REG_q <= 'd0;
-    CNPSCHDSTS4REG_q <= 'd0;
-    CNPSCHDSTS5REG_q <= 'd0;
-    CNPSCHDSTS6REG_q <= 'd0;
-    CNPSCHDSTS7REG_q <= 'd0;
-    CNPSCHDSTS8REG_q <= 'd0;
+    hold_wr_q <= 'd0;
   
-    for(int i = 0; i < NUM_PD; i++) begin
-      PDPDNUM_q[i] <= 'd0;
-      VIRTADDRLSB_q[i] <= 'd0;
-      VIRTADDRMSB_q[i] <= 'd0;
-      BUFBASEADDRLSB_q[i] <= 'd0;
-      BUFBASEADDRMSB_q[i] <= 'd0;
-      BUFRKEY_q[i] <= 'd0;
-      WRRDBUFLEN_q[i] <= 'd0;
-      ACCESSDESC_q[i] <= 'd0;
-    end
-
-    for(int i = 0; i < NUM_QP; i++) begin
-      QPCONFi_q[i] <= 'd0;
-      QPADVCONFi_q[i] <= 'd0;
-      RQBAi_q[i] <= 'd0;
-      RQBAMSBi_q[i] <= 'd0;
-      SQBAi_q[i] <= 'd0;
-      SQBAMSBi_q[i] <= 'd0;
-      CQBAi_q[i] <= 'd0;
-      CQBAMSBi_q[i] <= 'd0;
-      RQWPTRDBADDi_q[i] <= 'd0;
-      RQWPTRDBADDMSBi_q[i] <= 'd0;
-      CQDBADDi_q[i] <= 'd0;
-      CQDBADDMSBi_q[i] <= 'd0;
-      CQHEADi_q[i] <= 'd0;
-      RQCIi_q[i] <= 'd0;
-      SQPIi_q[i] <= 'd0;
-      QDEPTHi_q[i] <= 'd0;
-      SQPSNi_q[i] <= 'd0;
-      LSTRQREQi_q[i] <= 'd0;
-      DESTQPCONFi_q[i] <= 'd0;
-      MACDESADDLSBi_q[i] <= 'd0;
-      MACDESADDMSBi_q[i] <= 'd0;
-      IPDESADDR1i_q[i] <= 'd0;
-      IPDESADDR2i_q[i] <= 'd0;
-      IPDESADDR3i_q[i] <= 'd0;
-      IPDESADDR4i_q[i] <= 'd0;
-      TIMEOUTCONFi_q[i] <= 'd0;
-      STATSSNi_q[i] <= 'd0;
-      STATMSNi_q[i] <= 'd0;
-      STATQPi_q[i] <= 'd0;
-      STATCURSQPTRi_q[i] <= 'd0;
-      STATRESPSNi_q[i] <= 'd0;
-      STATRQBUFCAi_q[i] <= 'd0;
-      STATRQBUFCAMSBi_q[i] <= 'd0;
-      STATWQEi_q[i] <= 'd0;
-      STATRQPIDBi_q[i] <= 'd0;
-      PDNUMi_q[i] <= 'd0;
-    end
-
-    SQidx_q <= 'hff;
-    QPidx_q <= 'd0;
-    PDidx_q <= 'd0;
-    connidx_q <= 'd0;
   end else begin
     r_state_q <= r_state_d;
     w_state_q <= w_state_d;
     RAddrReg_q <= RAddrReg_d;
     RDataReg_q <= RDataReg_d;
     RRespReg_q <= RRespReg_d;
+    hold_rd_q <= hold_rd_d;
+    
     WAddrReg_q <= WAddrReg_d;
     WDataReg_q <= WDataReg_d;
     WRespReg_q <= WRespReg_d;
     WStrbReg_q <= WStrbReg_d;
+    hold_wr_q <= hold_wr_d;
 
-    conn_configured_q <= conn_configured_d;
-    qp_configured_q <= qp_configured_d;
-
-    CONF_q <= CONF_d;
-    ADCONF_q <= ADCONF_d;
-    BUF_THRESHOLD_ROCE_q <= BUF_THRESHOLD_ROCE_d;
-    PAUSE_CONF_q <= PAUSE_CONF_d;
-    MACADDLSB_q <= MACADDLSB_d;
-    MACADDMSB_q <= MACADDMSB_d;
-    BUF_THRESHOLD_NON_ROCE_q <= BUF_THRESHOLD_NON_ROCE_d;
-
-    IPv6ADD1_q <= IPv6ADD1_d;
-    IPv6ADD2_q <= IPv6ADD2_d;
-    IPv6ADD3_q <= IPv6ADD3_d;
-    IPv6ADD4_q <= IPv6ADD4_d;
-
-    ERRBUFBA_q <= ERRBUFBA_d;
-    ERRBUFBAMSB_q <= ERRBUFBAMSB_d;
-    ERRBUFSZ_q <= ERRBUFSZ_d;
-    ERRBUFWPTR_q <= ERRBUFWPTR_d; 
-    IPv4ADD_q <= IPv4ADD_d;
-
-    OPKTERRQBA_q <= OPKTERRQBA_d;
-    OPKTERRQBAMSB_q <= OPKTERRQBAMSB_d;
-    OUTERRSTSQSZ_q <= OUTERRSTSQSZ_d;
-    OPTERRSTSQQPTRDB_q <= OPTERRSTSQQPTRDB_d;
-    IPKTERRQBA_q <= IPKTERRQBA_d;
-    IPKTERRQBAMSB_q <= IPKTERRQBAMSB_d;
-    IPKTERRQSZ_q <= IPKTERRQSZ_d;
-    IPKTERRQWPTR_q <= IPKTERRQWPTR_d;
-
-    DATBUFBA_q <= DATBUFBA_d;
-    DATBUFBAMSB_q <= DATBUFBAMSB_d;
-    DATBUFSZ_q <= DATBUFSZ_d;
-    CON_IO_CONF_q <= CON_IO_CONF_d;
-    RESPERRPKTBA_q <= RESPERRPKTBA_d;
-    RESPERRPKTBAMSB_q <= RESPERRPKTBAMSB_d;
-    RESPERRSZ_q <= RESPERRSZ_d;
-    RESPERRSZMSB_q <= RESPERRSZMSB_d;
-
-    //Global status regs
-    INSRRPKTCNT_q <= INSRRPKTCNT_d;
-    INAMPKTCNT_q <= INAMPKTCNT_d;
-    OUTIOPKTCNT_q <= OUTIOPKTCNT_d;
-    OUTAMPKTCNT_q <= OUTAMPKTCNT_d;
-    LSTINPKT_q <= LSTINPKT_d;
-    LSTOUTPKT_q <= LSTOUTPKT_d;
-    ININVDUPCNT_q <= ININVDUPCNT_d;
-    INNCKPKTSTS_q <= INNCKPKTSTS_d;
-    OUTRNRPKTSTS_q <= OUTRNRPKTSTS_d;
-    WQEPROCSTS_q <= WQEPROCSTS_d;
-    QPMSTS_q <= QPMSTS_d;
-    INALLDRPPKTCNT_q <= INALLDRPPKTCNT_d;
-    INNAKPKTCNT_q <= INNAKPKTCNT_d;
-    OUTNAKPKTCNT_q <= OUTNAKPKTCNT_d;
-    RESPHNDSTS_q <= RESPHNDSTS_d;
-    RETRYCNTSTS_q <= RETRYCNTSTS_d;
-
-    INCNPPKTCNT_q <= INCNPPKTCNT_d;
-    OUTCNPPKTCNT_q <= OUTCNPPKTCNT_d;
-    OUTRDRSPPKTCNT_q <= OUTRDRSPPKTCNT_d;
-    INTEN_q <= INTEN_d;
-    INTSTS_q <= INTSTS_d;
-
-    RQINTSTS1_q <= RQINTSTS1_d; 
-    RQINTSTS2_q <= RQINTSTS2_d;
-    RQINTSTS3_q <= RQINTSTS3_d;
-    RQINTSTS4_q <= RQINTSTS4_d;
-    RQINTSTS5_q <= RQINTSTS5_d;
-    RQINTSTS6_q <= RQINTSTS6_d;
-    RQINTSTS7_q <= RQINTSTS7_d;
-    RQINTSTS8_q <= RQINTSTS8_d;
-    CQINTSTS1_q <= CQINTSTS1_d;
-    CQINTSTS2_q <= CQINTSTS2_d;
-    CQINTSTS3_q <= CQINTSTS3_d;
-    CQINTSTS4_q <= CQINTSTS4_d;
-    CQINTSTS5_q <= CQINTSTS5_d;
-    CQINTSTS6_q <= CQINTSTS6_d;
-    CQINTSTS7_q <= CQINTSTS7_d;
-    CQINTSTS8_q <= CQINTSTS8_d;
-    CNPSCHDSTS1REG_q <= CNPSCHDSTS1REG_d;
-    CNPSCHDSTS2REG_q <= CNPSCHDSTS2REG_d;
-    CNPSCHDSTS3REG_q <= CNPSCHDSTS3REG_d;
-    CNPSCHDSTS4REG_q <= CNPSCHDSTS4REG_d;
-    CNPSCHDSTS5REG_q <= CNPSCHDSTS5REG_d;
-    CNPSCHDSTS6REG_q <= CNPSCHDSTS6REG_d;
-    CNPSCHDSTS7REG_q <= CNPSCHDSTS7REG_d;
-    CNPSCHDSTS8REG_q <= CNPSCHDSTS8REG_d;
-
-    for(int i = 0; i < NUM_PD; i++) begin
-      PDPDNUM_q[i] <= PDPDNUM_d[i];
-      VIRTADDRLSB_q[i] <= VIRTADDRLSB_d[i];
-      VIRTADDRMSB_q[i] <= VIRTADDRMSB_d[i];
-      BUFBASEADDRLSB_q[i] <= BUFBASEADDRLSB_d[i];
-      BUFBASEADDRMSB_q[i] <= BUFBASEADDRMSB_d[i];
-      BUFRKEY_q[i] <= BUFRKEY_d[i];
-      WRRDBUFLEN_q[i] <= WRRDBUFLEN_d[i];
-      ACCESSDESC_q[i] <= ACCESSDESC_d[i];
-    end
-
-    for(int i = 0; i < NUM_QP; i++) begin
-      QPCONFi_q[i] <= QPCONFi_d[i];
-      QPADVCONFi_q[i] <= QPADVCONFi_d[i];
-      RQBAi_q[i] <= RQBAi_d[i];
-      RQBAMSBi_q[i] <= RQBAMSBi_d[i];
-      SQBAi_q[i] <= SQBAi_d[i];
-      SQBAMSBi_q[i] <= SQBAMSBi_d[i];
-      CQBAi_q[i] <= CQBAi_d[i];
-      CQBAMSBi_q[i] <= CQBAMSBi_d[i];
-      RQWPTRDBADDi_q[i] <= RQWPTRDBADDi_d[i];
-      RQWPTRDBADDMSBi_q[i] <= RQWPTRDBADDMSBi_d[i];
-      CQDBADDi_q[i] <= CQDBADDi_d[i];
-      CQDBADDMSBi_q[i] <= CQDBADDMSBi_d[i];
-      CQHEADi_q[i] <= CQHEADi_d[i];
-      RQCIi_q[i] <=  RQCIi_d[i];
-      SQPIi_q[i] <= SQPIi_d[i];
-      QDEPTHi_q[i] <= QDEPTHi_d[i];
-      SQPSNi_q[i] <= SQPSNi_d[i];
-      LSTRQREQi_q[i] <= LSTRQREQi_d[i];
-      DESTQPCONFi_q[i] <= DESTQPCONFi_d[i];
-      MACDESADDLSBi_q[i] <= MACDESADDLSBi_d[i];
-      MACDESADDMSBi_q[i] <= MACDESADDMSBi_d[i];
-      IPDESADDR1i_q[i] <= IPDESADDR1i_d[i];
-      IPDESADDR2i_q[i] <= IPDESADDR2i_d[i];
-      IPDESADDR3i_q[i] <= IPDESADDR3i_d[i];
-      IPDESADDR4i_q[i] <= IPDESADDR4i_d[i];
-      TIMEOUTCONFi_q[i] <= TIMEOUTCONFi_d[i];
-      STATSSNi_q[i] <= STATSSNi_d[i];
-      STATMSNi_q[i] <= STATMSNi_d[i];
-      STATQPi_q[i] <= STATQPi_d[i];
-      STATCURSQPTRi_q[i] <= STATCURSQPTRi_d[i];
-      STATRESPSNi_q[i] <= STATRESPSNi_d[i];
-      STATRQBUFCAi_q[i] <= STATRQBUFCAi_d[i];
-      STATRQBUFCAMSBi_q[i] <= STATRQBUFCAMSBi_d[i];
-      STATWQEi_q[i] <= STATWQEi_d[i];
-      STATRQPIDBi_q[i] <= STATRQPIDBi_d[i];
-      PDNUMi_q[i] <= PDNUMi_d[i];
-    end
-
-    SQidx_q <= SQidx_d;
-    QPidx_q <= QPidx_d;
-    PDidx_q <= PDidx_d;
-    connidx_q <= connidx_d;
   end
 end
+
+
+
+
+
+
+
+////////////////////////////
+//                        //  
+//  AXIS clock domain     //
+//                        //
+////////////////////////////
+logic [REG_WIDTH-1:0] CONF_d, CONF_q;
+//logic [REG_WIDTH-1:0] ADCONF_d, ADCONF_q;
+//logic [REG_WIDTH-1:0] BUF_THRESHOLD_ROCE_d, BUF_THRESHOLD_ROCE_q;
+//logic [REG_WIDTH-1:0] PAUSE_CONF_d, PAUSE_CONF_q;
+logic [REG_WIDTH-1:0] MACADDLSB_d, MACADDLSB_q;
+logic [REG_WIDTH-1:0] MACADDMSB_d, MACADDMSB_q;
+//logic [REG_WIDTH-1:0] BUF_THRESHOLD_NON_ROCE_d, BUF_THRESHOLD_NON_ROCE_q;
+
+//logic [REG_WIDTH-1:0] IPv6ADD1_d, IPv6ADD1_q;
+//logic [REG_WIDTH-1:0] IPv6ADD2_d, IPv6ADD2_q;
+//logic [REG_WIDTH-1:0] IPv6ADD3_d, IPv6ADD3_q;
+//logic [REG_WIDTH-1:0] IPv6ADD4_d, IPv6ADD4_q;
+
+//logic [REG_WIDTH-1:0] ERRBUFBA_d, ERRBUFBA_q;
+//logic [REG_WIDTH-1:0] ERRBUFBAMSB_d, ERRBUFBAMSB_q;
+//logic [REG_WIDTH-1:0] ERRBUFSZ_d, ERRBUFSZ_q;
+//logic [REG_WIDTH-1:0] ERRBUFWPTR_d, ERRBUFWPTR_q; 
+logic [REG_WIDTH-1:0] IPv4ADD_d, IPv4ADD_q;
+
+//logic [REG_WIDTH-1:0] OPKTERRQBA_d, OPKTERRQBA_q;
+//logic [REG_WIDTH-1:0] OPKTERRQBAMSB_d, OPKTERRQBAMSB_q;
+//logic [REG_WIDTH-1:0] OUTERRSTSQSZ_d, OUTERRSTSQSZ_q;
+//logic [REG_WIDTH-1:0] OPTERRSTSQQPTRDB_d, OPTERRSTSQQPTRDB_q;
+//logic [REG_WIDTH-1:0] IPKTERRQBA_d, IPKTERRQBA_q;
+//logic [REG_WIDTH-1:0] IPKTERRQBAMSB_d, IPKTERRQBAMSB_q;
+//logic [REG_WIDTH-1:0] IPKTERRQSZ_d, IPKTERRQSZ_q;
+//logic [REG_WIDTH-1:0] IPKTERRQWPTR_d, IPKTERRQWPTR_q;
+
+//logic [REG_WIDTH-1:0] DATBUFBA_d, DATBUFBA_q;
+//logic [REG_WIDTH-1:0] DATBUFBAMSB_d, DATBUFBAMSB_q;
+//logic [REG_WIDTH-1:0] DATBUFSZ_d, DATBUFSZ_q;
+//logic [REG_WIDTH-1:0] CON_IO_CONF_d, CON_IO_CONF_q;
+//logic [REG_WIDTH-1:0] RESPERRPKTBA_d, RESPERRPKTBA_q;
+//logic [REG_WIDTH-1:0] RESPERRPKTBAMSB_d, RESPERRPKTBAMSB_q;
+//logic [REG_WIDTH-1:0] RESPERRSZ_d, RESPERRSZ_q;
+//logic [REG_WIDTH-1:0] RESPERRSZMSB_d, RESPERRSZMSB_q;
+
+//Global status regs
+//logic [REG_WIDTH-1:0] INSRRPKTCNT_d, INSRRPKTCNT_q;
+//logic [REG_WIDTH-1:0] INAMPKTCNT_d, INAMPKTCNT_q;
+//logic [REG_WIDTH-1:0] OUTIOPKTCNT_d, OUTIOPKTCNT_q;
+//logic [REG_WIDTH-1:0] OUTAMPKTCNT_d, OUTAMPKTCNT_q;
+//logic [REG_WIDTH-1:0] LSTINPKT_d, LSTINPKT_q;
+//logic [REG_WIDTH-1:0] LSTOUTPKT_d, LSTOUTPKT_q;
+//logic [REG_WIDTH-1:0] ININVDUPCNT_d, ININVDUPCNT_q;
+//logic [REG_WIDTH-1:0] INNCKPKTSTS_d, INNCKPKTSTS_q;
+//logic [REG_WIDTH-1:0] OUTRNRPKTSTS_d, OUTRNRPKTSTS_q;
+//logic [REG_WIDTH-1:0] WQEPROCSTS_d, WQEPROCSTS_q;
+//logic [REG_WIDTH-1:0] QPMSTS_d, QPMSTS_q;
+//logic [REG_WIDTH-1:0] INALLDRPPKTCNT_d, INALLDRPPKTCNT_q;
+//logic [REG_WIDTH-1:0] INNAKPKTCNT_d, INNAKPKTCNT_q;
+//logic [REG_WIDTH-1:0] OUTNAKPKTCNT_d, OUTNAKPKTCNT_q;
+//logic [REG_WIDTH-1:0] RESPHNDSTS_d, RESPHNDSTS_q;
+//logic [REG_WIDTH-1:0] RETRYCNTSTS_d, RETRYCNTSTS_q;
+
+//logic [REG_WIDTH-1:0] INCNPPKTCNT_d, INCNPPKTCNT_q;
+//logic [REG_WIDTH-1:0] OUTCNPPKTCNT_d, OUTCNPPKTCNT_q;
+//logic [REG_WIDTH-1:0] OUTRDRSPPKTCNT_d, OUTRDRSPPKTCNT_q;
+//logic [REG_WIDTH-1:0] INTEN_d, INTEN_q;
+//logic [REG_WIDTH-1:0] INTSTS_d, INTSTS_q;
+
+//logic [REG_WIDTH-1:0] RQINTSTS1_d, RQINTSTS1_q; 
+//logic [REG_WIDTH-1:0] RQINTSTS2_d, RQINTSTS2_q;
+//logic [REG_WIDTH-1:0] RQINTSTS3_d, RQINTSTS3_q;
+//logic [REG_WIDTH-1:0] RQINTSTS4_d, RQINTSTS4_q;
+//logic [REG_WIDTH-1:0] RQINTSTS5_d, RQINTSTS5_q;
+//logic [REG_WIDTH-1:0] RQINTSTS6_d, RQINTSTS6_q;
+//logic [REG_WIDTH-1:0] RQINTSTS7_d, RQINTSTS7_q;
+//logic [REG_WIDTH-1:0] RQINTSTS8_d, RQINTSTS8_q;
+//logic [REG_WIDTH-1:0] CQINTSTS1_d, CQINTSTS1_q;
+//logic [REG_WIDTH-1:0] CQINTSTS2_d, CQINTSTS2_q;
+//logic [REG_WIDTH-1:0] CQINTSTS3_d, CQINTSTS3_q;
+//logic [REG_WIDTH-1:0] CQINTSTS4_d, CQINTSTS4_q;
+//logic [REG_WIDTH-1:0] CQINTSTS5_d, CQINTSTS5_q;
+//logic [REG_WIDTH-1:0] CQINTSTS6_d, CQINTSTS6_q;
+//logic [REG_WIDTH-1:0] CQINTSTS7_d, CQINTSTS7_q;
+//logic [REG_WIDTH-1:0] CQINTSTS8_d, CQINTSTS8_q;
+//logic [REG_WIDTH-1:0] CNPSCHDSTS1REG_d, CNPSCHDSTS1REG_q;
+//logic [REG_WIDTH-1:0] CNPSCHDSTS2REG_d, CNPSCHDSTS2REG_q;
+//logic [REG_WIDTH-1:0] CNPSCHDSTS3REG_d, CNPSCHDSTS3REG_q;
+//logic [REG_WIDTH-1:0] CNPSCHDSTS4REG_d, CNPSCHDSTS4REG_q;
+//logic [REG_WIDTH-1:0] CNPSCHDSTS5REG_d, CNPSCHDSTS5REG_q;
+//logic [REG_WIDTH-1:0] CNPSCHDSTS6REG_d, CNPSCHDSTS6REG_q;
+//logic [REG_WIDTH-1:0] CNPSCHDSTS7REG_d, CNPSCHDSTS7REG_q;
+//logic [REG_WIDTH-1:0] CNPSCHDSTS8REG_d, CNPSCHDSTS8REG_q;
+
+rd_cmd_t rd_sq_vaddr_d, rd_sq_vaddr_q;
+logic rd_sq_vaddr_valid_d, rd_sq_vaddr_valid_q;
+logic config_sq;
+
+logic [7:0] pd_addr_d, pd_addr_q;
+logic find_pd_addr_rd, find_pd_addr_wr;
+
+always_comb begin
+  rd_sq_vaddr_d = rd_sq_vaddr_q;
+  rd_sq_vaddr_valid_d = rd_sq_vaddr_valid_q;
+  l_reg_st_d = l_reg_st_q;
+  l_rd_cmd_d = l_rd_cmd_q;
+  QPidx_d = QPidx_q;
+  hold_rd_axis_d = hold_rd_axis_q;
+  cmd_fifo_rd_en = 1'b0;
+  qp_configured_o = 1'b0;
+  conn_configured_o = 1'b0;
+  sq_updated_o = 1'b0;
+  config_sq = 1'b0;
+  rd_qp_ready_o = 1'b0;
+  find_pd_rd_ready = 1'b0;
+  find_pd_wr_ready = 1'b0;
+  PD_REG_WEA_AXIS = 'd0;
+  QP_REG_WEA_AXIS = 'd0;
+  GLB_REG_WEA_AXIS = 'd0;
+  PD_REG_ENA_AXIS = 'd0;
+  QP_REG_ENA_AXIS = 'd0;
+  GLB_REG_ENA_AXIS = 'd0;
+  
+  CONF_d = CONF_q;
+  MACADDLSB_d = MACADDLSB_q;
+  MACADDMSB_d = MACADDMSB_q;
+  IPv4ADD_d = IPv4ADD_q;
+
+  PD_RD_REG_AXIS_D = PD_RD_REG_AXIS_Q;
+  QP_RD_REG_AXIS_D = QP_RD_REG_AXIS_Q;
+
+  case(l_reg_st_q)
+    L_IDLE: begin
+      if(rd_sq_vaddr_valid_q && !writing) begin
+        rd_sq_vaddr_valid_d = 1'b0;
+        l_rd_cmd_d = rd_sq_vaddr_q;
+        l_reg_st_d = L_READ_MULTI;
+      end else if (!cmd_fifo_empty && !writing) begin // && !writing in different clock domain??
+        cmd_fifo_rd_en = 1'b1;
+        l_reg_st_d = L_READ_CMD;
+      end else if(rd_qp_valid_i) begin
+        l_rd_cmd_d = rd_qp_i;
+        if(rd_qp_i.read_all) begin
+          l_reg_st_d = L_READ_MULTI;
+        end else begin
+          l_reg_st_d = L_READ_SINGLE;
+        end
+      end else if(find_pd_rd_valid) begin
+        find_pd_rd_valid = 1'b0;
+        l_rd_cmd_d = find_pd_rd_q;
+        if(find_pd_rd_q.read_all) begin
+          l_reg_st_d = L_READ_MULTI;
+        end else begin
+          l_reg_st_d = L_READ_SINGLE;
+        end
+      end else if(find_pd_wr_valid) begin
+        find_pd_wr_valid = 1'b0;
+        l_rd_cmd_d = find_pd_wr_q;
+        if(find_pd_wr_q.read_all) begin
+          l_reg_st_d = L_READ_MULTI;
+        end else begin
+          l_reg_st_d = L_READ_SINGLE;
+        end
+      end
+    end
+    L_READ_CMD: begin
+      cmd_fifo_rd_en = 1'b1;
+      if(cmd_fifo_out_valid) begin
+        cmd_fifo_rd_en = 1'b0;
+        l_rd_cmd_d = cmd_fifo_out;
+        if( cmd_fifo_out.read_all ) begin
+          l_reg_st_d = L_READ_MULTI;
+        end else begin
+          l_reg_st_d = L_READ_SINGLE;
+        end
+      end
+    end
+    L_READ_SINGLE: begin
+      if(l_rd_cmd_q.region == 2'b0) begin
+        GLB_ADDR_AXIS = l_rd_cmd_q.address;
+        GLB_REG_ENA_AXIS = 1'b1;
+        case(l_rd_cmd_q.address << 2)
+          ADDR_CONF: begin
+            CONF_d = GLB_RD_REG_AXIS;
+          end
+          ADDR_MACADDLSB: begin
+            MACADDLSB_d = GLB_RD_REG_AXIS;
+          end
+          ADDR_MACADDMSB: begin
+            MACADDMSB_d = GLB_RD_REG_AXIS;
+          end
+          ADDR_IPv4ADD: begin
+            IPv4ADD_d = GLB_RD_REG_AXIS; 
+          end
+        endcase
+      end else if (l_rd_cmd_q.region == 2'b01) begin
+        PD_ADDR_AXIS = l_rd_cmd_q.address;
+        PD_REG_ENA_AXIS[l_rd_cmd_q.bram_idx] = 1'b1;
+        PD_RD_REG_AXIS_D[l_rd_cmd_q.bram_idx] = PD_RD_REG_AXIS[l_rd_cmd_q.bram_idx];
+      end else if (l_rd_cmd_q.region == 2'b10) begin
+        QP_ADDR_AXIS = l_rd_cmd_q.address;
+        QP_REG_ENA_AXIS[l_rd_cmd_q.bram_idx] = 1'b1;
+        QP_RD_REG_AXIS_D[l_rd_cmd_q.bram_idx] = QP_RD_REG_AXIS[l_rd_cmd_q.bram_idx];
+      end else begin
+        l_reg_st_d = L_IDLE;
+      end
+      
+      if(hold_rd_axis_q == RD_LAT) begin
+        hold_rd_axis_d = 'd0;
+        l_reg_st_d = L_READ_READY;
+      end else begin
+        hold_rd_axis_d = hold_rd_axis_q + 'd1;
+        l_reg_st_d = L_READ_SINGLE;
+      end
+    
+    end
+    L_READ_MULTI: begin
+      if (l_rd_cmd_q.region == 2'b01) begin
+        PD_ADDR_AXIS = l_rd_cmd_q.address;
+        PD_REG_ENA_AXIS = ~0;
+        PD_RD_REG_AXIS_D = PD_RD_REG_AXIS;
+      end else if (l_rd_cmd_q.region == 2'b10) begin
+        QPidx_d = l_rd_cmd_q.address;
+        QP_ADDR_AXIS = l_rd_cmd_q.address;
+        QP_REG_ENA_AXIS = ~0;
+        QP_RD_REG_AXIS_D = QP_RD_REG_AXIS;
+      end else begin
+        l_reg_st_d = L_IDLE;
+      end
+
+      if(hold_rd_axis_q == RD_LAT) begin
+        hold_rd_axis_d = 'd0;
+        l_reg_st_d = L_READ_READY;
+      end else begin
+        hold_rd_axis_d = hold_rd_axis_q + 'd1;
+        l_reg_st_d = L_READ_MULTI;
+      end
+    end
+    L_READ_READY: begin
+      if(l_rd_cmd_q.region == 'd2) begin
+        if(l_rd_cmd_q.bram_idx == SQPSNi_idx || l_rd_cmd_q.bram_idx == LSTRQREQi_idx) begin
+          qp_configured_o = 1'b1;
+          l_reg_st_d = L_IDLE;
+        end else if (l_rd_cmd_q.bram_idx == DESTQPCONFi_idx || l_rd_cmd_q.bram_idx == IPDESADDR1i_idx) begin
+          conn_configured_o = 1'b1;
+          l_reg_st_d = L_IDLE;
+        end else if(l_rd_cmd_q.bram_idx == SQPIi_idx) begin
+          config_sq = 1'b1;
+          l_reg_st_d = L_READ_VADDR;
+        end else if (l_rd_cmd_q.bram_idx == NUM_QP_REGS) begin
+          rd_qp_ready_o = 1'b1;
+          l_reg_st_d = L_IDLE;
+        end else if (l_rd_cmd_q.bram_idx == PDNUMi_idx) begin
+          find_pd_rd_ready = 1'b1;
+          find_pd_wr_ready = 1'b1;
+          l_reg_st_d = L_IDLE;
+        end else begin
+          l_reg_st_d = L_IDLE;
+        end
+      end else if(l_rd_cmd_q.region == 'd1) begin
+        if (l_rd_cmd_q.bram_idx == PDPDNUM_idx) begin
+          pdnum_table[l_rd_cmd_q.address] = PD_RD_REG_AXIS_Q[PDPDNUM_idx][23:0];
+        end else if(l_rd_cmd_q.bram_idx == VIRTADDRLSB_idx) begin
+          sq_updated_o = 1'b1;
+        end else if (l_rd_cmd_q.bram_idx == PDNUMi_idx) begin //abuse PDNUMi_idx for ready signal in phys addr lookup
+          find_pd_rd_ready = 1'b1;
+          find_pd_wr_ready = 1'b1;
+        end
+        l_reg_st_d = L_IDLE;
+      end else begin
+        l_reg_st_d = L_IDLE;
+      end
+    end
+    L_READ_VADDR: begin
+      rd_sq_vaddr_d.region = 'd1;
+      rd_sq_vaddr_d.read_all = 1'b1;
+      rd_sq_vaddr_d.bram_idx = VIRTADDRLSB_idx;
+      rd_sq_vaddr_d.address = pd_addr_q;
+      rd_sq_vaddr_valid_d = 1'b1;
+      l_reg_st_d = L_IDLE;
+    end
+  endcase
+end
+
+
+
+
+
+always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
+  if(!axis_rstn_i) begin
+    PD_ADDR_AXIS <= 'd0;
+    PD_WR_REG_AXIS <= 'd0;
+    pdnum_table <= ~0;
+
+    
+    QP_ADDR_AXIS <= 'd0;
+    QP_WR_REG_AXIS <= 'd0;
+
+    GLB_ADDR_AXIS <= 'd0;
+    GLB_WR_REG_AXIS <= 'd0;
+
+    l_reg_st_q <= L_IDLE;
+    l_rd_cmd_q <= 'd0;
+    hold_rd_axis_q <= 'd0;
+    QPidx_q <= 'd0;
+
+    rd_sq_vaddr_q <= 'd0;
+    rd_sq_vaddr_valid_q <= 'd0;
+
+    CONF_q <= 'd0;
+    MACADDLSB_q <= 'd0;
+    MACADDMSB_q <= 'd0;
+    IPv4ADD_q <= 'd0;
+
+    PD_RD_REG_AXIS_Q <= 'd0;
+    QP_RD_REG_AXIS_Q <= 'd0;
+
+  end else begin
+    l_reg_st_q <= l_reg_st_d;
+    l_rd_cmd_q <= l_rd_cmd_d;
+    hold_rd_axis_q <= hold_rd_axis_d;
+    QPidx_q <= QPidx_d;
+
+    rd_sq_vaddr_q <= rd_sq_vaddr_d;
+    rd_sq_vaddr_valid_q <= rd_sq_vaddr_valid_d;
+
+    CONF_q <= CONF_d;
+    MACADDLSB_q <= MACADDLSB_d;
+    MACADDMSB_q <= MACADDMSB_d;
+    IPv4ADD_q <= IPv4ADD_d;
+
+    PD_RD_REG_AXIS_Q <= PD_RD_REG_AXIS_D;
+    QP_RD_REG_AXIS_Q <= QP_RD_REG_AXIS_D;
+
+  end
+end
+
+
+
+
+
+
+
+
+
+
 
 
 //////////////
@@ -1936,64 +1334,327 @@ assign s_axil_rresp_o = RRespReg_q;
 assign s_axil_bresp_o = WRespReg_q;
 
 assign CONF_o = CONF_q;
-assign ADCONF_o = ADCONF_q;
+//assign ADCONF_o = ADCONF_q;
 assign MACADD_o = {MACADDMSB_q[15:0], MACADDLSB_q};
 assign IPv4ADD_o = IPv4ADD_q;
-assign INTEN_o = INTEN_q;
-assign ERRBUFBA_o = {ERRBUFBAMSB_q, ERRBUFBA_q};
-assign ERRBUFSZ_o = ERRBUFSZ_q;
-assign IPKTERRQBA_o = {IPKTERRQBAMSB_q, IPKTERRQBA_q};
-assign IPKTERRQSZ_o = IPKTERRQSZ_q;
-assign DATBUFBA_o = {DATBUFBAMSB_q, DATBUFBA_q};
-assign DATBUFSZ_o = DATBUFSZ_q;
-assign RESPERRPKTBA_o = {RESPERRPKTBAMSB_q, RESPERRPKTBA_q};
-assign RESPERRSZ_o = {RESPERRSZMSB_q, RESPERRSZ_q};
+//assign INTEN_o = INTEN_q;
+//assign ERRBUFBA_o = {ERRBUFBAMSB_q, ERRBUFBA_q};
+//assign ERRBUFSZ_o = ERRBUFSZ_q;
+//assign IPKTERRQBA_o = {IPKTERRQBAMSB_q, IPKTERRQBA_q};
+//assign IPKTERRQSZ_o = IPKTERRQSZ_q;
+//assign DATBUFBA_o = {DATBUFBAMSB_q, DATBUFBA_q};
+//assign DATBUFSZ_o = DATBUFSZ_q;
+//assign RESPERRPKTBA_o = {RESPERRPKTBAMSB_q, RESPERRPKTBA_q};
+//assign RESPERRSZ_o = {RESPERRSZMSB_q, RESPERRSZ_q};
 
-assign SQidx_o = SQidx_q;
 assign QPidx_o = QPidx_q;
-assign connidx_o = connidx_q;
-assign conn_configured_o = conn_configured_q;
-assign qp_configured_o = qp_configured_q;
+
 
 
 
 //That's a mux...
-assign QPCONFi_o = QPCONFi_q[QPidx_q];
-assign QPADVCONFi_o = QPADVCONFi_q[QPidx_q];
-assign RQBAi_o = {RQBAMSBi_q[QPidx_q], RQBAi_q[QPidx_q]};
+assign QPCONFi_o      = QP_RD_REG_AXIS_Q[QPCONFi_idx];
+//assign QPADVCONFi_o   = QP_RD_REG_AXIS_Q[QPADVCONFi_idx];
+assign RQBAi_o        = {QP_RD_REG_AXIS_Q[RQBAMSBi_idx], QP_RD_REG_AXIS_Q[RQBAi_idx]};
 
-assign SQBAi_o = {SQBAMSBi_q[SQidx_q], SQBAi_q[SQidx_q]};
-assign CQBAi_o = {CQBAMSBi_q[SQidx_q], CQBAi_q[SQidx_q]};
-assign SQPIi_o = SQPIi_q[SQidx_q];
+assign SQBAi_o        = {QP_RD_REG_AXIS_Q[SQBAMSBi_idx], QP_RD_REG_AXIS_Q[SQBAi_idx]};
+assign CQBAi_o        = {QP_RD_REG_AXIS_Q[CQBAMSBi_idx], QP_RD_REG_AXIS_Q[CQBAi_idx]};
+assign SQPIi_o        = QP_RD_REG_AXIS_Q[SQPIi_idx];
+assign CQHEADi_o      = QP_RD_REG_AXIS_Q[CQHEADi_idx];
 
-assign RQWPTRDBADDi_o = {RQWPTRDBADDMSBi_q[QPidx_q], RQWPTRDBADDi_q[QPidx_q]};
-assign CQDBADDi_o = {CQDBADDMSBi_q[QPidx_q], CQDBADDi_q[QPidx_q]};
+//assign RQWPTRDBADDi_o = {QP_RD_REG_AXIS_Q[RQWPTRDBADDMSBi_idx], QP_RD_REG_AXIS_Q[RQWPTRDBADDi_idx]};
+//assign CQDBADDi_o     = {QP_RD_REG_AXIS_Q[CQDBADDMSBi_idx],     QP_RD_REG_AXIS_Q[CQDBADDi_idx]};
 
-assign QDEPTHi_o = QDEPTHi_q[QPidx_q];
-assign SQPSNi_o = SQPSNi_q[QPidx_q][23:0];
-assign LSTRQREQi_o = LSTRQREQi_q[QPidx_q];
-assign DESTQPCONFi_o = DESTQPCONFi_q[QPidx_q][23:0];
-assign MACDESADDi_o = {MACDESADDMSBi_q[MACADD_SEL_i][15:0], MACDESADDLSBi_q[MACADD_SEL_i]};
+//assign QDEPTHi_o      = QP_RD_REG_AXIS_Q[QDEPTHi_idx];
+assign SQPSNi_o       = QP_RD_REG_AXIS_Q[SQPSNi_idx][23:0];
+assign LSTRQREQi_o    = QP_RD_REG_AXIS_Q[LSTRQREQi_idx];
+assign DESTQPCONFi_o  = QP_RD_REG_AXIS_Q[DESTQPCONFi_idx][23:0];
 
-assign IPDESADDR1i_o = IPDESADDR1i_q[connidx_q];
 
-assign SQ_QPCONFi_o = QPCONFi_q[C_SQidx_i];
-assign SQ_SQPSNi_o = SQPSNi_q[C_SQidx_i][23:0];
-assign SQ_LSTRQREQi_o = LSTRQREQi_q[C_SQidx_i];
+assign MACDESADDi_o   = {QP_RD_REG_AXIS_Q[MACDESADDMSBi_idx][15:0], QP_RD_REG_AXIS_Q[MACDESADDLSBi_idx]};
+assign IPDESADDR1i_o  = QP_RD_REG_AXIS_Q[IPDESADDR1i_idx];
 
+assign VIRTADDR_o = {PD_RD_REG_AXIS_Q[VIRTADDRMSB_idx], PD_RD_REG_AXIS_Q[VIRTADDRLSB_idx]};
 
 
 
 ////////////////////////////
-//                        //  
-//  AXI MM clock domain   //
+//                        //
+//  REGISTER DEFINITIONS  //
 //                        //
 ////////////////////////////
 
-typedef enum {VTP_IDLE, VTP_VALID} virt_to_phys_state;
-virt_to_phys_state rd_vtp_st_d, rd_vtp_st_q, wr_vtp_st_d, wr_vtp_st_q;
-dma_req_t rd_resp_addr_data_d, rd_resp_addr_data_q, wr_resp_addr_data_d, wr_resp_addr_data_q;
 
+
+//Protection Domain
+generate
+  for (genvar i = 0; i < NUM_PD_REGS; i++) begin : pd_regs
+    block_ram_1k PD_CONF_inst (
+      .addra(PD_ADDR_AXIL),
+      .dina(PD_WR_REG_AXIL),
+      .douta(PD_RD_REG_AXIL[i]),
+      .ena(PD_REG_ENA_AXIL[i]),
+      .wea(PD_REG_WEA_AXIL),
+      .clka(axil_aclk_i),
+      .rsta(!axil_rstn_i),
+      .addrb(PD_ADDR_AXIS),
+      .dinb(PD_WR_REG_AXIS),
+      .doutb(PD_RD_REG_AXIS[i]),
+      .enb(PD_REG_ENA_AXIS[i]),
+      .web(PD_REG_WEA_AXIS),
+      .clkb(axis_aclk_i)
+    );
+  end
+endgenerate
+
+//GLobal config
+block_ram_1k GLBCONF_inst (
+  .addra(GLB_ADDR_AXIL),
+  .dina(GLB_WR_REG_AXIL),
+  .douta(GLB_RD_REG_AXIL),
+  .ena(GLB_REG_ENA_AXIL),
+  .wea(GLB_REG_WEA_AXIL),
+  .clka(axil_aclk_i),
+  .rsta(!axil_rstn_i),
+  .addrb(GLB_ADDR_AXIS),
+  .dinb(GLB_WR_REG_AXIS), 
+  .doutb(GLB_RD_REG_AXIS),
+  .enb(GLB_REG_ENA_AXIS),
+  .web(GLB_REG_WEA_AXIS),
+  .clkb(axis_aclk_i)
+);
+
+//Per QP config //TODO: make a for loop
+generate
+  for (genvar i = 0; i < NUM_QP_REGS; i++) begin : qp_regs
+    block_ram_1k PER_QP_inst (
+      .addra(QP_ADDR_AXIL),
+      .dina(QP_WR_REG_AXIL),
+      .douta(QP_RD_REG_AXIL[i]),
+      .ena(QP_REG_ENA_AXIL[i]),
+      .wea(QP_REG_WEA_AXIL),
+      .clka(axil_aclk_i),
+      .rsta(!axil_rstn_i),
+      .addrb(QP_ADDR_AXIS),
+      .dinb(QP_WR_REG_AXIS[i]),
+      .doutb(QP_RD_REG_AXIS[i]),
+      .enb(QP_REG_ENA_AXIS[i]),
+      .web(QP_REG_WEA_AXIS),
+      .clkb(axis_aclk_i)
+    );
+  end
+endgenerate
+
+
+always_comb begin
+  pd_addr_d = pd_addr_q;
+  if(find_pd_addr_rd || find_pd_addr_wr || config_sq) begin
+    for(int i=0; i < NUM_PD; i++) begin
+      if(pdnum_table[i] == QP_RD_REG_AXIS_Q[PDNUMi_idx]) begin
+        pd_addr_d = i;
+      end
+    end
+  end
+end
+
+always_comb begin
+  rd_req_addr_ready_o = 1'b1;
+  rd_resp_addr_valid_o = 1'b0;
+  rd_resp_addr_data_d = rd_resp_addr_data_q;
+  rd_vtp_st_d = rd_vtp_st_q;
+  
+  find_pd_addr_rd = 1'b0;
+  find_pd_rd_d = find_pd_rd_q;
+
+
+  case(rd_vtp_st_q)
+  VTP_IDLE: begin
+    if(rd_req_addr_valid_i && rd_req_addr_ready_o) begin
+      rd_req_addr_ready_o = 1'b0;
+      rd_resp_addr_data_d.accesdesc = ~0;
+      rd_resp_addr_data_d.rkey = ~0;
+      rd_resp_addr_data_d.buflen = ~0;
+      rd_resp_addr_data_d.paddr = ~0;
+
+      if(rd_req_addr_vaddr_i == 'd0) begin
+        rd_resp_addr_data_d.accesdesc = 'd0;
+        rd_resp_addr_data_d.buflen = ~0;
+        rd_resp_addr_data_d.rkey = ~0;
+        rd_resp_addr_data_d.paddr = 'd0;
+        rd_vtp_st_d = VTP_VALID;
+      end else begin
+        find_pd_rd_d.region = 'd2;
+        find_pd_rd_d.read_all = 1'b1;
+        find_pd_rd_d.bram_idx = PDNUMi_idx;
+        find_pd_rd_d.address = rd_req_addr_qpn_i[LOG_NUM_QP-1:0];
+        rd_vtp_st_d = VTP_RD_PDN_VLD;
+      end
+    end
+  end
+  VTP_RD_PDN_VLD: begin
+    rd_req_addr_ready_o = 1'b0;
+    find_pd_rd_valid = 1'b1;
+    rd_vtp_st_d = VTP_RD_PDN;
+  end
+  VTP_RD_PDN: begin
+    rd_req_addr_ready_o = 1'b0;
+    if(find_pd_rd_ready) begin
+      find_pd_addr_rd = 1'b1;
+      rd_vtp_st_d = VTP_REQ_PD;
+    end
+  end
+  VTP_REQ_PD: begin
+    rd_req_addr_ready_o = 1'b0;
+    find_pd_rd_d.region = 'd1;
+    find_pd_rd_d.read_all = 1'b1;
+    find_pd_rd_d.bram_idx = PDNUMi_idx;
+    find_pd_rd_d.address = pd_addr_q; //TODO: check if this works
+    rd_vtp_st_d = VTP_PREP_RESP_VLD;
+  end
+  VTP_PREP_RESP_VLD: begin
+    rd_req_addr_ready_o = 1'b0;
+    find_pd_rd_valid = 1'b1;
+    rd_vtp_st_d = VTP_PREP_RESP;
+  end
+  VTP_PREP_RESP: begin
+    rd_req_addr_ready_o = 1'b0;
+    if(find_pd_rd_ready) begin
+      if(rd_req_addr_vaddr_i == {PD_RD_REG_AXIS_Q[VIRTADDRMSB_idx], PD_RD_REG_AXIS_Q[VIRTADDRLSB_idx]}) begin
+        rd_resp_addr_data_d.accesdesc = PD_RD_REG_AXIS_Q[ACCESSDESC_idx][3:0];
+        rd_resp_addr_data_d.buflen = {PD_RD_REG_AXIS_Q[ACCESSDESC_idx][31:16], PD_RD_REG_AXIS_Q[WRRDBUFLEN_idx]};
+        rd_resp_addr_data_d.rkey = PD_RD_REG_AXIS_Q[BUFRKEY_idx][7:0];
+        rd_resp_addr_data_d.paddr = {PD_RD_REG_AXIS_Q[BUFBASEADDRMSB_idx], PD_RD_REG_AXIS_Q[BUFBASEADDRLSB_idx]};
+      end
+      rd_vtp_st_d = VTP_VALID;
+    end
+  end
+  VTP_VALID: begin
+    rd_req_addr_ready_o = 1'b0;
+    rd_resp_addr_valid_o = 1'b1;
+    if(rd_resp_addr_ready_i) begin
+      rd_vtp_st_d = VTP_IDLE;
+    end
+  end
+  endcase
+end
+
+
+
+always_comb begin
+  wr_req_addr_ready_o = 1'b1;
+  wr_resp_addr_valid_o = 1'b0;
+  wr_resp_addr_data_d = wr_resp_addr_data_q;
+  wr_vtp_st_d = wr_vtp_st_q;
+  find_pd_addr_wr = 1'b0;
+  find_pd_wr_d = find_pd_wr_q;
+
+
+  case(wr_vtp_st_q)
+  VTP_IDLE: begin
+    if(wr_req_addr_valid_i && wr_req_addr_ready_o) begin
+      wr_req_addr_ready_o = 1'b0;
+      wr_resp_addr_data_d.accesdesc = ~0;
+      wr_resp_addr_data_d.rkey = ~0;
+      wr_resp_addr_data_d.buflen = ~0;
+      wr_resp_addr_data_d.paddr = ~0;
+
+      //lookup defined qpn of the request of the request
+      find_pd_wr_d.region = 'd2;
+      find_pd_wr_d.read_all = 1'b1;
+      find_pd_wr_d.bram_idx = PDNUMi_idx;
+      find_pd_wr_d.address = wr_req_addr_qpn_i[LOG_NUM_QP-1:0];
+      wr_vtp_st_d = VTP_RD_PDN_VLD;
+    end
+  end
+  VTP_RD_PDN_VLD: begin
+    wr_req_addr_ready_o = 1'b0;
+    find_pd_wr_valid = 1'b1;
+    wr_vtp_st_d = VTP_RD_PDN;
+  end
+  VTP_RD_PDN: begin
+    wr_req_addr_ready_o = 1'b0;
+    if(find_pd_wr_ready) begin
+      if(wr_req_addr_vaddr_i == 'd0) begin 
+          wr_resp_addr_data_d.accesdesc = 4'b0010;
+          wr_resp_addr_data_d.buflen = ~0;
+          wr_resp_addr_data_d.rkey = ~0;
+          wr_resp_addr_data_d.paddr = {QP_RD_REG_AXIS_Q[RQBAMSBi_idx], QP_RD_REG_AXIS[RQBAi_idx]};
+          wr_vtp_st_d = VTP_VALID;
+      end else begin
+        find_pd_addr_wr = 1'b1;
+        wr_vtp_st_d = VTP_REQ_PD;
+      end
+    end
+  end
+  VTP_REQ_PD: begin
+    wr_req_addr_ready_o = 1'b0;
+    find_pd_wr_d.region = 'd1;
+    find_pd_wr_d.read_all = 1'b1;
+    find_pd_wr_d.bram_idx = PDNUMi_idx;
+    find_pd_wr_d.address = pd_addr_q;
+    wr_vtp_st_d = VTP_PREP_RESP_VLD;
+  end
+  VTP_PREP_RESP_VLD: begin
+    wr_req_addr_ready_o = 1'b0;
+    find_pd_wr_valid = 1'b1;
+    wr_vtp_st_d = VTP_PREP_RESP;
+  end
+  VTP_PREP_RESP: begin
+    wr_req_addr_ready_o = 1'b0;
+    if(find_pd_wr_ready) begin
+      if(wr_req_addr_vaddr_i == {PD_RD_REG_AXIS_Q[VIRTADDRMSB_idx], PD_RD_REG_AXIS_Q[VIRTADDRLSB_idx]}) begin
+        wr_resp_addr_data_d.accesdesc = PD_RD_REG_AXIS_Q[ACCESSDESC_idx][3:0];
+        wr_resp_addr_data_d.buflen = {PD_RD_REG_AXIS_Q[ACCESSDESC_idx][31:16], PD_RD_REG_AXIS_Q[WRRDBUFLEN_idx]};
+        wr_resp_addr_data_d.rkey = PD_RD_REG_AXIS_Q[BUFRKEY_idx][7:0];
+        wr_resp_addr_data_d.paddr = {PD_RD_REG_AXIS_Q[BUFBASEADDRMSB_idx], PD_RD_REG_AXIS_Q[BUFBASEADDRLSB_idx]};
+      end  
+      wr_vtp_st_d = VTP_VALID;
+    end
+  end
+  VTP_VALID: begin
+    wr_req_addr_ready_o = 1'b0;
+    wr_resp_addr_valid_o = 1'b1;
+    if(wr_resp_addr_ready_i) begin
+      wr_vtp_st_d = VTP_IDLE;
+    end
+  end
+  endcase
+end
+
+
+
+always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
+  if(!axis_rstn_i) begin
+    rd_vtp_st_q <= VTP_IDLE;
+    wr_vtp_st_q <= VTP_IDLE;
+    rd_resp_addr_data_q <= 'd0;
+    wr_resp_addr_data_q <= 'd0;
+    find_pd_rd_valid <= 1'b0;
+    find_pd_wr_valid <= 1'b0;
+    
+    find_pd_rd_q <= 'd0;
+    find_pd_wr_q <= 'd0;
+    pd_addr_q <= ~0;
+  end else begin
+    rd_vtp_st_q <= rd_vtp_st_d;
+    wr_vtp_st_q <= wr_vtp_st_d;
+    rd_resp_addr_data_q <= rd_resp_addr_data_d;
+    wr_resp_addr_data_q <= wr_resp_addr_data_d;
+
+    find_pd_rd_q <= find_pd_rd_d;
+    find_pd_wr_q <= find_pd_wr_d;
+    pd_addr_q <= pd_addr_d;
+  end
+end
+
+assign rd_resp_addr_data_o = rd_resp_addr_data_q;
+assign wr_resp_addr_data_o = wr_resp_addr_data_q;
+
+
+
+
+
+/*
 //TODO: RKEY matching?
 always_comb begin
   rd_req_addr_ready_o = 1'b1;
@@ -2040,6 +1701,8 @@ always_comb begin
     end
   endcase
 end
+
+
 
 
 always_comb begin
@@ -2089,22 +1752,7 @@ always_comb begin
   endcase
 end
 
-always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
-  if(!axis_rstn_i) begin
-    rd_vtp_st_q <= VTP_IDLE;
-    wr_vtp_st_q <= VTP_IDLE;
-    rd_resp_addr_data_q <= 'd0;
-    wr_resp_addr_data_q <= 'd0;
-  end else begin
-    rd_vtp_st_q <= rd_vtp_st_d;
-    wr_vtp_st_q <= wr_vtp_st_d;
-    rd_resp_addr_data_q <= rd_resp_addr_data_d;
-    wr_resp_addr_data_q <= wr_resp_addr_data_d;
-  end
-end
-
-assign rd_resp_addr_data_o = rd_resp_addr_data_q;
-assign wr_resp_addr_data_o = wr_resp_addr_data_q;
+*/
 
 
 

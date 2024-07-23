@@ -59,10 +59,10 @@ set_property BOARD_PART $board_part [current_project]
 set ip_dict [dict create]
 
 if {[string equal $roce_stack_sources "1"]} {
-  source ${roce_dir}/vivado_ip/sim_vivado_ip.tcl
+  source ${roce_dir}/sim_vivado_ip/sim_vivado_ip.tcl
   foreach ip $ips {
     set xci_file ${ip_build_dir}/$ip/$ip.xci
-    source ${roce_dir}/vivado_ip/${ip}.tcl
+    source ${roce_dir}/sim_vivado_ip/${ip}.tcl
     generate_target all [get_files  $xci_file]
     create_ip_run [get_files -of_objects [get_fileset sources_1] $xci_file]
     launch_runs ${ip}_synth_1 -jobs 8

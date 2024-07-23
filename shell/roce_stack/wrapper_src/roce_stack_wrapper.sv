@@ -133,8 +133,11 @@ logic [7:0]   wr_ptr_wtc;
 logic [31:0]  IPv4ADD;
 logic [31:0]  IPv4ADD_net;
 
-logic [7:0]   connidx, QPidx, SQidx, SQ_SEL_IDX, MACADD_SEL;
-logic         conn_configured, qp_configured;
+logic [7:0]   QPidx;
+logic         conn_configured, qp_configured, sq_updated;
+
+rd_cmd_t rd_qp;
+logic rd_qp_ready, rd_qp_valid;
 
 logic [31:0]  CONF;
 logic [47:0]  MACADD;
@@ -148,6 +151,7 @@ logic [63:0]  CQBAi;
 logic [63:0]  RQWPTRDBADDi;
 logic [63:0]  CQDBADDi;
 logic [31:0]  SQPIi;
+logic [31:0]  CQHEADi;
 logic [31:0]  QDEPTHi;
 logic [23:0]  SQPSNi;
 logic [31:0]  LSTRQREQi;
@@ -161,14 +165,14 @@ logic [31:0]  SQ_QPCONFi;
 logic [23:0]  SQ_SQPSNi;
 logic [31:0]  SQ_LSTRQREQi;
 
-logic [63:0] VIRTADDRi;
+logic [63:0] VIRTADDR;
 
 
 //write back regs
 logic         wb_ready, wb_valid;
 
-logic [39:0]  CQHEADi_wb_axis, CQHEADi_wb_axil;
-logic         CQHEADi_wb_axis_valid, CQHEADi_wb_axil_valid;
+logic [39:0]  CQHEADi_wb;
+logic         CQHEADi_wb_valid;
 
 logic [39:0]  SQPSNi_wb_axil, LSTRQREQi_wb_axil;
 logic         SQPSNi_wb_axil_valid, LSTRQREQi_wb_axil_valid;
@@ -176,8 +180,8 @@ logic         SQPSNi_wb_axil_valid, LSTRQREQi_wb_axil_valid;
 logic [31:0]  INSRRPKTCNT_wb_axil;
 logic         INSRRPKTCNT_wb_axil_valid;
 
-logic [31:0]  INAMPKTCNT_wb_axis, INAMPKTCNT_wb_axil;
-logic         INAMPKTCNT_wb_axis_valid, INAMPKTCNT_wb_axil_valid;
+logic [31:0]  INAMPKTCNT_wb;
+logic         INAMPKTCNT_wb_valid;
 
 logic [31:0]  INNCKPKTSTS_wb_axil;
 logic         INNCKPKTSTS_wb_axil_valid;
@@ -186,8 +190,8 @@ logic         INNCKPKTSTS_wb_axil_valid;
 logic [31:0]  OUTIOPKTCNT_wb_axil;
 logic         OUTIOPKTCNT_wb_axil_valid;
 
-logic [31:0]  OUTAMPKTCNT_wb_axis, OUTAMPKTCNT_wb_axil;
-logic         OUTAMPKTCNT_wb_axis_valid, OUTAMPKTCNT_wb_axil_valid;
+logic [31:0]  OUTAMPKTCNT_wb;
+logic         OUTAMPKTCNT_wb_valid;
 
 logic [16:0]  OUTNAKPKTCNT_wb_axil;
 logic         OUTNAKPKTCNT_wb_axil_valid;
@@ -292,11 +296,7 @@ roce_stack_tx_axis_interconnect roce_stack_tx_axis_interconnect_inst (
 );
 
 
-roce_stack_csr #(
-  .NUM_QP(NUM_QP),
-  .AXIL_ADDR_WIDTH(AXIL_ADDR_WIDTH),
-  .AXIL_DATA_WIDTH(AXIL_DATA_WIDTH)
-) inst_roce_stack_csr(
+roce_stack_csr  inst_roce_stack_csr(
   .s_axil_awvalid_i(s_axil_awvalid_i),
   .s_axil_awaddr_i(s_axil_awaddr_i),
   .s_axil_awready_o(s_axil_awready_o),
@@ -315,66 +315,58 @@ roce_stack_csr #(
   .s_axil_rresp_o(s_axil_rresp_o),
   .s_axil_rready_i(s_axil_rready_i),
   
-  .VIRTADDR_o(VIRTADDRi),
-
   .CONF_o(CONF),
   .MACADD_o(MACADD),
-
   .IPv4ADD_o(IPv4ADD),
+
   
-  .SQidx_o(SQidx),
   .QPidx_o(QPidx),
-  .connidx_o(connidx),
   .conn_configured_o(conn_configured),
   .qp_configured_o(qp_configured),
+  .sq_updated_o(sq_updated),
   
   .QPCONFi_o(QPCONFi),
-  .QPADVCONFi_o(),
-  .RQBAi_o(),
   .SQBAi_o(SQBAi),
   .CQBAi_o(CQBAi),
-  .RQWPTRDBADDi_o(),
-  .CQDBADDi_o(),
   .SQPIi_o(SQPIi),
-  .QDEPTHi_o(),
+  .CQHEADi_o(CQHEADi),
   .SQPSNi_o(SQPSNi),
   .LSTRQREQi_o(LSTRQREQi),
   .DESTQPCONFi_o(DESTQPCONFi),
   
-  .MACADD_SEL_i(MACADD_SEL),
   .MACDESADDi_o(MACDESADDi),
   .IPDESADDR1i_o(IPDESADDR1i),
 
-  .C_SQidx_i(SQ_SEL_IDX),
-  .SQ_QPCONFi_o(SQ_QPCONFi),
-  .SQ_SQPSNi_o(SQ_SQPSNi),
-  .SQ_LSTRQREQi_o(SQ_LSTRQREQi),
+  .VIRTADDR_o(VIRTADDR),
 
-  .wb_ready_o(wb_ready),
-  .wb_valid_i(wb_valid),
-  .WB_CQHEADi_i(CQHEADi_wb_axil),
-  .WB_CQHEADi_valid_i(CQHEADi_wb_axil_valid),
+  .rd_qp_i(rd_qp),
+  .rd_qp_valid_i(rd_qp_valid),
+  .rd_qp_ready_o(rd_qp_ready),
 
-  .WB_INSRRPKTCNT_i(INSRRPKTCNT_wb_axil),
-  .WB_INSRRPKTCNT_valid_i(INSRRPKTCNT_wb_axil_valid),
-  .WB_INAMPKTCNT_i(INAMPKTCNT_wb_axil),
-  .WB_INAMPKTCNT_valid_i(INAMPKTCNT_wb_axil_valid),
-  .WB_INNCKPKTSTS_i(INNCKPKTSTS_wb_axil),
-  .WB_INNCKPKTSTS_valid_i(INNCKPKTSTS_wb_axil_valid),
 
-  .WB_OUTAMPKTCNT_i(OUTAMPKTCNT_wb_axil),
-  .WB_OUTAMPKTCNT_valid_i(OUTAMPKTCNT_wb_axil_valid),
-  .WB_OUTNAKPKTCNT_i(OUTNAKPKTCNT_wb_axil),
-  .WB_OUTNAKPKTCNT_valid_i(OUTNAKPKTCNT_wb_axil_valid),
-  .WB_OUTIOPKTCNT_i(OUTIOPKTCNT_wb_axil),
-  .WB_OUTIOPKTCNT_valid_i(OUTIOPKTCNT_wb_axil_valid),
-  .WB_OUTRDRSPPKTCNT_i(OUTRDRSPPKTCNT_wb_axil),
-  .WB_OUTRDRSPPKTCNT_valid_i(OUTRDRSPPKTCNT_wb_axil_valid),
+  .WB_CQHEADi_i(CQHEADi_wb),
+  .WB_CQHEADi_valid_i(CQHEADi_wb_valid),
+  .WB_SQPSNi_i(npsn_data),
+  .WB_SQPSNi_valid_i(npsn_valid),
+  .WB_LSTRQREQi_i(epsn_data),
+  .WB_LSTRQREQi_valid_i(epsn_valid),
 
-  .WB_SQPSNi_i(SQPSNi_wb_axil),
-  .WB_SQPSNi_valid_i(SQPSNi_wb_axil_valid),
-  .WB_LSTRQREQi_i(LSTRQREQi_wb_axil),
-  .WB_LSTRQREQi_valid_i(LSTRQREQi_wb_axil_valid),
+  .WB_INAMPKTCNT_i(INAMPKTCNT_wb),
+  .WB_INAMPKTCNT_valid_i(INAMPKTCNT_wb_valid),
+  .WB_INNCKPKTSTS_i(rx_nack_data),
+  .WB_INNCKPKTSTS_valid_i(rx_nack_data),
+  .WB_INSRRPKTCNT_i(rx_srr_data),
+  .WB_INSRRPKTCNT_valid_i(rx_srr_valid),
+
+  .WB_OUTAMPKTCNT_i(OUTAMPKTCNT_wb),
+  .WB_OUTAMPKTCNT_valid_i(OUTAMPKTCNT_wb_valid),
+  .WB_OUTNAKPKTCNT_i(tx_nack_data),
+  .WB_OUTNAKPKTCNT_valid_i(tx_nack_valid),
+  .WB_OUTIOPKTCNT_i(tx_srw_data),
+  .WB_OUTIOPKTCNT_valid_i(tx_srw_valid),
+  .WB_OUTRDRSPPKTCNT_i(tx_rr_data),
+  .WB_OUTRDRSPPKTCNT_valid_i(tx_rr_valid),
+
 
   .rd_req_addr_valid_i(rd_req_addr_valid),
   .rd_req_addr_ready_o(rd_req_addr_ready),
@@ -401,73 +393,15 @@ roce_stack_csr #(
   .axil_rstn_i(axil_rstn_i)
 );
 
-writeback_cdc_wrapper inst_wb_cdc_wrapper (
-  .wb_ready_i(wb_ready),
-  .wb_valid_o(wb_valid),
-  
-  .CQHEADi_wb_valid_i(CQHEADi_wb_axis_valid),
-  .CQHEADi_wb_i(CQHEADi_wb_axis),
-  .SQPSNi_wb_i(npsn_data),
-  .SQPSNi_wb_valid_i(npsn_valid),
-  .LSTRQREQi_wb_i(epsn_data),
-  .LSTRQREQi_wb_valid_i(epsn_valid),
-
-  .INSRRPKTCNT_wb_valid_i(rx_srr_valid),
-  .INSRRPKTCNT_wb_i(rx_srr_data),
-  .INAMPKTCNT_wb_valid_i(INAMPKTCNT_wb_axis_valid),
-  .INAMPKTCNT_wb_i(INAMPKTCNT_wb_axis),
-  .INNCKPKTSTS_wb_valid_i(rx_nack_valid),
-  .INNCKPKTSTS_wb_i(rx_nack_data),
-
-  .OUTAMPKTCNT_wb_valid_i(OUTAMPKTCNT_wb_axis_valid),
-  .OUTAMPKTCNT_wb_i(OUTAMPKTCNT_wb_axis),
-  .OUTNAKPKTCNT_wb_valid_i(tx_nack_valid),
-  .OUTNAKPKTCNT_wb_i(tx_nack_data),
-  .OUTIOPKTCNT_wb_valid_i(tx_srw_valid),
-  .OUTIOPKTCNT_wb_i(tx_srw_data),
-  .OUTRDRSPPKTCNT_wb_valid_i(tx_rr_valid),
-  .OUTRDRSPPKTCNT_wb_i(tx_rr_data),
-
-  .CQHEADi_wb_valid_o(CQHEADi_wb_axil_valid),
-  .CQHEADi_wb_o(CQHEADi_wb_axil),
-  .SQPSNi_wb_o(SQPSNi_wb_axil),
-  .SQPSNi_wb_valid_o(SQPSNi_wb_axil_valid),
-  .LSTRQREQi_wb_o(LSTRQREQi_wb_axil),
-  .LSTRQREQi_wb_valid_o(LSTRQREQi_wb_axil_valid),
-
-  .INSRRPKTCNT_wb_valid_o(INSRRPKTCNT_wb_axil_valid),
-  .INSRRPKTCNT_wb_o(INSRRPKTCNT_wb_axil),
-  .INAMPKTCNT_wb_valid_o(INAMPKTCNT_wb_axil_valid),
-  .INAMPKTCNT_wb_o(INAMPKTCNT_wb_axil),
-  .INNCKPKTSTS_wb_valid_o(INNCKPKTSTS_wb_axil_valid),
-  .INNCKPKTSTS_wb_o(INNCKPKTSTS_wb_axil),
-
-  .OUTAMPKTCNT_wb_valid_o(OUTAMPKTCNT_wb_axil_valid),
-  .OUTAMPKTCNT_wb_o(OUTAMPKTCNT_wb_axil),
-  .OUTNAKPKTCNT_wb_valid_o(OUTNAKPKTCNT_wb_axil_valid),
-  .OUTNAKPKTCNT_wb_o(OUTNAKPKTCNT_wb_axil),
-  .OUTIOPKTCNT_wb_valid_o(OUTIOPKTCNT_wb_axil_valid),
-  .OUTIOPKTCNT_wb_o(OUTIOPKTCNT_wb_axil),
-  .OUTRDRSPPKTCNT_wb_valid_o(OUTRDRSPPKTCNT_wb_axil_valid),
-  .OUTRDRSPPKTCNT_wb_o(OUTRDRSPPKTCNT_wb_axil),
-
-  .in_clk_i(axis_aclk_i),
-  .out_clk_i(axil_aclk_i),
-  .in_rstn_i(axis_rstn_i),
-  .out_rstn_i(axil_rstn_i)
-);
 
 
-
-//TODO: finish this!
 roce_stack_wq_manager #(
   .NUM_QP(NUM_QP)
 )inst_roce_stack_wq_manager(
-  .SQidx_i(SQidx),
   .QPidx_i(QPidx),
-  .connidx_i(connidx),
   .conn_configured_i(conn_configured),
   .qp_configured_i(qp_configured),
+  .sq_updated_i(sq_updated),
 
   .CONF_i(CONF),
 
@@ -477,19 +411,19 @@ roce_stack_wq_manager #(
   .SQPSNi_i(SQPSNi),
   .LSTRQREQi_i(LSTRQREQi),
 
-  .C_SQidx_o(SQ_SEL_IDX),
-  .SQ_QPCONFi_i(SQ_QPCONFi),
-  .SQ_SQPSNi_i(SQ_SQPSNi),
-  .SQ_LSTRQREQi_i(SQ_LSTRQREQi),
-
-
+  
   .SQBAi_i(SQBAi),
   .CQBAi_i(CQBAi),
   .SQPIi_i(SQPIi),
-  .VIRTADDR_i(VIRTADDRi),
+  .CQHEADi_i(CQHEADi),
+  .VIRTADDR_i(VIRTADDR),
    
-  .WB_CQHEADi_o(CQHEADi_wb_axis),
-  .WB_CQHEADi_valid_o(CQHEADi_wb_axis_valid),
+  .rd_qp_o(rd_qp),
+  .rd_qp_valid_o(rd_qp_valid),
+  .rd_qp_ready_i(rd_qp_ready),
+   
+  .WB_CQHEADi_o(CQHEADi_wb),
+  .WB_CQHEADi_valid_o(CQHEADi_wb_valid),
 
   .rx_ack_valid_i(rx_ack_valid),
   .rx_nack_valid_i(rx_nack_valid),
@@ -543,11 +477,10 @@ roce_stack_wq_manager #(
   .m_axi_qp_get_wqe_rvalid_i(m_axi_qp_get_wqe_rvalid_i),
   .m_axi_qp_get_wqe_rready_o(m_axi_qp_get_wqe_rready_o),
 
-  .axil_aclk_i(axil_aclk_i),
   .axis_aclk_i(axis_aclk_i),
-  .axil_rstn_i(axil_rstn_i),
   .axis_rstn_i(axis_rstn_i)
 );
+
 
 
 roce_stack_axis_to_aximm #(
@@ -634,6 +567,7 @@ roce_stack_axis_to_aximm #(
 
 );
 
+
 mac_ip_encode_ip mac_ip_encode_inst (
 `ifdef VITIS_HLS
     .s_axis_ip_TVALID(axis_tx_roce_to_eth.tvalid),
@@ -673,6 +607,7 @@ mac_ip_encode_ip mac_ip_encode_inst (
     .ap_rst_n(axis_rstn_i) // input aresetn
 `endif
 );
+
 
 AXI4S #(.AXI4S_DATA_BITS(512)) axis_ip_handler_droppedpkg_dbg ();
 assign axis_ip_handler_droppedpkg_dbg.tready = 1'b1;
@@ -768,34 +703,34 @@ roce_stack inst_roce_stack (
 );
 
 // a bit hacky but it works ;)
-logic ms_d, ms_q;
-always_comb begin
-  ms_d = ms_q;
-  if(epsn_valid) begin
-    ms_d = 1'b0;
-  end else if(npsn_valid) begin
-    ms_d = 1'b1;
-  end
-end
+//logic ms_d, ms_q;
+//always_comb begin
+//  ms_d = ms_q;
+//  if(epsn_valid) begin
+//    ms_d = 1'b0;
+//  end else if(npsn_valid) begin
+//    ms_d = 1'b1;
+//  end
+//end
+//
+//always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
+//  if(!axis_rstn_i) begin
+//    ms_q <= 1'b0;
+//  end else begin
+//    ms_q <= ms_d;
+//  end
+//end
+//
+//
+//assign MACADD_SEL = ms_q ? npsn_data[31:24] : epsn_data[31:24];
 
-always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
-  if(!axis_rstn_i) begin
-    ms_q <= 1'b0;
-  end else begin
-    ms_q <= ms_d;
-  end
-end
+assign INAMPKTCNT_wb[15:0] = rx_ack_data;
+assign INAMPKTCNT_wb[31:16] = 16'd0; //incoming MAD packets (unsupported)
+assign INAMPKTCNT_wb_valid = rx_ack_valid;
 
-
-assign MACADD_SEL = ms_q ? npsn_data[31:24] : epsn_data[31:24];
-
-assign INAMPKTCNT_wb_axis[15:0] = rx_ack_data;
-assign INAMPKTCNT_wb_axis[31:16] = 16'd0; //incoming MAD packets (unsupported)
-assign INAMPKTCNT_wb_axis_valid = rx_ack_valid;
-
-assign OUTAMPKTCNT_wb_axis[15:0] = tx_ack_data;
-assign OUTAMPKTCNT_wb_axis[31:16] = 16'd0; //incoming MAD packets (unsupported)
-assign OUTAMPKTCNT_wb_axis_valid = tx_ack_valid;
+assign OUTAMPKTCNT_wb[15:0] = tx_ack_data;
+assign OUTAMPKTCNT_wb[31:16] = 16'd0; //incoming MAD packets (unsupported)
+assign OUTAMPKTCNT_wb_valid = tx_ack_valid;
 
 
 //convert to network format

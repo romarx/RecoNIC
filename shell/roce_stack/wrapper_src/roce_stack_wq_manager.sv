@@ -2,14 +2,13 @@ import roceTypes::*;
 
 //TODO: better control logic for multiple QP's (except maybe for conn interface)
 module roce_stack_wq_manager #(
-  parameter int NUM_QP = 8
+  parameter int NUM_QP = 256
 )(
-    input  logic [7:0]    SQidx_i,
     input  logic [7:0]    QPidx_i,
-    input  logic [7:0]    connidx_i,
 
     input  logic          conn_configured_i,
     input  logic          qp_configured_i,
+    input  logic          sq_updated_i,
 
     input  logic [31:0]   CONF_i,
 
@@ -19,15 +18,15 @@ module roce_stack_wq_manager #(
     input  logic [23:0]   SQPSNi_i,
     input  logic [31:0]   LSTRQREQi_i,
 
-    output logic [7:0]    C_SQidx_o,
-    input  logic [31:0]   SQ_QPCONFi_i,
-    input  logic [23:0]   SQ_SQPSNi_i,
-    input  logic [31:0]   SQ_LSTRQREQi_i,
-
     input  logic [63:0]   SQBAi_i,
     input  logic [63:0]   CQBAi_i,
     input  logic [31:0]   SQPIi_i,
+    input  logic [31:0]   CQHEADi_i,
     input  logic [63:0]   VIRTADDR_i,
+
+    output rd_cmd_t       rd_qp_o,
+    output logic          rd_qp_valid_o,
+    input  logic          rd_qp_ready_i,
     
     output logic [39:0]   WB_CQHEADi_o,
     output logic          WB_CQHEADi_valid_o,
@@ -84,20 +83,16 @@ module roce_stack_wq_manager #(
     input  logic          m_axi_qp_get_wqe_rvalid_i,
     output logic          m_axi_qp_get_wqe_rready_o,
 
-    input  logic          axil_aclk_i,
     input  logic          axis_aclk_i,
-    input  logic          axil_rstn_i,
     input logic           axis_rstn_i
 );
 
 
-conndata_struct conn_if_input_d, conn_if_input_q, conn_if_output_d, conn_if_output_q, conn_if_meta;
-QPdata_struct qp_if_input_d, qp_if_input_q, qp_if_output_d, qp_if_output_q, qp_if_meta;
-SQdata_struct sq_if_input_d, sq_if_input_q, sq_if_output_d, sq_if_output_q;
 
-logic [31:0] localidx_d[NUM_QP-1:0], localidx_q[NUM_QP-1:0], localpi_d[NUM_QP-1:0], localpi_q[NUM_QP-1:0];
-logic [31:0] SQPIi_tmp;
-logic [7:0]  QPidx_tmp;
+SQdata_struct sq_if_input_d, sq_if_input_q, sq_if_output, sq_if_output_d, sq_if_output_q;
+rd_cmd_t rd_qp_d, rd_qp_q;
+
+logic [31:0] localidx;
 logic fetch_wqe;
 logic fetch_next_wqe;
 logic sq_done;
@@ -127,50 +122,27 @@ logic qp_intf_done;
 //                  //
 //////////////////////
 
-//AXIL CLOCK DOMAIN
-
-always_comb begin
-  conn_if_input_d = conn_if_input_q;
-  if(conn_configured_i) begin
-    conn_if_input_d.conn_idx      = connidx_i;
-    conn_if_input_d.dest_qp       = DESTQPCONFi_i;
-    conn_if_input_d.dest_ip_addr  = IPDESADDR1i_i;
-    conn_if_input_d.port          = CONF_i[31:16];
-  end
-end
-
-//AXIS CLOCK DOMAIN
-
 typedef enum {CONN_IDLE, CONN_IF_VALID, CONN_VALID} conn_state;
 conn_state conn_state_d, conn_state_q;
 
 always_comb begin
-  
   m_rdma_conn_interface_valid_o = 1'b0;
-  conn_if_output_d = conn_if_output_q;
   conn_state_d = conn_state_q;
   conn_ctx_d = conn_ctx_q;
 
   case(conn_state_q)
     CONN_IDLE: begin
       //should be safe, updating a reg takes a few cycles
-      if(conn_if_output_q != conn_if_meta) begin
-        conn_if_output_d = conn_if_meta;
-        conn_state_d = CONN_IF_VALID;
+      if(conn_configured_i) begin
+        if(IPDESADDR1i_i != 'd0) begin
+          conn_ctx_d.remote_udp_port = CONF_i[31:16];
+          conn_ctx_d.remote_ip_address = {IPDESADDR1i_i, IPDESADDR1i_i, IPDESADDR1i_i, IPDESADDR1i_i};
+          conn_ctx_d.remote_qpn = DESTQPCONFi_i;
+          conn_ctx_d.local_qpn = {8'b0, QPidx_i};
+          conn_state_d = CONN_VALID;
+        end
       end
     end
-    CONN_IF_VALID: begin
-      if(conn_if_output_q.dest_ip_addr != 'd0) begin
-        conn_ctx_d.remote_udp_port = conn_if_output_q.port;
-        conn_ctx_d.remote_ip_address = {conn_if_output_q.dest_ip_addr, conn_if_output_q.dest_ip_addr, conn_if_output_q.dest_ip_addr, conn_if_output_q.dest_ip_addr};
-        conn_ctx_d.remote_qpn = conn_if_output_q.dest_qp;
-        conn_ctx_d.local_qpn = {8'b0, conn_if_output_q.conn_idx};
-        
-        conn_state_d = CONN_VALID;
-      end else begin
-        conn_state_d = CONN_IDLE;
-      end
-    end 
     CONN_VALID: begin
       m_rdma_conn_interface_valid_o = 1'b1;
       if(m_rdma_conn_interface_ready_i) begin
@@ -187,69 +159,67 @@ end
 //                //
 ////////////////////
 
-
-//AXIL CLOCK DOMAIN
-always_comb begin
-  qp_if_input_d = qp_if_input_q;
-  if(qp_configured_i) begin  
-      qp_if_input_d.qp_idx        = QPidx_i;
-      qp_if_input_d.src_qp_conf   = QPCONFi_i;
-      qp_if_input_d.dest_qp       = DESTQPCONFi_i;
-      qp_if_input_d.sq_psn        = SQPSNi_i;
-      qp_if_input_d.dest_sq_psn   = LSTRQREQi_i[23:0];
-  end
-end
-
-
-//AXIS CLOCK DOMAIN
-typedef enum {QP_IDLE, QP_IF_VALID, QP_VALID, QP_SQ_VALID} qp_state;
+typedef enum {QP_IDLE, QP_IF_VALID, QP_VALID, QP_SQ_RD_QP, QP_SQ_VALID} qp_state;
 qp_state qp_state_d, qp_state_q;
 
 always_comb begin
   qp_state_d = qp_state_q;
-  qp_if_output_d = qp_if_output_q;
   mtu_d = mtu_q;
+  rd_qp_d = rd_qp_q;
   log_mtu_d = log_mtu_q;
   qp_ctx_d = qp_ctx_q;
   m_rdma_qp_interface_valid_o = 1'b0;
   qp_intf_done = 1'b0;
+  rd_qp_valid_o = 1'b0;
 
   case(qp_state_q) //TODO: two things can happen here.....
     QP_IDLE: begin
-      if(qp_if_output_q != qp_if_meta) begin
-        qp_if_output_d = qp_if_meta;
-        qp_state_d = QP_IF_VALID;
-      end else if (new_wqe_fetched) begin //TODO: take sq idx here!
-        if(SQ_QPCONFi_i[0] && SQ_QPCONFi_i[10:8] <= 3'b100) begin //if it's wrongly configured, don't proceed.
-          qp_ctx_d.vaddr = WQEReg_q[223:160]; //remote vaddr
-          qp_ctx_d.r_key = WQEReg_q[255:224]; // remote rkey
-          qp_ctx_d.local_psn = SQ_SQPSNi_i;
-          qp_ctx_d.remote_psn = SQ_LSTRQREQi_i[23:0] + 24'b1;
-          qp_ctx_d.qp_num = {16'b0, sq_if_output_q.sq_idx};
+      if(qp_configured_i) begin
+        if(QPCONFi_i[0] && QPCONFi_i[10:8] <= 3'b100) begin
+          mtu_d = 'd256 << QPCONFi_i[10:8];
+          log_mtu_d = 'd8 + {1'b0, QPCONFi_i[10:8]};
+          //these values are not necessary for the receiving side
+          qp_ctx_d.vaddr = 'd0;
+          qp_ctx_d.r_key = 'd0;
+          qp_ctx_d.local_psn = SQPSNi_i;
+          qp_ctx_d.remote_psn = LSTRQREQi_i[23:0] + 24'b1;
+          qp_ctx_d.qp_num = {16'b0, QPidx_i};
           qp_ctx_d.new_state = 32'b0;
-          
-          qp_state_d = QP_SQ_VALID;
-        end
-      end
-    end
-    QP_IF_VALID: begin
-        // only proceed if qp is enabled and mtu conf is valid
-        if(qp_if_output_q.src_qp_conf[0] && qp_if_output_q.src_qp_conf[10:8] <= 3'b100) begin
-          mtu_d = 'd256 << qp_if_output_q.src_qp_conf[10:8];
-          log_mtu_d = 'd8 + {1'b0, qp_if_output_q.src_qp_conf[10:8]};
-          //Maybe WQEReg is not yet set but who cares, these values are pointless anyway.........
-          qp_ctx_d.vaddr = WQEReg_q[223:160];
-          qp_ctx_d.r_key = WQEReg_q[255:224];
-          qp_ctx_d.local_psn = qp_if_output_q.sq_psn;
-          qp_ctx_d.remote_psn = qp_if_output_q.dest_sq_psn + 24'b1;
-          qp_ctx_d.qp_num = {16'b0, qp_if_output_q.qp_idx};
-          qp_ctx_d.new_state = 32'b0;          
-          
           qp_state_d = QP_VALID;
         end else begin
           qp_state_d = QP_IDLE;
-        end
+        end  
+      
+      end else if (new_wqe_fetched) begin // update interface
+        rd_qp_d.region = 'd2;
+        rd_qp_d.read_all = 1'b1;
+        rd_qp_d.bram_idx = NUM_QP_REGS; //use max for ready_o
+        rd_qp_d.address = sq_if_output_q.sq_idx;
+        qp_state_d = QP_SQ_RD_QP;
       end
+    end
+    QP_SQ_RD_QP: begin
+      rd_qp_valid_o = 1'b1;
+      if( rd_qp_ready_i ) begin
+        rd_qp_valid_o = 1'b0;
+        if(QPCONFi_i[0] && QPCONFi_i[10:8] <= 3'b100) begin
+          mtu_d = 'd256 << QPCONFi_i[10:8];
+          log_mtu_d = 'd8 + {1'b0, QPCONFi_i[10:8]};
+          //update vaddr and RKEY of receciving side
+          qp_ctx_d.vaddr = WQEReg_q[223:160];
+          qp_ctx_d.r_key = WQEReg_q[255:224];
+          qp_ctx_d.local_psn = SQPSNi_i;
+          qp_ctx_d.remote_psn = LSTRQREQi_i[23:0] + 24'b1;
+          qp_ctx_d.qp_num = {16'b0, QPidx_i};
+          qp_ctx_d.new_state = 32'b0;
+          qp_state_d = QP_SQ_VALID;
+        end else begin
+          sq_done = 1'b1;
+          qp_state_d = QP_IDLE;
+        end  
+      end
+    end
+
     QP_VALID: begin
       m_rdma_qp_interface_valid_o = 1'b1;
       if(m_rdma_qp_interface_ready_i) begin
@@ -266,6 +236,8 @@ always_comb begin
   endcase
 end
 
+assign rd_qp_o = rd_qp_q;
+
 
 ////////////////////
 //                //
@@ -273,29 +245,23 @@ end
 //                //
 ////////////////////
 
-//also make a separate index for sqpii
-//AXIL CLOCK DOMAIN
 
 typedef enum {SQ_FIFO_IDLE, SQ_FIFO_VALID } sq_fifo_st;
 sq_fifo_st sq_fifo_state_d, sq_fifo_state_q;
 
-logic sq_fifo_full, sq_fifo_wr_en, sq_fifo_wr_ack, sq_fifo_wr_rst_busy;
-logic sq_fifo_empty, sq_fifo_rd_en, sq_fifo_rd_valid, sq_fifo_rd_rst_busy;
+logic sq_fifo_ready_rd, sq_fifo_rd, sq_fifo_ready_wr, sq_fifo_wr;
 
 always_comb begin
   sq_if_input_d = sq_if_input_q;
-  for(int i=0; i < NUM_QP; i++) begin
-    localpi_d[i] = localpi_q[i];
-  end
   sq_fifo_state_d = sq_fifo_state_q;
-  sq_fifo_wr_en = 1'b0;
+  sq_fifo_wr = 1'b0;
 
   case(sq_fifo_state_q)
     SQ_FIFO_IDLE: begin
-      if(SQPIi_i > localpi_q[SQidx_i] && !sq_fifo_full && !sq_fifo_wr_rst_busy) begin //Assume all fields are set on SQPIi increase
-        localpi_d[SQidx_i] = SQPIi_i;
+      if(sq_updated_i && sq_fifo_ready_wr) begin //Assume all fields are set on SQPIi increase
         sq_if_input_d.sq_prod_idx = SQPIi_i;
-        sq_if_input_d.sq_idx = SQidx_i;
+        sq_if_input_d.cq_head_idx = CQHEADi_i;
+        sq_if_input_d.sq_idx = QPidx_i;
         sq_if_input_d.sq_base_addr = SQBAi_i;
         sq_if_input_d.cq_base_addr = CQBAi_i;
         sq_if_input_d.pd_vaddr = VIRTADDR_i;
@@ -303,62 +269,58 @@ always_comb begin
       end
     end
     SQ_FIFO_VALID: begin
-      sq_fifo_wr_en = 1'b1;
-      if(sq_fifo_wr_ack) begin
-        sq_fifo_state_d = SQ_FIFO_IDLE;
-      end
+      sq_fifo_wr = 1'b1;
+      sq_fifo_state_d = SQ_FIFO_IDLE;
     end
   endcase
 end
 
+fifo # (
+  .DATA_BITS(264),
+  .FIFO_SIZE(8)
+) sq_fifo (
+  .rd(sq_fifo_rd),
+	.wr(sq_fifo_wr),
 
-cdc_fifo_sq cdc_fifo_sq_inst (
-  .full(sq_fifo_full),
-  .din(sq_if_input_q),
-  .wr_en(sq_fifo_wr_en),
-  .wr_ack(sq_fifo_wr_ack),
+	.ready_rd(sq_fifo_ready_rd),
+	.ready_wr(sq_fifo_ready_wr),
 
-  .empty(sq_fifo_empty),
-  .dout(sq_if_output_d),
-  .rd_en(sq_fifo_rd_en),
-  .valid(sq_fifo_rd_valid),
+	.data_in(sq_if_input_q),
+  .data_out(sq_if_output),
 
-  .wr_clk(axil_aclk_i),
-  .rd_clk(axis_aclk_i),
-  .srst(!axil_rstn_i),
-  .wr_rst_busy(sq_fifo_wr_rst_busy),
-  .rd_rst_busy(sq_fifo_rd_rst_busy)
+  .aclk(axis_aclk_i),
+  .aresetn(axis_rstn_i)
 );
 
 
-//AXIS CLOCK DOMAIN
-//TODO: get the values!!!!
 typedef enum {SQ_IF_IDLE, SQ_OUT_VALID, SQ_IF_VALID} sq_if_state;
 sq_if_state sq_if_state_d, sq_if_state_q;
 
 always_comb begin
   sq_if_state_d = sq_if_state_q;
+  sq_if_output_d = sq_if_output_q;
   fetch_wqe = 1'b0;
-  sq_fifo_rd_en = 1'b0;
+  sq_fifo_rd = 1'b0;
 
   case(sq_if_state_q) 
     SQ_IF_IDLE: begin
-      if(sq_done && !sq_fifo_empty && !sq_fifo_rd_rst_busy) begin
+      if(sq_done && sq_fifo_ready_rd) begin
+        sq_fifo_rd = 1'b1;
+        sq_if_output_d = sq_if_output;
         sq_if_state_d = SQ_OUT_VALID;
       end
     end
     SQ_OUT_VALID: begin
-      sq_fifo_rd_en = 1'b1;
-      if(sq_fifo_rd_valid) begin
-        if(sq_if_output_d != sq_if_output_q) begin
-          sq_done = 1'b0;
-          sq_if_state_d = SQ_IF_VALID;
-        end else begin
-          sq_if_state_d = SQ_IF_IDLE;
-        end
-      end
+      //if(sq_if_output != sq_if_output_q) begin
+        sq_done = 1'b0;
+        sq_if_state_d = SQ_IF_VALID;
+      //end else begin
+      //  sq_if_state_d = SQ_IF_IDLE;
+      //end
+      
     end
     SQ_IF_VALID: begin
+      localidx = sq_if_output_q.cq_head_idx;
       fetch_wqe = 1'b1;
       sq_if_state_d = SQ_IF_IDLE;
     end
@@ -394,9 +356,6 @@ always_comb begin
   exp_resp_ctr_d = exp_resp_ctr_q;
   resp_ctr_d = resp_ctr_q;
   sq_state_d = sq_state_q;
-  for(int i=0; i < NUM_QP; i++) begin
-    localidx_d[i] = localidx_q[i];
-  end
   fetch_next_wqe = 1'b0;
 
   case(sq_state_q)
@@ -434,7 +393,7 @@ always_comb begin
           sq_req_d.req_2.vaddr  = WQEReg_q[223:160];
           sq_req_d.req_2.offs   = 4'b0;
           sq_req_d.req_2.len    = WQEReg_q[127:96];
-          sq_req_d.req_2.rsrvd        = 'd0;
+          sq_req_d.req_2.rsrvd  = 'd0;
           
           last_d = 1'b1;
           sq_state_d = SQ_VALID;
@@ -663,12 +622,12 @@ always_comb begin
     SQ_WRITE_COMPLETION: begin
       resp_ctr_d = 'd0;
       if(completion_written) begin
-        localidx_d[sq_if_output_q.sq_idx] = localidx_q[sq_if_output_q.sq_idx] + 1;
+        localidx = localidx + 1;
         sq_state_d = SQ_UPDATE_CQHEAD;
       end
     end
     SQ_UPDATE_CQHEAD: begin
-      if(localidx_q[sq_if_output_q.sq_idx] < sq_if_output_q.sq_prod_idx) begin
+      if(localidx < sq_if_output_q.sq_prod_idx) begin
           fetch_next_wqe = 1'b1;
         end else begin
           sq_done = 1'b1;
@@ -681,7 +640,7 @@ always_comb begin
 end
 
 assign WB_CQHEADi_o[39:32] = sq_if_output_q.sq_idx;
-assign WB_CQHEADi_o[31:0]  = localidx_q[sq_if_output_q.sq_idx];
+assign WB_CQHEADi_o[31:0]  = localidx;
 
 
 
@@ -713,7 +672,7 @@ always_comb begin
       end
     end
     AW_CALC_ADDR: begin
-      WrAddrReg_d = {sq_if_output_q.cq_base_addr[63:34], sq_if_output_q.cq_base_addr[33:2] + localidx_q[sq_if_output_q.sq_idx], sq_if_output_q[1:0]};
+      WrAddrReg_d = {sq_if_output_q.cq_base_addr[63:34], sq_if_output_q.cq_base_addr[33:2] + localidx, sq_if_output_q[1:0]};
       AddrWr_State_d = AW_VALID;
     end
     AW_VALID: begin
@@ -785,7 +744,7 @@ always_comb begin
     end
     AR_CALC_ADDR: begin
       //64 byte aligned 
-      RdAddrReg_d = {sq_if_output_q.sq_base_addr[63:38], sq_if_output_q.sq_base_addr[37:6] + localidx_q[sq_if_output_q.sq_idx], sq_if_output_q.sq_base_addr[5:0]};
+      RdAddrReg_d = {sq_if_output_q.sq_base_addr[63:38], sq_if_output_q.sq_base_addr[37:6] + localidx, sq_if_output_q.sq_base_addr[5:0]};
       AddrRd_State_d = AR_VALID;
     end
     AR_VALID: begin
@@ -832,7 +791,6 @@ always_comb begin
   endcase
 end
 
-assign C_SQidx_o = sq_if_output_q.sq_idx;
 
 //blank write channel
 assign m_axi_qp_get_wqe_awid_o = 1'b0;
@@ -864,58 +822,25 @@ assign m_rdma_conn_interface_data_o = conn_ctx_q;
 assign m_rdma_qp_interface_data_o = qp_ctx_q;
 assign m_rdma_sq_interface_data_o = sq_req_q;
 
-//TODO: definitely needs dc fifo or simple cdc inside csr for better timing
-//assign CQHEADi_o = localidx_q;
 
-
-
-always_ff @(posedge axil_aclk_i, negedge axil_rstn_i) begin
-  if(!axil_rstn_i) begin
-    conn_if_input_q <= 'd0;
-    qp_if_input_q   <= 'd0;
-    sq_if_input_q   <= 'd0;
-    sq_fifo_state_q <= SQ_FIFO_IDLE;
-    for(int i=0; i < NUM_QP; i++) begin
-      localpi_q[i]  <= 'd0;
-    end
-  end else begin
-    conn_if_input_q <= conn_if_input_d;
-    qp_if_input_q   <= qp_if_input_d;
-    sq_if_input_q   <= sq_if_input_d;
-    sq_fifo_state_q <= sq_fifo_state_d;
-    for(int i=0; i < NUM_QP; i++) begin
-      localpi_q[i]  <= localpi_d[i];
-    end
-  end
-end
-
-always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
-  if(!axis_rstn_i) begin
-    conn_if_meta  <= 'd0;
-    qp_if_meta    <= 'd0;
-  end else begin
-    conn_if_meta  <= conn_if_input_q;
-    qp_if_meta    <= qp_if_input_q;
-  end
-end
 
 
 always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
   if(!axis_rstn_i) begin
+    localidx            <= 'd0;
     sq_done             <= 1'b1;
-    SQPIi_tmp           <= 'd0;
-    QPidx_tmp           <= 'd0;
    
     conn_state_q        <= CONN_IDLE;
-    conn_if_output_q    <= 'd0;
     conn_ctx_q          <= 'd0;
     
     mtu_q               <= 'd0;
     log_mtu_q           <= 'd0;
     qp_state_q          <= QP_IDLE;
-    qp_if_output_q      <= 'd0;
     qp_ctx_q            <= 'd0;
     
+    rd_qp_q             <= 'd0;
+    sq_fifo_state_q     <= SQ_FIFO_IDLE;
+    sq_if_input_q       <= 'd0;
     sq_if_state_q       <= SQ_IF_IDLE;
     sq_if_output_q      <= 'd0;
     sq_state_q          <= SQ_IDLE;
@@ -938,21 +863,18 @@ always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
     transfer_length_q   <= 'd0;
     last_q              <= 1'b0;
     first_q             <= 1'b1;
-    for(int i = 0; i < NUM_QP; i++) begin
-      localidx_q[i]     <= 'd0;
-    end
-
   end else begin
     conn_state_q        <= conn_state_d;
-    conn_if_output_q    <= conn_if_output_d;
     conn_ctx_q          <= conn_ctx_d;
     
     mtu_q               <= mtu_d;
     log_mtu_q           <= log_mtu_d;
     qp_state_q          <= qp_state_d;
-    qp_if_output_q      <= qp_if_output_d;
     qp_ctx_q            <= qp_ctx_d;
     
+    rd_qp_q             <= rd_qp_d;
+    sq_fifo_state_q     <= sq_fifo_state_d;
+    sq_if_input_q       <= sq_if_input_d;
     sq_if_state_q       <= sq_if_state_d;
     sq_if_output_q      <= sq_if_output_d;
     sq_state_q          <= sq_state_d;
@@ -975,9 +897,6 @@ always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
     transfer_length_q   <= transfer_length_d;
     last_q              <= last_d;
     first_q             <= first_d;
-    for(int i = 0; i < NUM_QP; i++) begin
-      localidx_q[i]     <= localidx_d[i];
-    end
   end
 end
 
