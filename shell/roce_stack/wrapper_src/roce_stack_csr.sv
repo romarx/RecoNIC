@@ -129,64 +129,48 @@ module roce_stack_csr (
 
 localparam int RD_LAT = 1;
 
-
-
-
-rd_cmd_t cmd_fifo_in, cmd_fifo_out;
-
+////////////////
+//            //
+//  CDC FIFO  //
+//            //
+////////////////
+rd_cmd_t cmd_fifo_in = 'd0;
+rd_cmd_t cmd_fifo_out;
 logic cmd_fifo_wr_en, cmd_fifo_rd_en;
 logic cmd_fifo_full, cmd_fifo_empty;
 logic cmd_fifo_out_valid, cmd_fifo_in_ack;
 logic cmd_fifo_wr_rst_busy, cmd_fifo_rd_rst_busy;
 
 
-reg_cmd_cdc_fifo reg_cmd_cdc_fifo_inst (
-  //write
-  .full(cmd_fifo_full),
-  .din(cmd_fifo_in),
-  .wr_en(cmd_fifo_wr_en),
-  .wr_ack(cmd_fifo_in_ack),
-  //read
-  .empty(cmd_fifo_empty),
-  .dout(cmd_fifo_out),
-  .rd_en(cmd_fifo_rd_en),
-  .valid(cmd_fifo_out_valid),
 
-  .wr_clk(axil_aclk_i),
-  .rd_clk(axis_aclk_i),
-  .srst(!axil_rstn_i),
-
-  .wr_rst_busy(cmd_fifo_wr_rst_busy),
-  .rd_rst_busy(cmd_fifo_rd_rst_busy)
-);
-
-
+////////////////////////
+//                    //
+// AXIL CLOCK DOMAIN  //
+//                    //
+////////////////////////
 
 // Protection domain regs: 0x0 - 0x10000
-logic [NUM_PD_REGS-1:0] PD_REG_ENA_AXIL;
-logic [AXIL_DATA_WIDTH_BYTES-1:0] PD_REG_WEA_AXIL;
-logic [LOG_NUM_PD-1:0] PD_ADDR_AXIL;
+logic [NUM_PD_REGS-1:0] PD_REG_ENA_AXIL = 'd0;
+logic [AXIL_DATA_WIDTH_BYTES-1:0] PD_REG_WEA_AXIL = 'd0;
+logic [LOG_NUM_PD-1:0] PD_ADDR_AXIL = 'd0;
+logic [REG_WIDTH-1:0] PD_WR_REG_AXIL = 'd0;
 logic [NUM_PD_REGS-1:0][REG_WIDTH-1:0] PD_RD_REG_AXIL;
-logic [REG_WIDTH-1:0] PD_WR_REG_AXIL;
-
-logic [NUM_PD-1:0][23:0] pdnum_table_d, pdnum_table_q; //huge table to lookup pdnum
 
 
 //Per QP registers (NUMQP min is 8, max is 256)
-logic [NUM_QP_REGS-1:0] QP_REG_ENA_AXIL;
-logic [AXIL_DATA_WIDTH_BYTES-1:0] QP_REG_WEA_AXIL;
-logic [LOG_NUM_QP-1:0] QP_ADDR_AXIL;
+logic [NUM_QP_REGS-1:0] QP_REG_ENA_AXIL = 'd0;
+logic [AXIL_DATA_WIDTH_BYTES-1:0] QP_REG_WEA_AXIL = 'd0;
+logic [LOG_NUM_QP-1:0] QP_ADDR_AXIL = 'd0;
+logic [REG_WIDTH-1:0] QP_WR_REG_AXIL = 'd0;
 logic [NUM_QP_REGS-1:0][REG_WIDTH-1:0] QP_RD_REG_AXIL;
-logic [REG_WIDTH-1:0] QP_WR_REG_AXIL;
 
 
 // Configuration and status regs 0x20000 - 0x201F0
-
-logic GLB_REG_ENA_AXIL;
-logic [AXIL_DATA_WIDTH_BYTES-1:0] GLB_REG_WEA_AXIL;
-logic [7:0] GLB_ADDR_AXIL;
+logic GLB_REG_ENA_AXIL = 1'b0;
+logic [AXIL_DATA_WIDTH_BYTES-1:0] GLB_REG_WEA_AXIL = 'd0;
+logic [7:0] GLB_ADDR_AXIL = 'd0;
+logic [REG_WIDTH-1:0] GLB_WR_REG_AXIL = 'd0;
 logic [REG_WIDTH-1:0] GLB_RD_REG_AXIL;
-logic [REG_WIDTH-1:0] GLB_WR_REG_AXIL;
 
 
 
@@ -196,8 +180,6 @@ logic [REG_WIDTH-1:0] GLB_WR_REG_AXIL;
 //                   //
 ///////////////////////
 
-
-//AXI Lite clock domain
 logic reading, writing;
 logic[1:0] hold_rd_d, hold_rd_q;
 logic[1:0] hold_wr_d, hold_wr_q; //TODO: not sure if needed
@@ -219,42 +201,11 @@ logic[AXIL_DATA_WIDTH_BYTES-1:0] WStrbReg_d, WStrbReg_q;
 typedef enum {W_IDLE, W_READY, WRITE, B_RESP} write_state;
 write_state w_state_d, w_state_q;
 
-//AXIS clock domain
-logic [LOG_NUM_QP-1:0] QPidx_d, QPidx_q;
-logic hold_rd_axis_d, hold_rd_axis_q;
-
-
-logic [NUM_PD_REGS-1:0] PD_REG_ENB_AXIS;
-logic [AXIL_DATA_WIDTH_BYTES-1:0] PD_REG_WEB_AXIS;
-logic [LOG_NUM_PD-1:0] PD_ADDR_AXIS;
-logic [NUM_PD_REGS-1:0][REG_WIDTH-1:0] PD_RD_REG_AXIS, PD_RD_REG_AXIS_D, PD_RD_REG_AXIS_Q;
-logic [REG_WIDTH-1:0] PD_WR_REG_AXIS; //these are never written by the hardware
-
-logic [NUM_QP_REGS-1:0] QP_REG_ENB_AXIS;
-logic [AXIL_DATA_WIDTH_BYTES-1:0] QP_REG_WEB_AXIS;
-logic [LOG_NUM_QP-1:0] QP_ADDR_AXIS;
-logic [NUM_QP_REGS-1:0][REG_WIDTH-1:0] QP_RD_REG_AXIS, QP_RD_REG_AXIS_D, QP_RD_REG_AXIS_Q;
-logic [NUM_QP_REGS-1:0][REG_WIDTH-1:0] QP_WR_REG_AXIS; //multidimensional for parallel writes
-
-logic GLB_REG_ENA_AXIS;
-logic [AXIL_DATA_WIDTH_BYTES-1:0] GLB_REG_WEA_AXIS;
-logic [7:0] GLB_ADDR_AXIS;
-logic [REG_WIDTH-1:0] GLB_RD_REG_AXIS;
-logic [REG_WIDTH-1:0] GLB_WR_REG_AXIS;
-
-typedef enum {L_IDLE, L_READ_CMD, L_READ_SINGLE, L_READ_MULTI, L_READ_READY, L_READ_VADDR} logic_reg_state_t;
-logic_reg_state_t l_reg_st_d, l_reg_st_q;
-rd_cmd_t l_rd_cmd_d, l_rd_cmd_q;
 
 
 
-// lookup physical addresses
-typedef enum {VTP_IDLE, VTP_RD_PDN, VTP_RD_PDN_VLD, VTP_RD_PD, VTP_PREP_RESP, VTP_PREP_RESP_VLD, VTP_REQ_PD, VTP_VALID} virt_to_phys_state;
-virt_to_phys_state rd_vtp_st_d, rd_vtp_st_q, wr_vtp_st_d, wr_vtp_st_q;
-dma_req_t rd_resp_addr_data_d, rd_resp_addr_data_q, wr_resp_addr_data_d, wr_resp_addr_data_q;
 
-logic find_pd_rd_valid, find_pd_rd_ready, find_pd_wr_valid, find_pd_wr_ready;
-rd_cmd_t find_pd_rd_d, find_pd_rd_q, find_pd_wr_d, find_pd_wr_q;
+
 
 
 ////////////////
@@ -925,23 +876,6 @@ end
 
 always_ff @(posedge axil_aclk_i, negedge axil_rstn_i) begin
   if(!axil_rstn_i) begin    
-    PD_ADDR_AXIL <= 'd0;
-    PD_REG_ENA_AXIL <= 'd0;
-    PD_REG_WEA_AXIL <= 'd0;
-    PD_WR_REG_AXIL  <= 'd0;
-    
-    QP_ADDR_AXIL <= 'd0;
-    QP_REG_ENA_AXIL <= 'd0;
-    QP_REG_WEA_AXIL <= 'd0;
-    QP_WR_REG_AXIL  <= 'd0;
-
-    GLB_ADDR_AXIL <= 'd0;
-    GLB_REG_ENA_AXIL <= 'd0;
-    GLB_REG_WEA_AXIL <= 'd0;
-    GLB_WR_REG_AXIL <= 'd0;
-
-    cmd_fifo_in <= 'd0;
-    
     r_state_q <= R_IDLE;
     w_state_q <= W_IDLE;
     RAddrReg_q <= 'd0;
@@ -975,14 +909,64 @@ end
 
 
 
+////////////////////////
+//                    //
+// AXIS CLOCK DOMAIN  //
+//                    //
+////////////////////////
 
 
 
-////////////////////////////
-//                        //  
-//  AXIS clock domain     //
-//                        //
-////////////////////////////
+// Protection domain regs: 0x0 - 0x10000
+logic [NUM_PD_REGS-1:0] PD_REG_ENB_AXIS;
+logic [AXIL_DATA_WIDTH_BYTES-1:0] PD_REG_WEB_AXIS;
+logic [LOG_NUM_PD-1:0] PD_ADDR_AXIS;
+logic [NUM_PD_REGS-1:0][REG_WIDTH-1:0] PD_RD_REG_AXIS, PD_RD_REG_AXIS_D, PD_RD_REG_AXIS_Q;
+logic [REG_WIDTH-1:0] PD_WR_REG_AXIS; //these are never written by the hardware
+
+//Per QP registers (NUMQP min is 8, max is 256)
+logic [NUM_QP_REGS-1:0] QP_REG_ENB_AXIS;
+logic [AXIL_DATA_WIDTH_BYTES-1:0] QP_REG_WEB_AXIS;
+logic [LOG_NUM_QP-1:0] QP_ADDR_AXIS;
+logic [NUM_QP_REGS-1:0][REG_WIDTH-1:0] QP_RD_REG_AXIS, QP_RD_REG_AXIS_D, QP_RD_REG_AXIS_Q;
+logic [REG_WIDTH-1:0] QP_WR_REG_AXIS;
+
+// Configuration and status regs 0x20000 - 0x201F0
+logic GLB_REG_ENB_AXIS;
+logic [AXIL_DATA_WIDTH_BYTES-1:0] GLB_REG_WEB_AXIS;
+logic [7:0] GLB_ADDR_AXIS;
+logic [REG_WIDTH-1:0] GLB_RD_REG_AXIS;
+logic [REG_WIDTH-1:0] GLB_WR_REG_AXIS;
+
+//huge table to lookup pdnum
+logic [NUM_PD-1:0][23:0] pdnum_table_d, pdnum_table_q; 
+
+
+//Control signals for r/w fsm
+typedef enum {L_IDLE, L_READ_CMD, L_READ_SINGLE, L_READ_MULTI, L_WRITE, L_READ_READY, L_READ_VADDR} logic_reg_state_t;
+logic_reg_state_t l_reg_st_d, l_reg_st_q;
+rd_cmd_t l_rd_cmd_d, l_rd_cmd_q;
+logic [1:0] hold_axis_d, hold_axis_q;
+
+wr_cmd_t l_wr_cmd_d, l_wr_cmd_q;
+
+
+
+// lookup physical addresses
+typedef enum {VTP_IDLE, VTP_RD_PDN, VTP_RD_PDN_VLD, VTP_RD_PD, VTP_PREP_RESP, VTP_PREP_RESP_VLD, VTP_REQ_PD, VTP_VALID} virt_to_phys_state;
+virt_to_phys_state rd_vtp_st_d, rd_vtp_st_q, wr_vtp_st_d, wr_vtp_st_q;
+rd_cmd_t find_pd_rd_d, find_pd_rd_q, find_pd_wr_d, find_pd_wr_q;
+logic find_pd_rd_valid = 0;
+logic find_pd_wr_valid = 0; 
+logic find_pd_rd_ready; 
+logic find_pd_wr_ready;
+dma_req_t rd_resp_addr_data_d, rd_resp_addr_data_q, wr_resp_addr_data_d, wr_resp_addr_data_q;
+
+
+
+
+logic [LOG_NUM_QP-1:0] QPidx_d, QPidx_q;
+
 logic [REG_WIDTH-1:0] CONF_d, CONF_q;
 //logic [REG_WIDTH-1:0] ADCONF_d, ADCONF_q;
 //logic [REG_WIDTH-1:0] BUF_THRESHOLD_ROCE_d, BUF_THRESHOLD_ROCE_q;
@@ -1069,6 +1053,264 @@ logic [REG_WIDTH-1:0] IPv4ADD_d, IPv4ADD_q;
 //logic [REG_WIDTH-1:0] CNPSCHDSTS7REG_d, CNPSCHDSTS7REG_q;
 //logic [REG_WIDTH-1:0] CNPSCHDSTS8REG_d, CNPSCHDSTS8REG_q;
 
+
+typedef enum {WB_IDLE, WB_VALID} gen_wb_cmd_t;
+
+gen_wb_cmd_t wb_CQHEADi_s_d, wb_CQHEADi_s_q;
+wr_cmd_t wb_CQHEADi_cmd_d, wb_CQHEADi_cmd_q;
+logic wb_CQHEADi_valid = 0;
+
+always_comb begin
+  wb_CQHEADi_s_d = wb_CQHEADi_s_q;
+  wb_CQHEADi_cmd_d = wb_CQHEADi_cmd_q;
+  case(wb_CQHEADi_s_q)
+    WB_IDLE: begin
+      if(WB_CQHEADi_valid_i) begin
+        wb_CQHEADi_cmd_d.region = 'd2;
+        wb_CQHEADi_cmd_d.bram_idx = CQHEADi_idx;
+        wb_CQHEADi_cmd_d.address = WB_CQHEADi_i[39:32];
+        wb_CQHEADi_cmd_d.wstrb = 'hf;
+        wb_CQHEADi_cmd_d.data = WB_CQHEADi_i[31:0];
+        wb_CQHEADi_s_d = WB_VALID;
+      end
+    end
+    WB_VALID: begin
+      wb_CQHEADi_valid = 1'b1;
+      wb_CQHEADi_s_d = WB_IDLE;
+    end
+  endcase
+end
+
+
+gen_wb_cmd_t wb_SQPSNi_s_d, wb_SQPSNi_s_q;
+wr_cmd_t wb_SQPSNi_cmd_d, wb_SQPSNi_cmd_q;
+logic wb_SQPSNi_valid = 0;
+
+always_comb begin
+  wb_SQPSNi_s_d = wb_SQPSNi_s_q;
+  wb_SQPSNi_cmd_d = wb_SQPSNi_cmd_q;
+  case(wb_SQPSNi_s_q)
+    WB_IDLE: begin
+      if(WB_SQPSNi_valid_i) begin
+        wb_SQPSNi_cmd_d.region = 'd2;
+        wb_SQPSNi_cmd_d.bram_idx = SQPSNi_idx;
+        wb_SQPSNi_cmd_d.address = WB_SQPSNi_i[31:24];
+        wb_SQPSNi_cmd_d.wstrb = 'b0111;
+        wb_SQPSNi_cmd_d.data = {8'h0, WB_SQPSNi_i[23:0]};
+        wb_SQPSNi_s_d = WB_VALID;
+      end
+    end
+    WB_VALID: begin
+      wb_SQPSNi_valid = 1'b1;
+      wb_SQPSNi_s_d = WB_IDLE;
+    end
+  endcase
+end
+
+
+gen_wb_cmd_t wb_LSTRQREQi_s_d, wb_LSTRQREQi_s_q;
+wr_cmd_t wb_LSTRQREQi_cmd_d, wb_LSTRQREQi_cmd_q;
+logic wb_LSTRQREQi_valid = 0;
+
+always_comb begin
+  wb_LSTRQREQi_s_d = wb_LSTRQREQi_s_q;
+  wb_LSTRQREQi_cmd_d = wb_LSTRQREQi_cmd_q;
+  case(wb_LSTRQREQi_s_q)
+    WB_IDLE: begin
+      if(WB_LSTRQREQi_valid_i) begin
+        wb_LSTRQREQi_cmd_d.region = 'd2;
+        wb_LSTRQREQi_cmd_d.bram_idx = LSTRQREQi_idx;
+        wb_LSTRQREQi_cmd_d.address = WB_LSTRQREQi_i[31:24];
+        wb_LSTRQREQi_cmd_d.wstrb = 'b0111;
+        wb_LSTRQREQi_cmd_d.data = {8'h0, WB_LSTRQREQi_i[23:0]};
+        wb_LSTRQREQi_s_d = WB_VALID;
+      end
+    end
+    WB_VALID: begin
+      wb_LSTRQREQi_valid = 1'b1;
+      wb_LSTRQREQi_s_d = WB_IDLE;
+    end
+  endcase
+end
+
+
+gen_wb_cmd_t wb_INSRRPKTCNT_s_d, wb_INSRRPKTCNT_s_q;
+wr_cmd_t wb_INSRRPKTCNT_cmd_d, wb_INSRRPKTCNT_cmd_q;
+logic wb_INSRRPKTCNT_valid = 0;
+
+always_comb begin
+  wb_INSRRPKTCNT_s_d = wb_INSRRPKTCNT_s_q;
+  wb_INSRRPKTCNT_cmd_d = wb_INSRRPKTCNT_cmd_q;
+  case(wb_INSRRPKTCNT_s_q)
+    WB_IDLE: begin
+      if(WB_INSRRPKTCNT_valid_i) begin
+        wb_INSRRPKTCNT_cmd_d.region = 'd0;
+        wb_INSRRPKTCNT_cmd_d.bram_idx = 'd0;
+        wb_INSRRPKTCNT_cmd_d.address = ADDR_INSRRPKTCNT >> 2;
+        wb_INSRRPKTCNT_cmd_d.wstrb = 'hf;
+        wb_INSRRPKTCNT_cmd_d.data = WB_INSRRPKTCNT_i;
+        wb_INSRRPKTCNT_s_d = WB_VALID;
+      end
+    end
+    WB_VALID: begin
+      wb_INSRRPKTCNT_valid = 1'b1;
+      wb_INSRRPKTCNT_s_d = WB_IDLE;
+    end
+  endcase
+end
+
+gen_wb_cmd_t wb_INAMPKTCNT_s_d, wb_INAMPKTCNT_s_q;
+wr_cmd_t wb_INAMPKTCNT_cmd_d, wb_INAMPKTCNT_cmd_q;
+logic wb_INAMPKTCNT_valid = 0;
+
+always_comb begin
+  wb_INAMPKTCNT_s_d = wb_INAMPKTCNT_s_q;
+  wb_INAMPKTCNT_cmd_d = wb_INAMPKTCNT_cmd_q;
+  case(wb_INAMPKTCNT_s_q)
+    WB_IDLE: begin
+      if(WB_INAMPKTCNT_valid_i) begin
+        wb_INAMPKTCNT_cmd_d.region = 'd0;
+        wb_INAMPKTCNT_cmd_d.bram_idx = 'd0;
+        wb_INAMPKTCNT_cmd_d.address = ADDR_INAMPKTCNT >> 2;
+        wb_INAMPKTCNT_cmd_d.wstrb = 'hf;
+        wb_INAMPKTCNT_cmd_d.data = WB_INAMPKTCNT_i;
+        wb_INAMPKTCNT_s_d = WB_VALID;
+      end
+    end
+    WB_VALID: begin
+      wb_INAMPKTCNT_valid = 1'b1;
+      wb_INAMPKTCNT_s_d = WB_IDLE;
+    end
+  endcase
+end
+
+gen_wb_cmd_t wb_INNCKPKTSTS_s_d, wb_INNCKPKTSTS_s_q;
+wr_cmd_t wb_INNCKPKTSTS_cmd_d, wb_INNCKPKTSTS_cmd_q;
+logic wb_INNCKPKTSTS_valid = 0;
+
+always_comb begin
+  wb_INNCKPKTSTS_s_d = wb_INNCKPKTSTS_s_q;
+  wb_INNCKPKTSTS_cmd_d = wb_INNCKPKTSTS_cmd_q;
+  case(wb_INNCKPKTSTS_s_q)
+    WB_IDLE: begin
+      if(WB_INNCKPKTSTS_valid_i) begin
+        wb_INNCKPKTSTS_cmd_d.region = 'd0;
+        wb_INNCKPKTSTS_cmd_d.bram_idx = 'd0;
+        wb_INNCKPKTSTS_cmd_d.address = ADDR_INNCKPKTSTS >> 2;
+        wb_INNCKPKTSTS_cmd_d.wstrb = 'hf;
+        wb_INNCKPKTSTS_cmd_d.data = WB_INNCKPKTSTS_i;
+        wb_INNCKPKTSTS_s_d = WB_VALID;
+      end
+    end
+    WB_VALID: begin
+      wb_INNCKPKTSTS_valid = 1'b1;
+      wb_INNCKPKTSTS_s_d = WB_IDLE;
+    end
+  endcase
+end
+
+
+gen_wb_cmd_t wb_OUTAMPKTCNT_s_d, wb_OUTAMPKTCNT_s_q;
+wr_cmd_t wb_OUTAMPKTCNT_cmd_d, wb_OUTAMPKTCNT_cmd_q;
+logic wb_OUTAMPKTCNT_valid= 0;
+
+always_comb begin
+  wb_OUTAMPKTCNT_s_d = wb_OUTAMPKTCNT_s_q;
+  wb_OUTAMPKTCNT_cmd_d = wb_OUTAMPKTCNT_cmd_q;
+  case(wb_OUTAMPKTCNT_s_q)
+    WB_IDLE: begin
+      if(WB_OUTAMPKTCNT_valid_i) begin
+        wb_OUTAMPKTCNT_cmd_d.region = 'd0;
+        wb_OUTAMPKTCNT_cmd_d.bram_idx = 'd0;
+        wb_OUTAMPKTCNT_cmd_d.address = ADDR_OUTAMPKTCNT >> 2;
+        wb_OUTAMPKTCNT_cmd_d.wstrb = 'hf;
+        wb_OUTAMPKTCNT_cmd_d.data = WB_OUTAMPKTCNT_i;
+        wb_OUTAMPKTCNT_s_d = WB_VALID;
+      end
+    end
+    WB_VALID: begin
+      wb_OUTAMPKTCNT_valid = 1'b1;
+      wb_OUTAMPKTCNT_s_d = WB_IDLE;
+    end
+  endcase
+end
+
+gen_wb_cmd_t wb_OUTNAKPKTCNT_s_d, wb_OUTNAKPKTCNT_s_q;
+wr_cmd_t wb_OUTNAKPKTCNT_cmd_d, wb_OUTNAKPKTCNT_cmd_q;
+logic wb_OUTNAKPKTCNT_valid = 0;
+
+always_comb begin
+  wb_OUTNAKPKTCNT_s_d = wb_OUTNAKPKTCNT_s_q;
+  wb_OUTNAKPKTCNT_cmd_d = wb_OUTNAKPKTCNT_cmd_q;
+  case(wb_OUTNAKPKTCNT_s_q)
+    WB_IDLE: begin
+      if(WB_OUTNAKPKTCNT_valid_i) begin
+        wb_OUTNAKPKTCNT_cmd_d.region = 'd0;
+        wb_OUTNAKPKTCNT_cmd_d.bram_idx = 'd0;
+        wb_OUTNAKPKTCNT_cmd_d.address = ADDR_OUTNAKPKTCNT >> 2;
+        wb_OUTNAKPKTCNT_cmd_d.wstrb = 'b0011;
+        wb_OUTNAKPKTCNT_cmd_d.data = {16'h0, WB_OUTNAKPKTCNT_i};
+        wb_OUTNAKPKTCNT_s_d = WB_VALID;
+      end
+    end
+    WB_VALID: begin
+      wb_OUTNAKPKTCNT_valid = 1'b1;
+      wb_OUTNAKPKTCNT_s_d = WB_IDLE;
+    end
+  endcase
+end
+
+gen_wb_cmd_t wb_OUTIOPKTCNT_s_d, wb_OUTIOPKTCNT_s_q;
+wr_cmd_t wb_OUTIOPKTCNT_cmd_d, wb_OUTIOPKTCNT_cmd_q;
+logic wb_OUTIOPKTCNT_valid = 0;
+
+always_comb begin
+  wb_OUTIOPKTCNT_s_d = wb_OUTIOPKTCNT_s_q;
+  wb_OUTIOPKTCNT_cmd_d = wb_OUTIOPKTCNT_cmd_q;
+  case(wb_OUTIOPKTCNT_s_q)
+    WB_IDLE: begin
+      if(WB_OUTIOPKTCNT_valid_i) begin
+        wb_OUTIOPKTCNT_cmd_d.region = 'd0;
+        wb_OUTIOPKTCNT_cmd_d.bram_idx = 'd0;
+        wb_OUTIOPKTCNT_cmd_d.address = ADDR_OUTIOPKTCNT >> 2;
+        wb_OUTIOPKTCNT_cmd_d.wstrb = 'hf;
+        wb_OUTIOPKTCNT_cmd_d.data = WB_OUTIOPKTCNT_i;
+        wb_OUTIOPKTCNT_s_d = WB_VALID;
+      end
+    end
+    WB_VALID: begin
+      wb_OUTIOPKTCNT_valid = 1'b1;
+      wb_OUTIOPKTCNT_s_d = WB_IDLE;
+    end
+  endcase
+end
+
+gen_wb_cmd_t wb_OUTRDRSPPKTCNT_s_d, wb_OUTRDRSPPKTCNT_s_q;
+wr_cmd_t wb_OUTRDRSPPKTCNT_cmd_d, wb_OUTRDRSPPKTCNT_cmd_q;
+logic wb_OUTRDRSPPKTCNT_valid = 0;
+
+always_comb begin
+  wb_OUTRDRSPPKTCNT_s_d = wb_OUTRDRSPPKTCNT_s_q;
+  wb_OUTRDRSPPKTCNT_cmd_d = wb_OUTRDRSPPKTCNT_cmd_q;
+  case(wb_OUTRDRSPPKTCNT_s_q)
+    WB_IDLE: begin
+      if(WB_OUTRDRSPPKTCNT_valid_i) begin
+        wb_OUTRDRSPPKTCNT_cmd_d.region = 'd0;
+        wb_OUTRDRSPPKTCNT_cmd_d.bram_idx = 'd0;
+        wb_OUTRDRSPPKTCNT_cmd_d.address = ADDR_OUTRDRSPPKTCNT >> 2;
+        wb_OUTRDRSPPKTCNT_cmd_d.wstrb = 'hf;
+        wb_OUTRDRSPPKTCNT_cmd_d.data = WB_OUTRDRSPPKTCNT_i;
+        wb_OUTRDRSPPKTCNT_s_d = WB_VALID;
+      end
+    end
+    WB_VALID: begin
+      wb_OUTRDRSPPKTCNT_valid = 1'b1;
+      wb_OUTRDRSPPKTCNT_s_d = WB_IDLE;
+    end
+  endcase
+end
+
+
 rd_cmd_t rd_sq_vaddr_d, rd_sq_vaddr_q;
 logic rd_sq_vaddr_valid_d, rd_sq_vaddr_valid_q;
 logic config_sq;
@@ -1081,9 +1323,11 @@ always_comb begin
   rd_sq_vaddr_valid_d = rd_sq_vaddr_valid_q;
   l_reg_st_d = l_reg_st_q;
   l_rd_cmd_d = l_rd_cmd_q;
+  l_wr_cmd_d = l_wr_cmd_q;
+
   pdnum_table_d = pdnum_table_q;
   QPidx_d = QPidx_q;
-  hold_rd_axis_d = hold_rd_axis_q;
+  hold_axis_d = hold_axis_q;
   cmd_fifo_rd_en = 1'b0;
   qp_configured_o = 1'b0;
   conn_configured_o = 1'b0;
@@ -1092,13 +1336,22 @@ always_comb begin
   rd_qp_ready_o = 1'b0;
   find_pd_rd_ready = 1'b0;
   find_pd_wr_ready = 1'b0;
+    
   PD_REG_WEB_AXIS = 'd0;
   PD_REG_ENB_AXIS = 'd0;
+  PD_ADDR_AXIS = 'd0;
+  PD_WR_REG_AXIS = 'd0;
+
   QP_REG_WEB_AXIS = 'd0;
   QP_REG_ENB_AXIS = 'd0;
-  GLB_REG_WEA_AXIS = 'd0;
-  GLB_REG_ENA_AXIS = 'd0;
-  
+  QP_ADDR_AXIS = 'd0;
+  QP_WR_REG_AXIS = 'd0;
+
+  GLB_REG_WEB_AXIS = 'd0;
+  GLB_REG_ENB_AXIS = 'd0;
+  GLB_ADDR_AXIS = 'd0;
+  GLB_WR_REG_AXIS = 'd0;
+
   CONF_d = CONF_q;
   MACADDLSB_d = MACADDLSB_q;
   MACADDMSB_d = MACADDMSB_q;
@@ -1116,14 +1369,14 @@ always_comb begin
       end else if (!cmd_fifo_empty && !writing) begin // && !writing in different clock domain??
         cmd_fifo_rd_en = 1'b1;
         l_reg_st_d = L_READ_CMD;
-      end else if(rd_qp_valid_i) begin
+      end else if(rd_qp_valid_i && !writing) begin
         l_rd_cmd_d = rd_qp_i;
         if(rd_qp_i.read_all) begin
           l_reg_st_d = L_READ_MULTI;
         end else begin
           l_reg_st_d = L_READ_SINGLE;
         end
-      end else if(find_pd_rd_valid) begin
+      end else if(find_pd_rd_valid && !writing) begin
         find_pd_rd_valid = 1'b0;
         l_rd_cmd_d = find_pd_rd_q;
         if(find_pd_rd_q.read_all) begin
@@ -1131,7 +1384,7 @@ always_comb begin
         end else begin
           l_reg_st_d = L_READ_SINGLE;
         end
-      end else if(find_pd_wr_valid) begin
+      end else if(find_pd_wr_valid && !writing) begin
         find_pd_wr_valid = 1'b0;
         l_rd_cmd_d = find_pd_wr_q;
         if(find_pd_wr_q.read_all) begin
@@ -1139,6 +1392,47 @@ always_comb begin
         end else begin
           l_reg_st_d = L_READ_SINGLE;
         end
+      
+      end else if(wb_CQHEADi_valid && !writing) begin
+        wb_CQHEADi_valid = 1'b0;
+        l_wr_cmd_d = wb_CQHEADi_cmd_q;
+        l_reg_st_d = L_WRITE;
+      end else if(wb_SQPSNi_valid && !writing) begin
+        wb_SQPSNi_valid = 1'b0;
+        l_wr_cmd_d = wb_SQPSNi_cmd_q;
+        l_reg_st_d = L_WRITE;
+      end else if(wb_LSTRQREQi_valid && !writing) begin
+        wb_LSTRQREQi_valid = 1'b0;
+        l_wr_cmd_d = wb_LSTRQREQi_cmd_q;
+        l_reg_st_d = L_WRITE;
+      end else if(wb_INSRRPKTCNT_valid && !writing) begin
+        wb_INSRRPKTCNT_valid = 1'b0;
+        l_wr_cmd_d = wb_INSRRPKTCNT_cmd_q;
+        l_reg_st_d = L_WRITE;
+      end else if(wb_INAMPKTCNT_valid && !writing) begin
+        wb_INAMPKTCNT_valid = 1'b0;
+        l_wr_cmd_d = wb_INAMPKTCNT_cmd_q;
+        l_reg_st_d = L_WRITE;
+      end else if(wb_INNCKPKTSTS_valid && !writing) begin
+        wb_INNCKPKTSTS_valid = 1'b0;
+        l_wr_cmd_d = wb_INNCKPKTSTS_cmd_q;
+        l_reg_st_d = L_WRITE;
+      end else if(wb_OUTAMPKTCNT_valid && !writing) begin
+        wb_OUTAMPKTCNT_valid = 1'b0;
+        l_wr_cmd_d = wb_OUTAMPKTCNT_cmd_q;
+        l_reg_st_d = L_WRITE;
+      end else if(wb_OUTNAKPKTCNT_valid && !writing) begin
+        wb_OUTNAKPKTCNT_valid = 1'b0;
+        l_wr_cmd_d = wb_OUTNAKPKTCNT_cmd_q;
+        l_reg_st_d = L_WRITE;
+      end else if(wb_OUTIOPKTCNT_valid && !writing) begin
+        wb_OUTIOPKTCNT_valid = 1'b0;
+        l_wr_cmd_d = wb_OUTIOPKTCNT_cmd_q;
+        l_reg_st_d = L_WRITE;
+      end else if(wb_OUTRDRSPPKTCNT_valid && !writing) begin
+        wb_OUTRDRSPPKTCNT_valid = 1'b0;
+        l_wr_cmd_d = wb_OUTRDRSPPKTCNT_cmd_q;
+        l_reg_st_d = L_WRITE;
       end
     end
     L_READ_CMD: begin
@@ -1156,7 +1450,7 @@ always_comb begin
     L_READ_SINGLE: begin
       if(l_rd_cmd_q.region == 2'b0) begin
         GLB_ADDR_AXIS = l_rd_cmd_q.address;
-        GLB_REG_ENA_AXIS = 1'b1;
+        GLB_REG_ENB_AXIS = 1'b1;
         case(l_rd_cmd_q.address << 2)
           ADDR_CONF: begin
             CONF_d = GLB_RD_REG_AXIS;
@@ -1183,11 +1477,11 @@ always_comb begin
         l_reg_st_d = L_IDLE;
       end
       
-      if(hold_rd_axis_q == RD_LAT) begin
-        hold_rd_axis_d = 'd0;
+      if(hold_axis_q == RD_LAT) begin
+        hold_axis_d = 'd0;
         l_reg_st_d = L_READ_READY;
       end else begin
-        hold_rd_axis_d = hold_rd_axis_q + 'd1;
+        hold_axis_d = hold_axis_q + 'd1;
         l_reg_st_d = L_READ_SINGLE;
       end
     
@@ -1206,11 +1500,11 @@ always_comb begin
         l_reg_st_d = L_IDLE;
       end
 
-      if(hold_rd_axis_q == RD_LAT) begin
-        hold_rd_axis_d = 'd0;
+      if(hold_axis_q == RD_LAT) begin
+        hold_axis_d = 'd0;
         l_reg_st_d = L_READ_READY;
       end else begin
-        hold_rd_axis_d = hold_rd_axis_q + 'd1;
+        hold_axis_d = hold_axis_q + 'd1;
         l_reg_st_d = L_READ_MULTI;
       end
     end
@@ -1257,137 +1551,35 @@ always_comb begin
       rd_sq_vaddr_valid_d = 1'b1;
       l_reg_st_d = L_IDLE;
     end
+    L_WRITE: begin
+      if(l_wr_cmd_q.region == 'd0) begin
+        GLB_ADDR_AXIS = l_wr_cmd_q.address;
+        GLB_REG_WEB_AXIS = l_wr_cmd_q.wstrb;
+        GLB_WR_REG_AXIS = l_wr_cmd_q.data;
+        GLB_REG_ENB_AXIS = 1'b1;
+      end else if (l_wr_cmd_q.region == 'd1) begin
+        PD_ADDR_AXIS = l_wr_cmd_q.address;
+        PD_REG_WEB_AXIS = l_wr_cmd_q.wstrb;
+        PD_WR_REG_AXIS = l_wr_cmd_q.data;
+        PD_REG_ENB_AXIS[l_wr_cmd_q.bram_idx] = 1'b1;
+      end else if (l_wr_cmd_q.region == 'd2) begin
+        QP_ADDR_AXIS = l_wr_cmd_q.address;
+        QP_REG_WEB_AXIS = l_wr_cmd_q.wstrb;
+        QP_WR_REG_AXIS = l_wr_cmd_q.data;
+        QP_REG_ENB_AXIS[l_wr_cmd_q.bram_idx] = 1'b1;
+      end
+      if(hold_axis_q == 'd1) begin
+        hold_axis_d = 'd0;
+        l_reg_st_d = L_IDLE;
+      end else begin
+        hold_axis_d = hold_axis_q + 'd1;
+        l_reg_st_d = L_WRITE;
+      end
+    end
   endcase
 end
 
 
-
-
-
-
-
-
-//////////////
-//          //
-//    IO    //
-//          //
-//////////////
-
-assign s_axil_rdata_o = RDataReg_q;
-assign s_axil_rresp_o = RRespReg_q;
-assign s_axil_bresp_o = WRespReg_q;
-
-assign CONF_o = CONF_q;
-//assign ADCONF_o = ADCONF_q;
-assign MACADD_o = {MACADDMSB_q[15:0], MACADDLSB_q};
-assign IPv4ADD_o = IPv4ADD_q;
-//assign INTEN_o = INTEN_q;
-//assign ERRBUFBA_o = {ERRBUFBAMSB_q, ERRBUFBA_q};
-//assign ERRBUFSZ_o = ERRBUFSZ_q;
-//assign IPKTERRQBA_o = {IPKTERRQBAMSB_q, IPKTERRQBA_q};
-//assign IPKTERRQSZ_o = IPKTERRQSZ_q;
-//assign DATBUFBA_o = {DATBUFBAMSB_q, DATBUFBA_q};
-//assign DATBUFSZ_o = DATBUFSZ_q;
-//assign RESPERRPKTBA_o = {RESPERRPKTBAMSB_q, RESPERRPKTBA_q};
-//assign RESPERRSZ_o = {RESPERRSZMSB_q, RESPERRSZ_q};
-
-assign QPidx_o = QPidx_q;
-
-
-
-
-//That's a mux...
-assign QPCONFi_o      = QP_RD_REG_AXIS_Q[QPCONFi_idx];
-//assign QPADVCONFi_o   = QP_RD_REG_AXIS_Q[QPADVCONFi_idx];
-assign RQBAi_o        = {QP_RD_REG_AXIS_Q[RQBAMSBi_idx], QP_RD_REG_AXIS_Q[RQBAi_idx]};
-
-assign SQBAi_o        = {QP_RD_REG_AXIS_Q[SQBAMSBi_idx], QP_RD_REG_AXIS_Q[SQBAi_idx]};
-assign CQBAi_o        = {QP_RD_REG_AXIS_Q[CQBAMSBi_idx], QP_RD_REG_AXIS_Q[CQBAi_idx]};
-assign SQPIi_o        = QP_RD_REG_AXIS_Q[SQPIi_idx];
-assign CQHEADi_o      = QP_RD_REG_AXIS_Q[CQHEADi_idx];
-
-//assign RQWPTRDBADDi_o = {QP_RD_REG_AXIS_Q[RQWPTRDBADDMSBi_idx], QP_RD_REG_AXIS_Q[RQWPTRDBADDi_idx]};
-//assign CQDBADDi_o     = {QP_RD_REG_AXIS_Q[CQDBADDMSBi_idx],     QP_RD_REG_AXIS_Q[CQDBADDi_idx]};
-
-//assign QDEPTHi_o      = QP_RD_REG_AXIS_Q[QDEPTHi_idx];
-assign SQPSNi_o       = QP_RD_REG_AXIS_Q[SQPSNi_idx][23:0];
-assign LSTRQREQi_o    = QP_RD_REG_AXIS_Q[LSTRQREQi_idx];
-assign DESTQPCONFi_o  = QP_RD_REG_AXIS_Q[DESTQPCONFi_idx][23:0];
-
-
-assign MACDESADDi_o   = {QP_RD_REG_AXIS_Q[MACDESADDMSBi_idx][15:0], QP_RD_REG_AXIS_Q[MACDESADDLSBi_idx]};
-assign IPDESADDR1i_o  = QP_RD_REG_AXIS_Q[IPDESADDR1i_idx];
-
-assign VIRTADDR_o = {PD_RD_REG_AXIS_Q[VIRTADDRMSB_idx], PD_RD_REG_AXIS_Q[VIRTADDRLSB_idx]};
-
-
-
-////////////////////////////
-//                        //
-//  REGISTER DEFINITIONS  //
-//                        //
-////////////////////////////
-
-
-
-//Protection Domain
-generate
-  for (genvar i = 0; i < NUM_PD_REGS; i++) begin : pd_regs
-    block_ram_1k PD_CONF_inst (
-      .addra(PD_ADDR_AXIL),
-      .dina(PD_WR_REG_AXIL),
-      .douta(PD_RD_REG_AXIL[i]),
-      .ena(PD_REG_ENA_AXIL[i]),
-      .wea(PD_REG_WEA_AXIL),
-      .clka(axil_aclk_i),
-      .rsta(!axil_rstn_i),
-      .addrb(PD_ADDR_AXIS),
-      .dinb(PD_WR_REG_AXIS),
-      .doutb(PD_RD_REG_AXIS[i]),
-      .enb(PD_REG_ENB_AXIS[i]),
-      .web(PD_REG_WEB_AXIS),
-      .clkb(axis_aclk_i)
-    );
-  end
-endgenerate
-
-//GLobal config
-block_ram_1k GLBCONF_inst (
-  .addra(GLB_ADDR_AXIL),
-  .dina(GLB_WR_REG_AXIL),
-  .douta(GLB_RD_REG_AXIL),
-  .ena(GLB_REG_ENA_AXIL),
-  .wea(GLB_REG_WEA_AXIL),
-  .clka(axil_aclk_i),
-  .rsta(!axil_rstn_i),
-  .addrb(GLB_ADDR_AXIS),
-  .dinb(GLB_WR_REG_AXIS), 
-  .doutb(GLB_RD_REG_AXIS),
-  .enb(GLB_REG_ENA_AXIS),
-  .web(GLB_REG_WEA_AXIS),
-  .clkb(axis_aclk_i)
-);
-
-//Per QP config //TODO: make a for loop
-generate
-  for (genvar i = 0; i < NUM_QP_REGS; i++) begin : qp_regs
-    block_ram_1k PER_QP_inst (
-      .addra(QP_ADDR_AXIL),
-      .dina(QP_WR_REG_AXIL),
-      .douta(QP_RD_REG_AXIL[i]),
-      .ena(QP_REG_ENA_AXIL[i]),
-      .wea(QP_REG_WEA_AXIL),
-      .clka(axil_aclk_i),
-      .rsta(!axil_rstn_i),
-      .addrb(QP_ADDR_AXIS),
-      .dinb(QP_WR_REG_AXIS[i]),
-      .doutb(QP_RD_REG_AXIS[i]),
-      .enb(QP_REG_ENB_AXIS[i]),
-      .web(QP_REG_WEB_AXIS),
-      .clkb(axis_aclk_i)
-    );
-  end
-endgenerate
 
 
 
@@ -1567,29 +1759,12 @@ always_comb begin
 end
 
 
-
 always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
   if(!axis_rstn_i) begin
-    PD_ADDR_AXIS <= 'd0;
-    PD_WR_REG_AXIS <= 'd0;
-    
-
-    
-    QP_ADDR_AXIS <= 'd0;
-    QP_WR_REG_AXIS <= 'd0;
-
-    GLB_ADDR_AXIS <= 'd0;
-    GLB_WR_REG_AXIS <= 'd0;
-    
-    
-    
-    find_pd_rd_valid <= 1'b0; //TODO: this has to be done nicer
-    find_pd_wr_valid <= 1'b0;
-    
-    pdnum_table_q <= ~0;
     l_reg_st_q <= L_IDLE;
     l_rd_cmd_q <= 'd0;
-    hold_rd_axis_q <= 'd0;
+    l_wr_cmd_q <= 'd0;
+    hold_axis_q <= 'd0;
     QPidx_q <= 'd0;
 
     rd_sq_vaddr_q <= 'd0;
@@ -1603,8 +1778,6 @@ always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
     PD_RD_REG_AXIS_Q <= 'd0;
     QP_RD_REG_AXIS_Q <= 'd0;
     
-    
-    
     rd_vtp_st_q <= VTP_IDLE;
     wr_vtp_st_q <= VTP_IDLE;
     rd_resp_addr_data_q <= 'd0;
@@ -1613,12 +1786,43 @@ always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
     
     find_pd_rd_q <= 'd0;
     find_pd_wr_q <= 'd0;
+    pdnum_table_q <= ~0;
     pd_addr_q <= ~0;
+
+    wb_CQHEADi_s_q <= WB_IDLE;
+    wb_CQHEADi_cmd_q <= 'd0;
+
+    wb_SQPSNi_s_q <= WB_IDLE;
+    wb_SQPSNi_cmd_q <= 'd0;
+
+    wb_LSTRQREQi_s_q <= WB_IDLE;
+    wb_LSTRQREQi_cmd_q <= 'd0;
+
+    wb_INSRRPKTCNT_s_q <= WB_IDLE;
+    wb_INSRRPKTCNT_cmd_q <= 'd0;
+
+    wb_INAMPKTCNT_s_q <= WB_IDLE;
+    wb_INAMPKTCNT_cmd_q <= 'd0;
+
+    wb_INNCKPKTSTS_s_q <= WB_IDLE;
+    wb_INNCKPKTSTS_cmd_q <= 'd0;
+
+    wb_OUTAMPKTCNT_s_q <= WB_IDLE;
+    wb_OUTAMPKTCNT_cmd_q <= 'd0;
+
+    wb_OUTNAKPKTCNT_s_q <= WB_IDLE;
+    wb_OUTNAKPKTCNT_cmd_q <= 'd0;
+
+    wb_OUTIOPKTCNT_s_q <= WB_IDLE;
+    wb_OUTIOPKTCNT_cmd_q <= 'd0;
+
+    wb_OUTRDRSPPKTCNT_s_q <= WB_IDLE;
+    wb_OUTRDRSPPKTCNT_cmd_q <= 'd0;
   end else begin
-    pdnum_table_q <= pdnum_table_d;
     l_reg_st_q <= l_reg_st_d;
     l_rd_cmd_q <= l_rd_cmd_d;
-    hold_rd_axis_q <= hold_rd_axis_d;
+    l_wr_cmd_q <= l_wr_cmd_d;
+    hold_axis_q <= hold_axis_d;
     QPidx_q <= QPidx_d;
 
     rd_sq_vaddr_q <= rd_sq_vaddr_d;
@@ -1639,7 +1843,38 @@ always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
 
     find_pd_rd_q <= find_pd_rd_d;
     find_pd_wr_q <= find_pd_wr_d;
+    pdnum_table_q <= pdnum_table_d;
     pd_addr_q <= pd_addr_d;
+
+    wb_CQHEADi_s_q <= wb_CQHEADi_s_d;
+    wb_CQHEADi_cmd_q <= wb_CQHEADi_cmd_d;
+
+    wb_SQPSNi_s_q <= wb_SQPSNi_s_d;
+    wb_SQPSNi_cmd_q <= wb_SQPSNi_cmd_d;
+
+    wb_LSTRQREQi_s_q <= wb_LSTRQREQi_s_d;
+    wb_LSTRQREQi_cmd_q <= wb_LSTRQREQi_cmd_d;
+
+    wb_INSRRPKTCNT_s_q <= wb_INSRRPKTCNT_s_d;
+    wb_INSRRPKTCNT_cmd_q <= wb_INSRRPKTCNT_cmd_d;
+
+    wb_INAMPKTCNT_s_q <= wb_INAMPKTCNT_s_d;
+    wb_INAMPKTCNT_cmd_q <= wb_INAMPKTCNT_cmd_d;
+
+    wb_INNCKPKTSTS_s_q <= wb_INNCKPKTSTS_s_d;
+    wb_INNCKPKTSTS_cmd_q <= wb_INNCKPKTSTS_cmd_d;
+
+    wb_OUTAMPKTCNT_s_q <= wb_OUTAMPKTCNT_s_d;
+    wb_OUTAMPKTCNT_cmd_q <= wb_OUTAMPKTCNT_cmd_d;
+
+    wb_OUTNAKPKTCNT_s_q <= wb_OUTNAKPKTCNT_s_d;
+    wb_OUTNAKPKTCNT_cmd_q <= wb_OUTNAKPKTCNT_cmd_d;
+
+    wb_OUTIOPKTCNT_s_q <= wb_OUTIOPKTCNT_s_d;
+    wb_OUTIOPKTCNT_cmd_q <= wb_OUTIOPKTCNT_cmd_d;
+
+    wb_OUTRDRSPPKTCNT_s_q <= wb_OUTRDRSPPKTCNT_s_d;
+    wb_OUTRDRSPPKTCNT_cmd_q <= wb_OUTRDRSPPKTCNT_cmd_d;
   end
 end
 
@@ -1647,9 +1882,157 @@ assign rd_resp_addr_data_o = rd_resp_addr_data_q;
 assign wr_resp_addr_data_o = wr_resp_addr_data_q;
 
 
+////////////////////
+//                //
+//  CDC CMD FIFO  //
+//                //
+////////////////////
+reg_cmd_cdc_fifo reg_cmd_cdc_fifo_inst (
+  //write
+  .full(cmd_fifo_full),
+  .din(cmd_fifo_in),
+  .wr_en(cmd_fifo_wr_en),
+  .wr_ack(cmd_fifo_in_ack),
+  //read
+  .empty(cmd_fifo_empty),
+  .dout(cmd_fifo_out),
+  .rd_en(cmd_fifo_rd_en),
+  .valid(cmd_fifo_out_valid),
+
+  .wr_clk(axil_aclk_i),
+  .rd_clk(axis_aclk_i),
+  .srst(!axil_rstn_i),
+
+  .wr_rst_busy(cmd_fifo_wr_rst_busy),
+  .rd_rst_busy(cmd_fifo_rd_rst_busy)
+);
 
 
 
+////////////////////////////
+//                        //
+//  REGISTER DEFINITIONS  //
+//                        //
+////////////////////////////
+
+
+
+//Protection Domain
+generate
+  for (genvar i = 0; i < NUM_PD_REGS; i++) begin : pd_regs
+    block_ram_1k PD_CONF_inst (
+      .addra(PD_ADDR_AXIL),
+      .dina(PD_WR_REG_AXIL),
+      .douta(PD_RD_REG_AXIL[i]),
+      .ena(PD_REG_ENA_AXIL[i]),
+      .wea(PD_REG_WEA_AXIL),
+      .clka(axil_aclk_i),
+      .rsta(!axil_rstn_i),
+      .addrb(PD_ADDR_AXIS),
+      .dinb(PD_WR_REG_AXIS),
+      .doutb(PD_RD_REG_AXIS[i]),
+      .enb(PD_REG_ENB_AXIS[i]),
+      .web(PD_REG_WEB_AXIS),
+      .clkb(axis_aclk_i)
+    );
+  end
+endgenerate
+
+//GLobal config
+block_ram_1k GLBCONF_inst (
+  .addra(GLB_ADDR_AXIL),
+  .dina(GLB_WR_REG_AXIL),
+  .douta(GLB_RD_REG_AXIL),
+  .ena(GLB_REG_ENA_AXIL),
+  .wea(GLB_REG_WEA_AXIL),
+  .clka(axil_aclk_i),
+  .rsta(!axil_rstn_i),
+  .addrb(GLB_ADDR_AXIS),
+  .dinb(GLB_WR_REG_AXIS), 
+  .doutb(GLB_RD_REG_AXIS),
+  .enb(GLB_REG_ENB_AXIS),
+  .web(GLB_REG_WEB_AXIS),
+  .clkb(axis_aclk_i)
+);
+
+//Per QP config //TODO: make a for loop
+generate
+  for (genvar i = 0; i < NUM_QP_REGS; i++) begin : qp_regs
+    block_ram_1k PER_QP_inst (
+      .addra(QP_ADDR_AXIL),
+      .dina(QP_WR_REG_AXIL),
+      .douta(QP_RD_REG_AXIL[i]),
+      .ena(QP_REG_ENA_AXIL[i]),
+      .wea(QP_REG_WEA_AXIL),
+      .clka(axil_aclk_i),
+      .rsta(!axil_rstn_i),
+      .addrb(QP_ADDR_AXIS),
+      .dinb(QP_WR_REG_AXIS),
+      .doutb(QP_RD_REG_AXIS[i]),
+      .enb(QP_REG_ENB_AXIS[i]),
+      .web(QP_REG_WEB_AXIS),
+      .clkb(axis_aclk_i)
+    );
+  end
+endgenerate
+
+
+
+
+
+
+//////////////
+//          //
+//    IO    //
+//          //
+//////////////
+
+assign s_axil_rdata_o = RDataReg_q;
+assign s_axil_rresp_o = RRespReg_q;
+assign s_axil_bresp_o = WRespReg_q;
+
+assign CONF_o = CONF_q;
+//assign ADCONF_o = ADCONF_q;
+assign MACADD_o = {MACADDMSB_q[15:0], MACADDLSB_q};
+assign IPv4ADD_o = IPv4ADD_q;
+//assign INTEN_o = INTEN_q;
+//assign ERRBUFBA_o = {ERRBUFBAMSB_q, ERRBUFBA_q};
+//assign ERRBUFSZ_o = ERRBUFSZ_q;
+//assign IPKTERRQBA_o = {IPKTERRQBAMSB_q, IPKTERRQBA_q};
+//assign IPKTERRQSZ_o = IPKTERRQSZ_q;
+//assign DATBUFBA_o = {DATBUFBAMSB_q, DATBUFBA_q};
+//assign DATBUFSZ_o = DATBUFSZ_q;
+//assign RESPERRPKTBA_o = {RESPERRPKTBAMSB_q, RESPERRPKTBA_q};
+//assign RESPERRSZ_o = {RESPERRSZMSB_q, RESPERRSZ_q};
+
+assign QPidx_o = QPidx_q;
+
+
+
+
+//That's a mux...
+assign QPCONFi_o      = QP_RD_REG_AXIS_Q[QPCONFi_idx];
+//assign QPADVCONFi_o   = QP_RD_REG_AXIS_Q[QPADVCONFi_idx];
+assign RQBAi_o        = {QP_RD_REG_AXIS_Q[RQBAMSBi_idx], QP_RD_REG_AXIS_Q[RQBAi_idx]};
+
+assign SQBAi_o        = {QP_RD_REG_AXIS_Q[SQBAMSBi_idx], QP_RD_REG_AXIS_Q[SQBAi_idx]};
+assign CQBAi_o        = {QP_RD_REG_AXIS_Q[CQBAMSBi_idx], QP_RD_REG_AXIS_Q[CQBAi_idx]};
+assign SQPIi_o        = QP_RD_REG_AXIS_Q[SQPIi_idx];
+assign CQHEADi_o      = QP_RD_REG_AXIS_Q[CQHEADi_idx];
+
+//assign RQWPTRDBADDi_o = {QP_RD_REG_AXIS_Q[RQWPTRDBADDMSBi_idx], QP_RD_REG_AXIS_Q[RQWPTRDBADDi_idx]};
+//assign CQDBADDi_o     = {QP_RD_REG_AXIS_Q[CQDBADDMSBi_idx],     QP_RD_REG_AXIS_Q[CQDBADDi_idx]};
+
+//assign QDEPTHi_o      = QP_RD_REG_AXIS_Q[QDEPTHi_idx];
+assign SQPSNi_o       = QP_RD_REG_AXIS_Q[SQPSNi_idx][23:0];
+assign LSTRQREQi_o    = QP_RD_REG_AXIS_Q[LSTRQREQi_idx];
+assign DESTQPCONFi_o  = QP_RD_REG_AXIS_Q[DESTQPCONFi_idx][23:0];
+
+
+assign MACDESADDi_o   = {QP_RD_REG_AXIS_Q[MACDESADDMSBi_idx][15:0], QP_RD_REG_AXIS_Q[MACDESADDLSBi_idx]};
+assign IPDESADDR1i_o  = QP_RD_REG_AXIS_Q[IPDESADDR1i_idx];
+
+assign VIRTADDR_o = {PD_RD_REG_AXIS_Q[VIRTADDRMSB_idx], PD_RD_REG_AXIS_Q[VIRTADDRLSB_idx]};
 
 
 endmodule: roce_stack_csr

@@ -92,10 +92,11 @@ module roce_stack_wq_manager #(
 SQdata_struct sq_if_input_d, sq_if_input_q, sq_if_output, sq_if_output_d, sq_if_output_q;
 rd_cmd_t rd_qp_d, rd_qp_q;
 
-logic [31:0] localidx;
+logic [31:0] localidx = 'd0;
+logic sq_busy = 1'b0;
+
 logic fetch_wqe;
 logic fetch_next_wqe;
-logic sq_done;
 
 
 
@@ -214,7 +215,7 @@ always_comb begin
           qp_ctx_d.new_state = 32'b0;
           qp_state_d = QP_SQ_VALID;
         end else begin
-          sq_done = 1'b1;
+          sq_busy = 1'b0;
           qp_state_d = QP_IDLE;
         end  
       end
@@ -258,7 +259,7 @@ always_comb begin
 
   case(sq_fifo_state_q)
     SQ_FIFO_IDLE: begin
-      if(sq_updated_i && sq_fifo_ready_wr) begin //Assume all fields are set on SQPIi increase
+      if(sq_updated_i && sq_fifo_ready_wr) begin //Assume all fields are set!
         sq_if_input_d.sq_prod_idx = SQPIi_i;
         sq_if_input_d.cq_head_idx = CQHEADi_i;
         sq_if_input_d.sq_idx = QPidx_i;
@@ -304,20 +305,14 @@ always_comb begin
 
   case(sq_if_state_q) 
     SQ_IF_IDLE: begin
-      if(sq_done && sq_fifo_ready_rd) begin
+      if(!sq_busy && sq_fifo_ready_rd) begin
         sq_fifo_rd = 1'b1;
-        sq_if_output_d = sq_if_output;
-        sq_if_state_d = SQ_OUT_VALID;
+        if(sq_if_output != sq_if_output_q) begin
+          sq_if_output_d = sq_if_output;
+          sq_busy = 1'b1;
+          sq_if_state_d = SQ_IF_VALID;
+        end
       end
-    end
-    SQ_OUT_VALID: begin
-      //if(sq_if_output != sq_if_output_q) begin
-        sq_done = 1'b0;
-        sq_if_state_d = SQ_IF_VALID;
-      //end else begin
-      //  sq_if_state_d = SQ_IF_IDLE;
-      //end
-      
     end
     SQ_IF_VALID: begin
       localidx = sq_if_output_q.cq_head_idx;
@@ -341,6 +336,7 @@ logic first_d, first_q;
 logic [31:0] transfer_length_d, transfer_length_q;
 logic [63:0] curr_local_vaddr_d, curr_local_vaddr_q, curr_remote_vaddr_d, curr_remote_vaddr_q;
 logic [31:0] exp_resp_ctr_d, exp_resp_ctr_q, resp_ctr_d, resp_ctr_q;
+logic [31:0] localidx_d, localidx_q;
 
 always_comb begin
   write_completion = 1'b0;
@@ -357,12 +353,14 @@ always_comb begin
   resp_ctr_d = resp_ctr_q;
   sq_state_d = sq_state_q;
   fetch_next_wqe = 1'b0;
+  localidx_d = localidx_q;
 
   case(sq_state_q)
     SQ_IDLE: begin
       //TODO: FIFO for all WQE's fetched in current execution
       //A new WQE is fetched, start examining it...
       if(qp_intf_done) begin
+        localidx_d = localidx;
         if(WQEReg_q[135:128] == 8'h00) begin
           //WRITE
           $display("write command");
@@ -622,16 +620,17 @@ always_comb begin
     SQ_WRITE_COMPLETION: begin
       resp_ctr_d = 'd0;
       if(completion_written) begin
-        localidx = localidx + 1;
+        localidx_d = localidx_q + 1;
         sq_state_d = SQ_UPDATE_CQHEAD;
       end
     end
     SQ_UPDATE_CQHEAD: begin
-      if(localidx < sq_if_output_q.sq_prod_idx) begin
+      localidx = localidx_q;
+      if(localidx_q < sq_if_output_q.sq_prod_idx) begin
           fetch_next_wqe = 1'b1;
-        end else begin
-          sq_done = 1'b1;
-        end
+      end else begin
+        sq_busy = 1'b0;
+      end
       WB_CQHEADi_valid_o = 1'b1;
       sq_state_d = SQ_IDLE;
     end
@@ -640,7 +639,7 @@ always_comb begin
 end
 
 assign WB_CQHEADi_o[39:32] = sq_if_output_q.sq_idx;
-assign WB_CQHEADi_o[31:0]  = localidx;
+assign WB_CQHEADi_o[31:0]  = localidx_q;
 
 
 
@@ -823,13 +822,9 @@ assign m_rdma_qp_interface_data_o = qp_ctx_q;
 assign m_rdma_sq_interface_data_o = sq_req_q;
 
 
-
-
 always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
   if(!axis_rstn_i) begin
-    localidx            <= 'd0;
-    sq_done             <= 1'b1;
-   
+    localidx_q          <= 'd0;
     conn_state_q        <= CONN_IDLE;
     conn_ctx_q          <= 'd0;
     
@@ -864,6 +859,8 @@ always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
     last_q              <= 1'b0;
     first_q             <= 1'b1;
   end else begin
+    localidx_q          <= localidx_d;
+
     conn_state_q        <= conn_state_d;
     conn_ctx_q          <= conn_ctx_d;
     

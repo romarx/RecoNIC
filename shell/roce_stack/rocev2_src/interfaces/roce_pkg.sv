@@ -288,8 +288,9 @@ package roceTypes;
     parameter integer CSR_ADDRESS_SPACE = 262144; //256kb
     parameter integer CSR_ADDRESS_WIDTH = $clog2(CSR_ADDRESS_SPACE);
 
-    parameter integer LOG_NUM_PD = $clog2(NUM_PD);
-    parameter integer LOG_NUM_QP = $clog2(NUM_QP);
+    parameter integer LOG_NUM_PD = 8;
+    parameter integer LOG_NUM_QP = 8; //fix to 8.
+    
 
     parameter integer NUM_PD_REGS = 8;
     parameter integer LOG_NUM_PD_REGS = $clog2(NUM_PD_REGS);
@@ -391,6 +392,13 @@ package roceTypes;
       logic [LOG_NUM_QP-1:0]      address;  // address to read (0-255)
     } rd_cmd_t;
 
+    typedef struct packed {
+      logic [1:0]                 region;   // 0: GLB, 1: PD, 2: QP
+      logic [LOG_NUM_QP_REGS-1:0] bram_idx; // idx of specific register (only in PD and QP)
+      logic [LOG_NUM_QP-1:0]      address;  // address to read (0-255)
+      logic [3:0]                 wstrb;
+      logic [REG_WIDTH-1:0]       data;
+    } wr_cmd_t;
 
     typedef struct packed {
         logic [ACCESDESC_BITS-1:0] accesdesc;
