@@ -92,11 +92,8 @@ module roce_stack_wq_manager #(
 SQdata_struct sq_if_input_d, sq_if_input_q, sq_if_output, sq_if_output_d, sq_if_output_q;
 rd_cmd_t rd_qp_d, rd_qp_q;
 
-logic [31:0] localidx = 'd0;
-logic sq_busy = 1'b0;
 
 logic fetch_wqe;
-logic fetch_next_wqe;
 
 
 
@@ -202,7 +199,6 @@ always_comb begin
     QP_SQ_RD_QP: begin
       rd_qp_valid_o = 1'b1;
       if( rd_qp_ready_i ) begin
-        rd_qp_valid_o = 1'b0;
         if(QPCONFi_i[0] && QPCONFi_i[10:8] <= 3'b100) begin
           mtu_d = 'd256 << QPCONFi_i[10:8];
           log_mtu_d = 'd8 + {1'b0, QPCONFi_i[10:8]};
@@ -215,7 +211,6 @@ always_comb begin
           qp_ctx_d.new_state = 32'b0;
           qp_state_d = QP_SQ_VALID;
         end else begin
-          sq_busy = 1'b0;
           qp_state_d = QP_IDLE;
         end  
       end
@@ -294,37 +289,8 @@ fifo # (
 );
 
 
-typedef enum {SQ_IF_IDLE, SQ_OUT_VALID, SQ_IF_VALID} sq_if_state;
-sq_if_state sq_if_state_d, sq_if_state_q;
 
-always_comb begin
-  sq_if_state_d = sq_if_state_q;
-  sq_if_output_d = sq_if_output_q;
-  fetch_wqe = 1'b0;
-  sq_fifo_rd = 1'b0;
-
-  case(sq_if_state_q) 
-    SQ_IF_IDLE: begin
-      if(!sq_busy && sq_fifo_ready_rd) begin
-        sq_fifo_rd = 1'b1;
-        if(sq_if_output != sq_if_output_q) begin
-          sq_if_output_d = sq_if_output;
-          sq_busy = 1'b1;
-          sq_if_state_d = SQ_IF_VALID;
-        end
-      end
-    end
-    SQ_IF_VALID: begin
-      localidx = sq_if_output_q.cq_head_idx;
-      fetch_wqe = 1'b1;
-      sq_if_state_d = SQ_IF_IDLE;
-    end
-  endcase
-end
-
-
-
-typedef enum {SQ_IDLE, SQ_VALID, SQ_WRITE, SQ_SEND, SQ_READ, SQ_WAIT_RESP_READ, SQ_WAIT_RESP_WRITE_SEND, SQ_WRITE_COMPLETION, SQ_UPDATE_CQHEAD} sq_state;
+typedef enum {SQ_IDLE, SQ_FIFO_READY, SQ_WAIT_QP, SQ_VALID, SQ_WRITE, SQ_SEND, SQ_READ, SQ_WAIT_RESP_READ, SQ_WAIT_RESP_WRITE_SEND, SQ_WRITE_COMPLETION, SQ_UPDATE_CQHEAD} sq_state;
 sq_state sq_state_d, sq_state_q;
 
 
@@ -339,11 +305,14 @@ logic [31:0] exp_resp_ctr_d, exp_resp_ctr_q, resp_ctr_d, resp_ctr_q;
 logic [31:0] localidx_d, localidx_q;
 
 always_comb begin
-  write_completion = 1'b0;
+  sq_state_d = sq_state_q;
   WB_CQHEADi_valid_o = 1'b0;
+  m_rdma_sq_interface_valid_o = 1'b0;
+  sq_fifo_rd = 1'b0;
+  fetch_wqe = 1'b0;
+  write_completion = 1'b0;
   CQReg_d = CQReg_q;
   sq_req_d = sq_req_q;
-  m_rdma_sq_interface_valid_o = 1'b0;
   last_d = last_q;
   first_d = first_q;
   transfer_length_d = transfer_length_q;
@@ -351,16 +320,28 @@ always_comb begin
   curr_remote_vaddr_d = curr_remote_vaddr_q;
   exp_resp_ctr_d = exp_resp_ctr_q;
   resp_ctr_d = resp_ctr_q;
-  sq_state_d = sq_state_q;
-  fetch_next_wqe = 1'b0;
   localidx_d = localidx_q;
+  sq_if_output_d = sq_if_output_q;
 
   case(sq_state_q)
     SQ_IDLE: begin
+      if(sq_fifo_ready_rd) begin
+        sq_fifo_rd = 1'b1;
+        if(sq_if_output != sq_if_output_q) begin
+          sq_if_output_d = sq_if_output;
+          sq_state_d = SQ_FIFO_READY;
+        end
+      end
+    end
+    SQ_FIFO_READY: begin
+      localidx_d = sq_if_output_q.cq_head_idx;
+      fetch_wqe = 1'b1;
+      sq_state_d = SQ_WAIT_QP;
+    end
+    SQ_WAIT_QP: begin
       //TODO: FIFO for all WQE's fetched in current execution
       //A new WQE is fetched, start examining it...
       if(qp_intf_done) begin
-        localidx_d = localidx;
         if(WQEReg_q[135:128] == 8'h00) begin
           //WRITE
           $display("write command");
@@ -625,14 +606,13 @@ always_comb begin
       end
     end
     SQ_UPDATE_CQHEAD: begin
-      localidx = localidx_q;
-      if(localidx_q < sq_if_output_q.sq_prod_idx) begin
-          fetch_next_wqe = 1'b1;
-      end else begin
-        sq_busy = 1'b0;
-      end
       WB_CQHEADi_valid_o = 1'b1;
-      sq_state_d = SQ_IDLE;
+      if(localidx_q < sq_if_output_q.sq_prod_idx) begin
+        fetch_wqe = 1'b1;
+        sq_state_d = SQ_WAIT_QP;
+      end else begin
+        sq_state_d = SQ_IDLE;
+      end
     end
     
   endcase
@@ -671,7 +651,7 @@ always_comb begin
       end
     end
     AW_CALC_ADDR: begin
-      WrAddrReg_d = {sq_if_output_q.cq_base_addr[63:34], sq_if_output_q.cq_base_addr[33:2] + localidx, sq_if_output_q[1:0]};
+      WrAddrReg_d = {sq_if_output_q.cq_base_addr[63:34], sq_if_output_q.cq_base_addr[33:2] + localidx_q, sq_if_output_q[1:0]};
       AddrWr_State_d = AW_VALID;
     end
     AW_VALID: begin
@@ -737,13 +717,13 @@ always_comb begin
   case(AddrRd_State_q)
     AR_IDLE: begin
       //new elements in work queue
-      if (fetch_wqe || fetch_next_wqe) begin
+      if (fetch_wqe) begin
         AddrRd_State_d = AR_CALC_ADDR; 
       end
     end
     AR_CALC_ADDR: begin
       //64 byte aligned 
-      RdAddrReg_d = {sq_if_output_q.sq_base_addr[63:38], sq_if_output_q.sq_base_addr[37:6] + localidx, sq_if_output_q.sq_base_addr[5:0]};
+      RdAddrReg_d = {sq_if_output_q.sq_base_addr[63:38], sq_if_output_q.sq_base_addr[37:6] + localidx_q, sq_if_output_q.sq_base_addr[5:0]};
       AddrRd_State_d = AR_VALID;
     end
     AR_VALID: begin
@@ -836,7 +816,6 @@ always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
     rd_qp_q             <= 'd0;
     sq_fifo_state_q     <= SQ_FIFO_IDLE;
     sq_if_input_q       <= 'd0;
-    sq_if_state_q       <= SQ_IF_IDLE;
     sq_if_output_q      <= 'd0;
     sq_state_q          <= SQ_IDLE;
     sq_req_q            <= 'd0;
@@ -872,7 +851,6 @@ always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
     rd_qp_q             <= rd_qp_d;
     sq_fifo_state_q     <= sq_fifo_state_d;
     sq_if_input_q       <= sq_if_input_d;
-    sq_if_state_q       <= sq_if_state_d;
     sq_if_output_q      <= sq_if_output_d;
     sq_state_q          <= sq_state_d;
     sq_req_q            <= sq_req_d;
