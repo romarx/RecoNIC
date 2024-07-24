@@ -169,7 +169,7 @@ logic [LOG_NUM_PD-1:0] PD_ADDR_AXIL;
 logic [NUM_PD_REGS-1:0][REG_WIDTH-1:0] PD_RD_REG_AXIL;
 logic [REG_WIDTH-1:0] PD_WR_REG_AXIL;
 
-logic [NUM_PD-1:0][23:0] pdnum_table; //huge table to lookup pdnum
+logic [NUM_PD-1:0][23:0] pdnum_table_d, pdnum_table_q; //huge table to lookup pdnum
 
 
 //Per QP registers (NUMQP min is 8, max is 256)
@@ -1081,6 +1081,7 @@ always_comb begin
   rd_sq_vaddr_valid_d = rd_sq_vaddr_valid_q;
   l_reg_st_d = l_reg_st_q;
   l_rd_cmd_d = l_rd_cmd_q;
+  pdnum_table_d = pdnum_table_q;
   QPidx_d = QPidx_q;
   hold_rd_axis_d = hold_rd_axis_q;
   cmd_fifo_rd_en = 1'b0;
@@ -1236,7 +1237,7 @@ always_comb begin
         end
       end else if(l_rd_cmd_q.region == 'd1) begin
         if (l_rd_cmd_q.bram_idx == PDPDNUM_idx) begin
-          pdnum_table[l_rd_cmd_q.address] = PD_RD_REG_AXIS_Q[PDPDNUM_idx][23:0];
+          pdnum_table_d[l_rd_cmd_q.address] = {l_rd_cmd_q.address, PD_RD_REG_AXIS_Q[PDPDNUM_idx][23:0]};
         end else if(l_rd_cmd_q.bram_idx == VIRTADDRLSB_idx) begin
           sq_updated_o = 1'b1;
         end else if (l_rd_cmd_q.bram_idx == PDNUMi_idx) begin //abuse PDNUMi_idx for ready signal in phys addr lookup
@@ -1263,54 +1264,6 @@ end
 
 
 
-always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
-  if(!axis_rstn_i) begin
-    PD_ADDR_AXIS <= 'd0;
-    PD_WR_REG_AXIS <= 'd0;
-    pdnum_table <= ~0;
-
-    
-    QP_ADDR_AXIS <= 'd0;
-    QP_WR_REG_AXIS <= 'd0;
-
-    GLB_ADDR_AXIS <= 'd0;
-    GLB_WR_REG_AXIS <= 'd0;
-
-    l_reg_st_q <= L_IDLE;
-    l_rd_cmd_q <= 'd0;
-    hold_rd_axis_q <= 'd0;
-    QPidx_q <= 'd0;
-
-    rd_sq_vaddr_q <= 'd0;
-    rd_sq_vaddr_valid_q <= 'd0;
-
-    CONF_q <= 'd0;
-    MACADDLSB_q <= 'd0;
-    MACADDMSB_q <= 'd0;
-    IPv4ADD_q <= 'd0;
-
-    PD_RD_REG_AXIS_Q <= 'd0;
-    QP_RD_REG_AXIS_Q <= 'd0;
-
-  end else begin
-    l_reg_st_q <= l_reg_st_d;
-    l_rd_cmd_q <= l_rd_cmd_d;
-    hold_rd_axis_q <= hold_rd_axis_d;
-    QPidx_q <= QPidx_d;
-
-    rd_sq_vaddr_q <= rd_sq_vaddr_d;
-    rd_sq_vaddr_valid_q <= rd_sq_vaddr_valid_d;
-
-    CONF_q <= CONF_d;
-    MACADDLSB_q <= MACADDLSB_d;
-    MACADDMSB_q <= MACADDMSB_d;
-    IPv4ADD_q <= IPv4ADD_d;
-
-    PD_RD_REG_AXIS_Q <= PD_RD_REG_AXIS_D;
-    QP_RD_REG_AXIS_Q <= QP_RD_REG_AXIS_D;
-
-  end
-end
 
 
 
@@ -1437,11 +1390,12 @@ generate
 endgenerate
 
 
+
 always_comb begin
   pd_addr_d = pd_addr_q;
-  if(find_pd_addr_rd || find_pd_addr_wr || config_sq) begin
+  if(find_pd_addr_rd | find_pd_addr_wr | config_sq) begin
     for(int i=0; i < NUM_PD; i++) begin
-      if(pdnum_table[i] == QP_RD_REG_AXIS_Q[PDNUMi_idx]) begin
+      if(pdnum_table_q[i] == QP_RD_REG_AXIS_Q[PDNUMi_idx][23:0]) begin
         pd_addr_d = i;
       end
     end
@@ -1499,7 +1453,7 @@ always_comb begin
     find_pd_rd_d.region = 'd1;
     find_pd_rd_d.read_all = 1'b1;
     find_pd_rd_d.bram_idx = PDNUMi_idx;
-    find_pd_rd_d.address = pd_addr_q; //TODO: check if this works
+    find_pd_rd_d.address = pd_addr_q;
     rd_vtp_st_d = VTP_PREP_RESP_VLD;
   end
   VTP_PREP_RESP_VLD: begin
@@ -1616,17 +1570,68 @@ end
 
 always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
   if(!axis_rstn_i) begin
+    PD_ADDR_AXIS <= 'd0;
+    PD_WR_REG_AXIS <= 'd0;
+    
+
+    
+    QP_ADDR_AXIS <= 'd0;
+    QP_WR_REG_AXIS <= 'd0;
+
+    GLB_ADDR_AXIS <= 'd0;
+    GLB_WR_REG_AXIS <= 'd0;
+    
+    
+    
+    find_pd_rd_valid <= 1'b0; //TODO: this has to be done nicer
+    find_pd_wr_valid <= 1'b0;
+    
+    pdnum_table_q <= ~0;
+    l_reg_st_q <= L_IDLE;
+    l_rd_cmd_q <= 'd0;
+    hold_rd_axis_q <= 'd0;
+    QPidx_q <= 'd0;
+
+    rd_sq_vaddr_q <= 'd0;
+    rd_sq_vaddr_valid_q <= 'd0;
+
+    CONF_q <= 'd0;
+    MACADDLSB_q <= 'd0;
+    MACADDMSB_q <= 'd0;
+    IPv4ADD_q <= 'd0;
+
+    PD_RD_REG_AXIS_Q <= 'd0;
+    QP_RD_REG_AXIS_Q <= 'd0;
+    
+    
+    
     rd_vtp_st_q <= VTP_IDLE;
     wr_vtp_st_q <= VTP_IDLE;
     rd_resp_addr_data_q <= 'd0;
     wr_resp_addr_data_q <= 'd0;
-    find_pd_rd_valid <= 1'b0;
-    find_pd_wr_valid <= 1'b0;
+
     
     find_pd_rd_q <= 'd0;
     find_pd_wr_q <= 'd0;
     pd_addr_q <= ~0;
   end else begin
+    pdnum_table_q <= pdnum_table_d;
+    l_reg_st_q <= l_reg_st_d;
+    l_rd_cmd_q <= l_rd_cmd_d;
+    hold_rd_axis_q <= hold_rd_axis_d;
+    QPidx_q <= QPidx_d;
+
+    rd_sq_vaddr_q <= rd_sq_vaddr_d;
+    rd_sq_vaddr_valid_q <= rd_sq_vaddr_valid_d;
+
+    CONF_q <= CONF_d;
+    MACADDLSB_q <= MACADDLSB_d;
+    MACADDMSB_q <= MACADDMSB_d;
+    IPv4ADD_q <= IPv4ADD_d;
+
+    PD_RD_REG_AXIS_Q <= PD_RD_REG_AXIS_D;
+    QP_RD_REG_AXIS_Q <= QP_RD_REG_AXIS_D;
+   
     rd_vtp_st_q <= rd_vtp_st_d;
     wr_vtp_st_q <= wr_vtp_st_d;
     rd_resp_addr_data_q <= rd_resp_addr_data_d;
