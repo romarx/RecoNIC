@@ -327,16 +327,18 @@ always_comb begin
     SQ_IDLE: begin
       if(sq_fifo_ready_rd) begin
         sq_fifo_rd = 1'b1;
-        if(sq_if_output != sq_if_output_q) begin
-          sq_if_output_d = sq_if_output;
-          sq_state_d = SQ_FIFO_READY;
-        end
+        sq_if_output_d = sq_if_output; // maybe modify fifo to read in next cycle
+        sq_state_d = SQ_FIFO_READY;
       end
     end
     SQ_FIFO_READY: begin
-      localidx_d = sq_if_output_q.cq_head_idx;
-      fetch_wqe = 1'b1;
-      sq_state_d = SQ_WAIT_QP;
+      if(sq_if_output_q.sq_prod_idx <= sq_if_output_q.cq_head_idx) begin //sanity check
+        sq_state_d = SQ_IDLE;
+      end else begin
+        localidx_d = sq_if_output_q.cq_head_idx;
+        fetch_wqe = 1'b1;
+        sq_state_d = SQ_WAIT_QP;
+      end
     end
     SQ_WAIT_QP: begin
       //TODO: FIFO for all WQE's fetched in current execution

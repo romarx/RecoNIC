@@ -922,7 +922,7 @@ logic [REG_WIDTH-1:0] PD_WR_REG_AXIS; //these are never written by the hardware
 
 //Per QP registers (NUMQP min is 8, max is 256)
 logic [NUM_QP_REGS-1:0] QP_REG_ENB_AXIS;
-logic [AXIL_DATA_WIDTH_BYTES-1:0] QP_REG_WEB_AXIS;
+logic [NUM_QP_REGS-1:0][AXIL_DATA_WIDTH_BYTES-1:0] QP_REG_WEB_AXIS;
 logic [LOG_NUM_QP-1:0] QP_ADDR_AXIS;
 logic [NUM_QP_REGS-1:0][REG_WIDTH-1:0] QP_RD_REG_AXIS, QP_RD_REG_AXIS_D, QP_RD_REG_AXIS_Q;
 logic [REG_WIDTH-1:0] QP_WR_REG_AXIS;
@@ -1078,7 +1078,7 @@ logic wb_SQPSNi_ready;
 always_comb begin
   wb_SQPSNi_valid_d = wb_SQPSNi_valid_q;
   wb_SQPSNi_cmd_d = wb_SQPSNi_cmd_q;
-  
+
   if(WB_SQPSNi_valid_i) begin
     wb_SQPSNi_cmd_d.region = 'd2;
     wb_SQPSNi_cmd_d.bram_idx = SQPSNi_idx;
@@ -1517,12 +1517,15 @@ always_comb begin
         PD_WR_REG_AXIS = l_wr_cmd_q.data;
         PD_REG_ENB_AXIS[l_wr_cmd_q.bram_idx] = 1'b1;
       end else if (l_wr_cmd_q.region == 'd2) begin
+        //in case of QP writeback from hardware, read all qp regs to select correct mac address for transaction
+        QPidx_d = l_wr_cmd_q.address;
         QP_ADDR_AXIS = l_wr_cmd_q.address;
-        QP_REG_WEB_AXIS = l_wr_cmd_q.wstrb;
+        QP_REG_WEB_AXIS[l_wr_cmd_q.bram_idx] = l_wr_cmd_q.wstrb;
         QP_WR_REG_AXIS = l_wr_cmd_q.data;
-        QP_REG_ENB_AXIS[l_wr_cmd_q.bram_idx] = 1'b1;
+        QP_REG_ENB_AXIS = ~0;
+        QP_RD_REG_AXIS_D = QP_RD_REG_AXIS;
       end
-      if(hold_axis_q == 'd1) begin
+      if(hold_axis_q == RD_LAT) begin //at writeback also hold as long as rd lat to select current qp
         hold_axis_d = 'd0;
         l_reg_st_d = L_IDLE;
       end else begin
@@ -1920,7 +1923,7 @@ generate
       .dinb(QP_WR_REG_AXIS),
       .doutb(QP_RD_REG_AXIS[i]),
       .enb(QP_REG_ENB_AXIS[i]),
-      .web(QP_REG_WEB_AXIS),
+      .web(QP_REG_WEB_AXIS[i]),
       .clkb(axis_aclk_i)
     );
   end
