@@ -54,6 +54,7 @@ package roceTypes;
     parameter integer ACCESDESC_BITS = 4;
     parameter integer BUFLEN_BITS = 48;
     parameter integer RKEY_BITS = 8;
+    parameter integer TAG_BITS = 32;
     parameter integer LEN_BITS = 28;
     parameter integer DEST_BITS = 4;
     parameter integer PID_BITS = 6;
@@ -404,7 +405,7 @@ package roceTypes;
         logic [ACCESDESC_BITS-1:0] accesdesc;
         logic [BUFLEN_BITS-1:0] buflen;
         logic [PADDR_BITS-1:0] paddr;
-        logic [RKEY_BITS-1:0] rkey;
+        logic [TAG_BITS-1:0] rkey;
     }dma_req_t;
 
     typedef struct packed {

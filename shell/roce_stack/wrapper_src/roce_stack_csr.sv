@@ -78,6 +78,9 @@ module roce_stack_csr (
   input  logic [39:0]                     WB_SQPSNi_i,
   input  logic                            WB_LSTRQREQi_valid_i,
   input  logic [39:0]                     WB_LSTRQREQi_i,
+  input  logic                            WB_STATRQi_valid_i,
+  input  logic [71:0]                     WB_STATRQBUFCAi_i,
+  input  logic [39:0]                     WB_STATRQPIDBi_i,
 
 
   input  logic                            WB_INSRRPKTCNT_valid_i,
@@ -578,10 +581,12 @@ always_comb begin
             end
             ADDR_RQBAi: begin
               QP_REG_ENA_AXIL[RQBAi_idx] = 1'b1;
+              QP_REG_ENA_AXIL[STATRQBUFCAi_idx] = 1'b1; //also write read only status register 
               QP_WR_REG_AXIL = WDataReg_q;
             end
             ADDR_RQBAMSBi: begin
               QP_REG_ENA_AXIL[RQBAMSBi_idx] = 1'b1;
+              QP_REG_ENA_AXIL[STATRQBUFCAMSBi_idx] = 1'b1; //also write read only status register 
               QP_WR_REG_AXIL = WDataReg_q;
             end
             ADDR_SQBAi: begin
@@ -1113,6 +1118,67 @@ always_comb begin
 end
 
 
+wr_cmd_t wb_STATRQBUFCAi_cmd_d, wb_STATRQBUFCAi_cmd_q;
+logic wb_STATRQBUFCAi_valid_d, wb_STATRQBUFCAi_valid_q;
+logic wb_STATRQBUFCAi_ready;
+
+always_comb begin
+  wb_STATRQBUFCAi_valid_d = wb_STATRQBUFCAi_valid_q;
+  wb_STATRQBUFCAi_cmd_d = wb_STATRQBUFCAi_cmd_q;
+  
+    if(WB_STATRQi_valid_i) begin
+      wb_STATRQBUFCAi_cmd_d.region = 'd2;
+      wb_STATRQBUFCAi_cmd_d.bram_idx = STATRQBUFCAi_idx;
+      wb_STATRQBUFCAi_cmd_d.address = WB_STATRQBUFCAi_i[71:64];
+      wb_STATRQBUFCAi_cmd_d.wstrb = 'hf;
+      wb_STATRQBUFCAi_cmd_d.data = WB_STATRQBUFCAi_i[31:0];
+      wb_STATRQBUFCAi_valid_d = 1'b1;
+    end else if (wb_STATRQBUFCAi_ready) begin
+      wb_STATRQBUFCAi_valid_d = 1'b0;
+    end
+end
+
+wr_cmd_t wb_STATRQBUFCAMSBi_cmd_d, wb_STATRQBUFCAMSBi_cmd_q;
+logic wb_STATRQBUFCAMSBi_valid_d, wb_STATRQBUFCAMSBi_valid_q;
+logic wb_STATRQBUFCAMSBi_ready;
+
+always_comb begin
+  wb_STATRQBUFCAMSBi_valid_d = wb_STATRQBUFCAMSBi_valid_q;
+  wb_STATRQBUFCAMSBi_cmd_d = wb_STATRQBUFCAMSBi_cmd_q;
+  
+    if(WB_STATRQi_valid_i) begin
+      wb_STATRQBUFCAMSBi_cmd_d.region = 'd2;
+      wb_STATRQBUFCAMSBi_cmd_d.bram_idx = STATRQBUFCAMSBi_idx;
+      wb_STATRQBUFCAMSBi_cmd_d.address = WB_STATRQBUFCAi_i[71:64];
+      wb_STATRQBUFCAMSBi_cmd_d.wstrb = 'hf;
+      wb_STATRQBUFCAMSBi_cmd_d.data = WB_STATRQBUFCAi_i[63:32];
+      wb_STATRQBUFCAMSBi_valid_d = 1'b1;
+    end else if (wb_STATRQBUFCAMSBi_ready) begin
+      wb_STATRQBUFCAMSBi_valid_d = 1'b0;
+    end
+end
+
+wr_cmd_t wb_STATRQPIDBi_cmd_d, wb_STATRQPIDBi_cmd_q;
+logic wb_STATRQPIDBi_valid_d, wb_STATRQPIDBi_valid_q;
+logic wb_STATRQPIDBi_ready;
+
+always_comb begin
+  wb_STATRQPIDBi_valid_d = wb_STATRQPIDBi_valid_q;
+  wb_STATRQPIDBi_cmd_d = wb_STATRQPIDBi_cmd_q;
+  
+    if(WB_STATRQi_valid_i) begin
+      wb_STATRQPIDBi_cmd_d.region = 'd2;
+      wb_STATRQPIDBi_cmd_d.bram_idx = STATRQPIDBi_idx;
+      wb_STATRQPIDBi_cmd_d.address = WB_STATRQPIDBi_i[39:32];
+      wb_STATRQPIDBi_cmd_d.wstrb = 'hf;
+      wb_STATRQPIDBi_cmd_d.data = WB_STATRQPIDBi_i[31:0];
+      wb_STATRQPIDBi_valid_d = 1'b1;
+    end else if (wb_STATRQPIDBi_ready) begin
+      wb_STATRQPIDBi_valid_d = 1'b0;
+    end
+end
+
+
 wr_cmd_t wb_INSRRPKTCNT_cmd_d, wb_INSRRPKTCNT_cmd_q;
 logic wb_INSRRPKTCNT_valid_d, wb_INSRRPKTCNT_valid_q;
 logic wb_INSRRPKTCNT_ready;
@@ -1308,6 +1374,9 @@ always_comb begin
   wb_CQHEADi_ready = 1'b0;
   wb_SQPSNi_ready = 1'b0;
   wb_LSTRQREQi_ready = 1'b0;
+  wb_STATRQBUFCAi_ready = 1'b0;
+  wb_STATRQBUFCAMSBi_ready = 1'b0;
+  wb_STATRQPIDBi_ready = 1'b0;
   wb_INSRRPKTCNT_ready = 1'b0;
   wb_INAMPKTCNT_ready = 1'b0;
   wb_INNCKPKTSTS_ready = 1'b0;
@@ -1358,6 +1427,18 @@ always_comb begin
       end else if(wb_LSTRQREQi_valid_q && !writing) begin
         wb_LSTRQREQi_ready = 1'b1;
         l_wr_cmd_d = wb_LSTRQREQi_cmd_q;
+        l_reg_st_d = L_WRITE;
+      end else if(wb_STATRQBUFCAi_valid_q && !writing) begin
+        wb_STATRQBUFCAi_ready = 1'b1;
+        l_wr_cmd_d = wb_STATRQBUFCAi_cmd_q;
+        l_reg_st_d = L_WRITE;
+      end else if(wb_STATRQBUFCAMSBi_valid_q && !writing) begin
+        wb_STATRQBUFCAMSBi_ready = 1'b1;
+        l_wr_cmd_d = wb_STATRQBUFCAMSBi_cmd_q;
+        l_reg_st_d = L_WRITE;
+      end else if(wb_STATRQPIDBi_valid_q && !writing) begin
+        wb_STATRQPIDBi_ready = 1'b1;
+        l_wr_cmd_d = wb_STATRQPIDBi_cmd_q;
         l_reg_st_d = L_WRITE;
       end else if(wb_INSRRPKTCNT_valid_q && !writing) begin
         wb_INSRRPKTCNT_ready = 1'b1;
@@ -1613,7 +1694,7 @@ always_comb begin
       if(rd_req_addr_vaddr_i == {PD_RD_REG_AXIS_Q[VIRTADDRMSB_idx], PD_RD_REG_AXIS_Q[VIRTADDRLSB_idx]}) begin
         rd_resp_addr_data_d.accesdesc = PD_RD_REG_AXIS_Q[ACCESSDESC_idx][3:0];
         rd_resp_addr_data_d.buflen = {PD_RD_REG_AXIS_Q[ACCESSDESC_idx][31:16], PD_RD_REG_AXIS_Q[WRRDBUFLEN_idx]};
-        rd_resp_addr_data_d.rkey = PD_RD_REG_AXIS_Q[BUFRKEY_idx][7:0];
+        rd_resp_addr_data_d.rkey[7:0] = PD_RD_REG_AXIS_Q[BUFRKEY_idx][7:0];
         rd_resp_addr_data_d.paddr = {PD_RD_REG_AXIS_Q[BUFBASEADDRMSB_idx], PD_RD_REG_AXIS_Q[BUFBASEADDRLSB_idx]};
       end
       rd_vtp_st_d = VTP_VALID;
@@ -1664,11 +1745,11 @@ always_comb begin
     wr_req_addr_ready_o = 1'b0;
     if(find_pd_wr_ready) begin
       find_pd_wr_valid_d = 1'b0;
-      if(wr_req_addr_vaddr_i == 'd0) begin 
-          wr_resp_addr_data_d.accesdesc = 4'b0010;
-          wr_resp_addr_data_d.buflen = ~0;
-          wr_resp_addr_data_d.rkey = ~0;
-          wr_resp_addr_data_d.paddr = {QP_RD_REG_AXIS_Q[RQBAMSBi_idx], QP_RD_REG_AXIS[RQBAi_idx]};
+      if(wr_req_addr_vaddr_i == 'd0) begin //SEND case
+          wr_resp_addr_data_d.accesdesc = 4'b0001;
+          wr_resp_addr_data_d.buflen = QP_RD_REG_AXIS[QPCONFi_idx][31:16] << 8;
+          wr_resp_addr_data_d.rkey = QP_RD_REG_AXIS[STATRQPIDBi_idx]; // use rkey field for doorbell idx
+          wr_resp_addr_data_d.paddr = {QP_RD_REG_AXIS_Q[STATRQBUFCAMSBi_idx], QP_RD_REG_AXIS[STATRQBUFCAi_idx]}; // probably not how it's meant to be implemented
           wr_vtp_st_d = VTP_VALID;
       end else begin
         find_pd_addr_wr = 1'b1;
@@ -1692,7 +1773,7 @@ always_comb begin
       if(wr_req_addr_vaddr_i == {PD_RD_REG_AXIS_Q[VIRTADDRMSB_idx], PD_RD_REG_AXIS_Q[VIRTADDRLSB_idx]}) begin
         wr_resp_addr_data_d.accesdesc = PD_RD_REG_AXIS_Q[ACCESSDESC_idx][3:0];
         wr_resp_addr_data_d.buflen = {PD_RD_REG_AXIS_Q[ACCESSDESC_idx][31:16], PD_RD_REG_AXIS_Q[WRRDBUFLEN_idx]};
-        wr_resp_addr_data_d.rkey = PD_RD_REG_AXIS_Q[BUFRKEY_idx][7:0];
+        wr_resp_addr_data_d.rkey[7:0] = PD_RD_REG_AXIS_Q[BUFRKEY_idx][7:0];
         wr_resp_addr_data_d.paddr = {PD_RD_REG_AXIS_Q[BUFBASEADDRMSB_idx], PD_RD_REG_AXIS_Q[BUFBASEADDRLSB_idx]};
       end  
       wr_vtp_st_d = VTP_VALID;
@@ -1748,6 +1829,15 @@ always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
 
     wb_LSTRQREQi_valid_q <= 1'b0;
     wb_LSTRQREQi_cmd_q <= 'd0;
+
+    wb_STATRQBUFCAi_valid_q <= 1'b0;
+    wb_STATRQBUFCAi_cmd_q <= 'd0;
+    
+    wb_STATRQBUFCAMSBi_valid_q <= 1'b0;
+    wb_STATRQBUFCAMSBi_cmd_q <= 'd0;
+    
+    wb_STATRQPIDBi_valid_q <= 1'b0;
+    wb_STATRQPIDBi_cmd_q <= 'd0;
 
     wb_INSRRPKTCNT_valid_q <= 1'b0;
     wb_INSRRPKTCNT_cmd_q <= 'd0;
@@ -1807,6 +1897,15 @@ always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
 
     wb_LSTRQREQi_valid_q <= wb_LSTRQREQi_valid_d;
     wb_LSTRQREQi_cmd_q <= wb_LSTRQREQi_cmd_d;
+    
+    wb_STATRQBUFCAi_valid_q <= wb_STATRQBUFCAi_valid_d;
+    wb_STATRQBUFCAi_cmd_q <= wb_STATRQBUFCAi_cmd_d;
+    
+    wb_STATRQBUFCAMSBi_valid_q <= wb_STATRQBUFCAMSBi_valid_d;
+    wb_STATRQBUFCAMSBi_cmd_q <= wb_STATRQBUFCAMSBi_cmd_d;
+    
+    wb_STATRQPIDBi_valid_q <= wb_STATRQPIDBi_valid_d;
+    wb_STATRQPIDBi_cmd_q <= wb_STATRQPIDBi_cmd_d;
 
     wb_INSRRPKTCNT_valid_q <= wb_INSRRPKTCNT_valid_d;
     wb_INSRRPKTCNT_cmd_q <= wb_INSRRPKTCNT_cmd_d;

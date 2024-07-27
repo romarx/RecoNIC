@@ -80,12 +80,17 @@ module roce_stack_axis_to_aximm #(
   input  logic                          m_axi_data_bus_rvalid_i,
   output logic                          m_axi_data_bus_rready_o,
 
+  output logic  [71:0]                  wb_rqbufaddr_o,
+  output logic  [39:0]                  wb_rqpidb_o,
+  output logic                          wb_valid_o,
+  
   input  logic                          axis_aclk_i,
   input  logic                          aresetn_i
 );
 
 logic [103:0] rd_mm2s_cmd_data, wr_s2mm_cmd_data;
 logic rd_mm2s_cmd_valid, rd_mm2s_cmd_ready, wr_s2mm_cmd_valid, wr_s2mm_cmd_ready;
+logic rd_err_st, wr_err_st;
 
 logic [7:0] s2mm_sts_data, mm2s_sts_data;
 logic s2mm_sts_valid, s2mm_sts_ready, s2mm_sts_last, s2mm_sts_keep, mm2s_sts_valid, mm2s_sts_ready, mm2s_sts_last, mm2s_sts_keep;
@@ -114,6 +119,7 @@ roce_stack_request_handler #(
     .cmd_valid_o(rd_mm2s_cmd_valid),
     .cmd_ready_i(rd_mm2s_cmd_ready),
     .cmd_data_o(rd_mm2s_cmd_data),
+    .err_st_o(rd_err_st),
     .clk_i(axis_aclk_i),
     .aresetn_i(aresetn_i)
 );
@@ -139,6 +145,10 @@ roce_stack_request_handler #(
     .cmd_valid_o(wr_s2mm_cmd_valid),
     .cmd_ready_i(wr_s2mm_cmd_ready),
     .cmd_data_o(wr_s2mm_cmd_data),
+    .err_st_o(wr_err_st),
+    .wb_rqbufaddr_o(wb_rqbufaddr_o),
+    .wb_rqpidb_o(wb_rqpidb_o),
+    .wb_valid_o(wb_valid_o),
     .clk_i(axis_aclk_i),
     .aresetn_i(aresetn_i)
 );

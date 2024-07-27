@@ -169,35 +169,16 @@ logic [63:0] VIRTADDR;
 
 
 //write back regs
-logic         wb_ready, wb_valid;
-
 logic [39:0]  CQHEADi_wb;
 logic         CQHEADi_wb_valid;
-
-logic [39:0]  SQPSNi_wb_axil, LSTRQREQi_wb_axil;
-logic         SQPSNi_wb_axil_valid, LSTRQREQi_wb_axil_valid;
-
-logic [31:0]  INSRRPKTCNT_wb_axil;
-logic         INSRRPKTCNT_wb_axil_valid;
 
 logic [31:0]  INAMPKTCNT_wb;
 logic         INAMPKTCNT_wb_valid;
 
-logic [31:0]  INNCKPKTSTS_wb_axil;
-logic         INNCKPKTSTS_wb_axil_valid;
-
-
-logic [31:0]  OUTIOPKTCNT_wb_axil;
-logic         OUTIOPKTCNT_wb_axil_valid;
-
 logic [31:0]  OUTAMPKTCNT_wb;
 logic         OUTAMPKTCNT_wb_valid;
 
-logic [16:0]  OUTNAKPKTCNT_wb_axil;
-logic         OUTNAKPKTCNT_wb_axil_valid;
 
-logic [31:0]  OUTRDRSPPKTCNT_wb_axil;
-logic         OUTRDRSPPKTCNT_wb_axil_valid;
 
 
 metaIntf #(.STYPE(req_t)) rdma_rd_req ();
@@ -234,6 +215,10 @@ logic [31:0] tx_srw_data, tx_rr_data;
 
 logic epsn_valid, npsn_valid;
 logic [39:0] epsn_data, npsn_data;
+
+logic [71:0] STATRQBUFCAi_data;
+logic [39:0] STATRQPIDBi_data;
+logic wb_rq_valid;
 
 //tx interface from roce stack
 logic axis_tx_tvalid, axis_tx_tready, axis_tx_tlast;
@@ -349,6 +334,10 @@ roce_stack_csr  inst_roce_stack_csr(
   .WB_SQPSNi_valid_i(npsn_valid),
   .WB_LSTRQREQi_i(epsn_data),
   .WB_LSTRQREQi_valid_i(epsn_valid),
+  .WB_STATRQi_valid_i(wb_rq_valid),
+  .WB_STATRQBUFCAi_i(STATRQBUFCAi_data),
+  .WB_STATRQPIDBi_i(STATRQPIDBi_data),
+
 
   .WB_INAMPKTCNT_i(INAMPKTCNT_wb),
   .WB_INAMPKTCNT_valid_i(INAMPKTCNT_wb_valid),
@@ -560,6 +549,10 @@ roce_stack_axis_to_aximm #(
   .m_axi_data_bus_rlast_i(m_axi_data_bus_rlast_i),
   .m_axi_data_bus_rvalid_i(m_axi_data_bus_rvalid_i),
   .m_axi_data_bus_rready_o(m_axi_data_bus_rready_o),
+
+  .wb_rqbufaddr_o(STATRQBUFCAi_data),
+  .wb_rqpidb_o(STATRQPIDBi_data),
+  .wb_valid_o(wb_rq_valid),
 
   .axis_aclk_i(axis_aclk_i),
   .aresetn_i(axis_rstn_i)
