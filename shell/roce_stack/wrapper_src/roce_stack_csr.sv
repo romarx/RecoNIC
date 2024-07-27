@@ -880,30 +880,30 @@ end
 
 always_ff @(posedge axil_aclk_i, negedge axil_rstn_i) begin
   if(!axil_rstn_i) begin    
-    rw_state_q <= A_IDLE;
-    RAddrReg_q <= 'd0;
-    RDataReg_q <= 'd0;
-    RRespReg_q <= 'd0;
-    hold_rd_q <= 'd0;
+    rw_state_q  <= A_IDLE;
+    RAddrReg_q  <= 'd0;
+    RDataReg_q  <= 'd0;
+    RRespReg_q  <= 'd0;
+    hold_rd_q   <= 'd0;
     
-    WAddrReg_q <= 'd0;
-    WDataReg_q <= 'd0;
-    WRespReg_q <= 'd0;
-    WStrbReg_q <= 'd0;
-    hold_wr_q <= 'd0;
+    WAddrReg_q  <= 'd0;
+    WDataReg_q  <= 'd0;
+    WRespReg_q  <= 'd0;
+    WStrbReg_q  <= 'd0;
+    hold_wr_q   <= 'd0;
   
   end else begin
-    rw_state_q <= rw_state_d;
-    RAddrReg_q <= RAddrReg_d;
-    RDataReg_q <= RDataReg_d;
-    RRespReg_q <= RRespReg_d;
-    hold_rd_q <= hold_rd_d;
+    rw_state_q  <= rw_state_d;
+    RAddrReg_q  <= RAddrReg_d;
+    RDataReg_q  <= RDataReg_d;
+    RRespReg_q  <= RRespReg_d;
+    hold_rd_q   <= hold_rd_d;
     
-    WAddrReg_q <= WAddrReg_d;
-    WDataReg_q <= WDataReg_d;
-    WRespReg_q <= WRespReg_d;
-    WStrbReg_q <= WStrbReg_d;
-    hold_wr_q <= hold_wr_d;
+    WAddrReg_q  <= WAddrReg_d;
+    WDataReg_q  <= WDataReg_d;
+    WRespReg_q  <= WRespReg_d;
+    WStrbReg_q  <= WStrbReg_d;
+    hold_wr_q   <= hold_wr_d;
   end
 end
 
@@ -1792,141 +1792,119 @@ end
 
 always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
   if(!axis_rstn_i) begin
-    l_reg_st_q <= L_IDLE;
-    l_rd_cmd_q <= 'd0;
-    l_wr_cmd_q <= 'd0;
-    hold_axis_q <= 'd0;
-    QPidx_q <= 'd0;
+    l_reg_st_q                  <= L_IDLE;
+    l_rd_cmd_q                  <= 'd0;
+    l_wr_cmd_q                  <= 'd0;
+    hold_axis_q                 <= 'd0;
+    QPidx_q                     <= 'd0;
 
-    rd_sq_vaddr_q <= 'd0;
-    rd_sq_vaddr_valid_q <= 'd0;
+    rd_sq_vaddr_q               <= 'd0;
+    rd_sq_vaddr_valid_q         <= 'd0;
 
-    CONF_q <= 'd0;
-    MACADDLSB_q <= 'd0;
-    MACADDMSB_q <= 'd0;
-    IPv4ADD_q <= 'd0;
+    CONF_q                      <= 'd0;
+    MACADDLSB_q                 <= 'd0;
+    MACADDMSB_q                 <= 'd0;
+    IPv4ADD_q                   <= 'd0;
 
-    PD_RD_REG_AXIS_Q <= 'd0;
-    QP_RD_REG_AXIS_Q <= 'd0;
+    PD_RD_REG_AXIS_Q            <= 'd0;
+    QP_RD_REG_AXIS_Q            <= 'd0;
     
-    rd_vtp_st_q <= VTP_IDLE;
-    wr_vtp_st_q <= VTP_IDLE;
-    rd_resp_addr_data_q <= 'd0;
-    wr_resp_addr_data_q <= 'd0;
+    rd_vtp_st_q                 <= VTP_IDLE;
+    wr_vtp_st_q                 <= VTP_IDLE;
+    rd_resp_addr_data_q         <= 'd0;
+    wr_resp_addr_data_q         <= 'd0;
 
-    find_pd_rd_q <= 'd0;
-    find_pd_rd_valid_q <= 1'b0;
-    find_pd_wr_q <= 'd0;
-    find_pd_wr_valid_q = 1'b0;
-    pdnum_table_q <= ~0;
-    pd_addr_q <= ~0;
+    find_pd_rd_q                <= 'd0;
+    find_pd_rd_valid_q          <= 1'b0;
+    find_pd_wr_q                <= 'd0;
+    find_pd_wr_valid_q          <= 1'b0;
+    pdnum_table_q               <= ~0;
+    pd_addr_q                   <= ~0;
 
-    wb_CQHEADi_valid_q <= 1'b0;
-    wb_CQHEADi_cmd_q <= 'd0;
+    wb_CQHEADi_valid_q          <= 1'b0;
+    wb_CQHEADi_cmd_q            <= 'd0;
+    wb_SQPSNi_valid_q           <= 1'b0;
+    wb_SQPSNi_cmd_q             <= 'd0;
+    wb_LSTRQREQi_valid_q        <= 1'b0;
+    wb_LSTRQREQi_cmd_q          <= 'd0;
+    wb_STATRQBUFCAi_valid_q     <= 1'b0;
+    wb_STATRQBUFCAi_cmd_q       <= 'd0;
+    wb_STATRQBUFCAMSBi_valid_q  <= 1'b0;
+    wb_STATRQBUFCAMSBi_cmd_q    <= 'd0;
+    wb_STATRQPIDBi_valid_q      <= 1'b0;
+    wb_STATRQPIDBi_cmd_q        <= 'd0;
 
-    wb_SQPSNi_valid_q <= 1'b0;
-    wb_SQPSNi_cmd_q <= 'd0;
-
-    wb_LSTRQREQi_valid_q <= 1'b0;
-    wb_LSTRQREQi_cmd_q <= 'd0;
-
-    wb_STATRQBUFCAi_valid_q <= 1'b0;
-    wb_STATRQBUFCAi_cmd_q <= 'd0;
-    
-    wb_STATRQBUFCAMSBi_valid_q <= 1'b0;
-    wb_STATRQBUFCAMSBi_cmd_q <= 'd0;
-    
-    wb_STATRQPIDBi_valid_q <= 1'b0;
-    wb_STATRQPIDBi_cmd_q <= 'd0;
-
-    wb_INSRRPKTCNT_valid_q <= 1'b0;
-    wb_INSRRPKTCNT_cmd_q <= 'd0;
-
-    wb_INAMPKTCNT_valid_q <= 1'b0;
-    wb_INAMPKTCNT_cmd_q <= 'd0;
-
-    wb_INNCKPKTSTS_valid_q <= 1'b0;
-    wb_INNCKPKTSTS_cmd_q <= 'd0;
-
-    wb_OUTAMPKTCNT_valid_q <= 1'b0;
-    wb_OUTAMPKTCNT_cmd_q <= 'd0;
-
-    wb_OUTNAKPKTCNT_valid_q <= 1'b0;
-    wb_OUTNAKPKTCNT_cmd_q <= 'd0;
-
-    wb_OUTIOPKTCNT_valid_q <= 1'b0;
-    wb_OUTIOPKTCNT_cmd_q <= 'd0;
-
-    wb_OUTRDRSPPKTCNT_valid_q <= 1'b0;
-    wb_OUTRDRSPPKTCNT_cmd_q <= 'd0;
+    wb_INSRRPKTCNT_valid_q      <= 1'b0;
+    wb_INSRRPKTCNT_cmd_q        <= 'd0;
+    wb_INAMPKTCNT_valid_q       <= 1'b0;
+    wb_INAMPKTCNT_cmd_q         <= 'd0;
+    wb_INNCKPKTSTS_valid_q      <= 1'b0;
+    wb_INNCKPKTSTS_cmd_q        <= 'd0;
+    wb_OUTAMPKTCNT_valid_q      <= 1'b0;
+    wb_OUTAMPKTCNT_cmd_q        <= 'd0;
+    wb_OUTNAKPKTCNT_valid_q     <= 1'b0;
+    wb_OUTNAKPKTCNT_cmd_q       <= 'd0;
+    wb_OUTIOPKTCNT_valid_q      <= 1'b0;
+    wb_OUTIOPKTCNT_cmd_q        <= 'd0;
+    wb_OUTRDRSPPKTCNT_valid_q   <= 1'b0;
+    wb_OUTRDRSPPKTCNT_cmd_q     <= 'd0;
   end else begin
-    l_reg_st_q <= l_reg_st_d;
-    l_rd_cmd_q <= l_rd_cmd_d;
-    l_wr_cmd_q <= l_wr_cmd_d;
-    hold_axis_q <= hold_axis_d;
-    QPidx_q <= QPidx_d;
+    l_reg_st_q                  <= l_reg_st_d;
+    l_rd_cmd_q                  <= l_rd_cmd_d;
+    l_wr_cmd_q                  <= l_wr_cmd_d;
+    hold_axis_q                 <= hold_axis_d;
+    QPidx_q                     <= QPidx_d;
 
-    rd_sq_vaddr_q <= rd_sq_vaddr_d;
-    rd_sq_vaddr_valid_q <= rd_sq_vaddr_valid_d;
+    rd_sq_vaddr_q               <= rd_sq_vaddr_d;
+    rd_sq_vaddr_valid_q         <= rd_sq_vaddr_valid_d;
 
-    CONF_q <= CONF_d;
-    MACADDLSB_q <= MACADDLSB_d;
-    MACADDMSB_q <= MACADDMSB_d;
-    IPv4ADD_q <= IPv4ADD_d;
+    CONF_q                      <= CONF_d;
+    MACADDLSB_q                 <= MACADDLSB_d;
+    MACADDMSB_q                 <= MACADDMSB_d;
+    IPv4ADD_q                   <= IPv4ADD_d;
 
-    PD_RD_REG_AXIS_Q <= PD_RD_REG_AXIS_D;
-    QP_RD_REG_AXIS_Q <= QP_RD_REG_AXIS_D;
+    PD_RD_REG_AXIS_Q            <= PD_RD_REG_AXIS_D;
+    QP_RD_REG_AXIS_Q            <= QP_RD_REG_AXIS_D;
    
-    rd_vtp_st_q <= rd_vtp_st_d;
-    wr_vtp_st_q <= wr_vtp_st_d;
-    rd_resp_addr_data_q <= rd_resp_addr_data_d;
-    wr_resp_addr_data_q <= wr_resp_addr_data_d;
+    rd_vtp_st_q                 <= rd_vtp_st_d;
+    wr_vtp_st_q                 <= wr_vtp_st_d;
+    rd_resp_addr_data_q         <= rd_resp_addr_data_d;
+    wr_resp_addr_data_q         <= wr_resp_addr_data_d;
 
-    find_pd_rd_q <= find_pd_rd_d;
-    find_pd_rd_valid_q <= find_pd_rd_valid_d;
-    find_pd_wr_q <= find_pd_wr_d;
-    find_pd_wr_valid_q <= find_pd_wr_valid_d;
-    pdnum_table_q <= pdnum_table_d;
-    pd_addr_q <= pd_addr_d;
+    find_pd_rd_q                <= find_pd_rd_d;
+    find_pd_rd_valid_q          <= find_pd_rd_valid_d;
+    find_pd_wr_q                <= find_pd_wr_d;
+    find_pd_wr_valid_q          <= find_pd_wr_valid_d;
+    pdnum_table_q               <= pdnum_table_d;
+    pd_addr_q                   <= pd_addr_d;
 
-    wb_CQHEADi_valid_q <= wb_CQHEADi_valid_d;
-    wb_CQHEADi_cmd_q <= wb_CQHEADi_cmd_d;
+    wb_CQHEADi_valid_q          <= wb_CQHEADi_valid_d;
+    wb_CQHEADi_cmd_q            <= wb_CQHEADi_cmd_d;
+    wb_SQPSNi_valid_q           <= wb_SQPSNi_valid_d;
+    wb_SQPSNi_cmd_q             <= wb_SQPSNi_cmd_d;
+    wb_LSTRQREQi_valid_q        <= wb_LSTRQREQi_valid_d;
+    wb_LSTRQREQi_cmd_q          <= wb_LSTRQREQi_cmd_d;
+    wb_STATRQBUFCAi_valid_q     <= wb_STATRQBUFCAi_valid_d;
+    wb_STATRQBUFCAi_cmd_q       <= wb_STATRQBUFCAi_cmd_d;
+    wb_STATRQBUFCAMSBi_valid_q  <= wb_STATRQBUFCAMSBi_valid_d;
+    wb_STATRQBUFCAMSBi_cmd_q    <= wb_STATRQBUFCAMSBi_cmd_d;
+    wb_STATRQPIDBi_valid_q      <= wb_STATRQPIDBi_valid_d;
+    wb_STATRQPIDBi_cmd_q        <= wb_STATRQPIDBi_cmd_d;
 
-    wb_SQPSNi_valid_q <= wb_SQPSNi_valid_d;
-    wb_SQPSNi_cmd_q <= wb_SQPSNi_cmd_d;
-
-    wb_LSTRQREQi_valid_q <= wb_LSTRQREQi_valid_d;
-    wb_LSTRQREQi_cmd_q <= wb_LSTRQREQi_cmd_d;
-    
-    wb_STATRQBUFCAi_valid_q <= wb_STATRQBUFCAi_valid_d;
-    wb_STATRQBUFCAi_cmd_q <= wb_STATRQBUFCAi_cmd_d;
-    
-    wb_STATRQBUFCAMSBi_valid_q <= wb_STATRQBUFCAMSBi_valid_d;
-    wb_STATRQBUFCAMSBi_cmd_q <= wb_STATRQBUFCAMSBi_cmd_d;
-    
-    wb_STATRQPIDBi_valid_q <= wb_STATRQPIDBi_valid_d;
-    wb_STATRQPIDBi_cmd_q <= wb_STATRQPIDBi_cmd_d;
-
-    wb_INSRRPKTCNT_valid_q <= wb_INSRRPKTCNT_valid_d;
-    wb_INSRRPKTCNT_cmd_q <= wb_INSRRPKTCNT_cmd_d;
-
-    wb_INAMPKTCNT_valid_q <= wb_INAMPKTCNT_valid_d;
-    wb_INAMPKTCNT_cmd_q <= wb_INAMPKTCNT_cmd_d;
-
-    wb_INNCKPKTSTS_valid_q <= wb_INNCKPKTSTS_valid_d;
-    wb_INNCKPKTSTS_cmd_q <= wb_INNCKPKTSTS_cmd_d;
-
-    wb_OUTAMPKTCNT_valid_q <= wb_OUTAMPKTCNT_valid_d;
-    wb_OUTAMPKTCNT_cmd_q <= wb_OUTAMPKTCNT_cmd_d;
-
-    wb_OUTNAKPKTCNT_valid_q <= wb_OUTNAKPKTCNT_valid_d;
-    wb_OUTNAKPKTCNT_cmd_q <= wb_OUTNAKPKTCNT_cmd_d;
-
-    wb_OUTIOPKTCNT_valid_q <= wb_OUTIOPKTCNT_valid_d;
-    wb_OUTIOPKTCNT_cmd_q <= wb_OUTIOPKTCNT_cmd_d;
-
-    wb_OUTRDRSPPKTCNT_valid_q <= wb_OUTRDRSPPKTCNT_valid_d;
-    wb_OUTRDRSPPKTCNT_cmd_q <= wb_OUTRDRSPPKTCNT_cmd_d;
+    wb_INSRRPKTCNT_valid_q      <= wb_INSRRPKTCNT_valid_d;
+    wb_INSRRPKTCNT_cmd_q        <= wb_INSRRPKTCNT_cmd_d;
+    wb_INAMPKTCNT_valid_q       <= wb_INAMPKTCNT_valid_d;
+    wb_INAMPKTCNT_cmd_q         <= wb_INAMPKTCNT_cmd_d;
+    wb_INNCKPKTSTS_valid_q      <= wb_INNCKPKTSTS_valid_d;
+    wb_INNCKPKTSTS_cmd_q        <= wb_INNCKPKTSTS_cmd_d;
+    wb_OUTAMPKTCNT_valid_q      <= wb_OUTAMPKTCNT_valid_d;
+    wb_OUTAMPKTCNT_cmd_q        <= wb_OUTAMPKTCNT_cmd_d;
+    wb_OUTNAKPKTCNT_valid_q     <= wb_OUTNAKPKTCNT_valid_d;
+    wb_OUTNAKPKTCNT_cmd_q       <= wb_OUTNAKPKTCNT_cmd_d;
+    wb_OUTIOPKTCNT_valid_q      <= wb_OUTIOPKTCNT_valid_d;
+    wb_OUTIOPKTCNT_cmd_q        <= wb_OUTIOPKTCNT_cmd_d;
+    wb_OUTRDRSPPKTCNT_valid_q   <= wb_OUTRDRSPPKTCNT_valid_d;
+    wb_OUTRDRSPPKTCNT_cmd_q     <= wb_OUTRDRSPPKTCNT_cmd_d;
   end
 end
 
