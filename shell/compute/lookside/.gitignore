@@ -1,0 +1,6 @@
+*.log
+*.jou
+cl_box/*
+interface/*
+kernel/*
+mmult/*

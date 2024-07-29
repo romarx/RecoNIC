@@ -52,22 +52,30 @@ run_questasim()
 # Vivado xsim main
 run_xsim()
 {
-  echo "current director: $(pwd)"
+  echo "current directory: $(pwd)"
   copy_test_data $1
-
-  top_module_name="$3"
+  
+  if [[ "$4" == "on" ]]; then
+    top_module_name="rn_tb_2rdma_roce_top"
+  else
+    top_module_name="$3"
+  fi
   top_module_opt="${top_module_name}_opt"
-
   # Compile
   source xsim_compile.do 2>&1 | tee -a xsim_compile.log
 
   # Elaborate reco
   if [[ "$3" == "cl_tb_top" ]]; then
-    xelab --incr --relax --debug typical --mt auto -L reco -L ernic_v3_1_1 -L xilinx_vip -L xpm -L cam_v2_2_2 -L vitis_net_p4_v1_0_2 -L -L axi_protocol_checker_v2_0_8 -L unisims_ver -L unimacro_ver -L secureip --snapshot $top_module_opt reco.cl_tb_top reco.glbl -log xsim_elaborate.log
+    xelab --incr --relax --debug typical --mt auto -L reco -L ernic_v3_1_1 -L rocev2_ip -L xilinx_vip -L xpm -L cam_v2_2_2 -L vitis_net_p4_v1_0_2 -L -L axi_protocol_checker_v2_0_8 -L unisims_ver -L unimacro_ver -L secureip --snapshot $top_module_opt reco.cl_tb_top reco.glbl -log xsim_elaborate.log
   elif [[ "$3" == "rn_tb_2rdma_top" ]]; then
-    xelab --incr --relax --debug typical --mt auto -L reco -L ernic_v3_1_1 -L xilinx_vip -L xpm -L cam_v2_2_2 -L vitis_net_p4_v1_0_2 -L -L axi_protocol_checker_v2_0_8 -L unisims_ver -L unimacro_ver -L secureip --snapshot $top_module_opt reco.rn_tb_2rdma_top reco.glbl -log xsim_elaborate.log
+    echo "$4"
+    if [[ "$4" == "off" ]]; then
+      xelab --incr --relax --debug typical --mt auto -L reco -L ernic_v3_1_1 -L rocev2_ip -L axis_interconnect_v1_1_19 -L xilinx_vip -L xpm -L cam_v2_2_2 -L vitis_net_p4_v1_0_2 -L -L axi_protocol_checker_v2_0_8 -L unisims_ver -L unimacro_ver -L secureip --snapshot $top_module_opt reco.rn_tb_2rdma_top reco.glbl -log xsim_elaborate.log
+    else
+      xelab --incr --relax --debug typical --mt auto -L reco -L ernic_v3_1_1 -L rocev2_ip -L xilinx_vip -L xpm -L cam_v2_2_2 -L vitis_net_p4_v1_0_2 -L -L axi_protocol_checker_v2_0_8 -L unisims_ver -L unimacro_ver -L secureip --snapshot $top_module_opt reco.rn_tb_2rdma_roce_top reco.glbl -log xsim_elaborate.log
+    fi
   else 
-    xelab --incr --relax --debug typical --mt auto -L reco -L ernic_v3_1_1  -L xilinx_vip -L xpm -L cam_v2_2_2 -L vitis_net_p4_v1_0_2 -L -L axi_protocol_checker_v2_0_8 -L unisims_ver -L unimacro_ver -L secureip --snapshot $top_module_opt reco.rn_tb_top reco.glbl -log xsim_elaborate.log
+    xelab --incr --relax --debug typical --mt auto -L reco -L ernic_v3_1_1 -L rocev2_ip -L xilinx_vip -L xpm -L cam_v2_2_2 -L vitis_net_p4_v1_0_2 -L -L axi_protocol_checker_v2_0_8 -L unisims_ver -L unimacro_ver -L secureip --snapshot $top_module_opt reco.rn_tb_top reco.glbl -log xsim_elaborate.log
   fi
 
   # Simulate
@@ -192,6 +200,11 @@ while [[ $# -gt 0 ]]; do
       shift
       shift
       ;;
+    -rv2|--rocev2)
+      rocev2="$2"
+      shift
+      shift
+      ;;
     -c|--clean)
       clean
       shift 
@@ -213,7 +226,7 @@ if [[ $simulator == "questasim" ]]; then
   run_questasim $testcase $gui $top_module
 elif [[ $simulator == "xsim" ]]; then
   echo "INFO: Start xsim simulation"
-  run_xsim $testcase $gui $top_module
+  run_xsim $testcase $gui $top_module $rocev2
 else
   echo "ERROR: Simulator not supported. Please use either questasim or xsim"
   usage

@@ -15,11 +15,14 @@ ROOT_DIR     := ..
 SHELL_DIR    := $(ROOT_DIR)/shell
 SCRIPT_DIR   := $(ROOT_DIR)/scripts
 BUILD_DIR    := $(ROOT_DIR)/build
+ROCE_BUILD_DIR := $(ROOT_DIR)/roce_build
 RN_BUILD_DIR := $(BUILD_DIR)/reconic
 
 IMPL       ?= 1
 
-GEN_HLS    ?= 0
+GEN_HLS    ?= 1
+
+GEN_ROCEV2 ?= 1
 
 PYTHON_EXE ?= python
 
@@ -29,6 +32,9 @@ VIVADO_VERSION := $(shell vivado -version | grep ^Vivado |  sed -n 's/.*\(v[0-9]
 # Module directories
 ## RecoNIC top module
 RN_TOP            := $(SHELL_DIR)/top
+
+ROCE_DIR		  := $(SHELL_DIR)/roce_stack
+
 ## Packet Classification module
 PC                := packet_classification
 PKT_CLASSI_DIR    := $(SHELL_DIR)/$(PC)
@@ -51,17 +57,24 @@ PLUGS_DIR         := $(SHELL_DIR)/plugs
 
 PLUGIN_DIR     := $(PLUGS_DIR)/rdma_onic_plugin
 SMARTNIC_DIR := $(ROOT_DIR)/base_nics/open-nic-shell/src/box_250mhz
+SMARTNIC_ROCE_DIR := $(ROOT_DIR)/base_nics/open-nic-shell/src/roce_stack
 SMARTNIC_SCRIPT_DIR := $(ROOT_DIR)/base_nics/open-nic-shell/script
 
 build_nic: build_reconic
 ifeq ($(IMPL), 1)
-	cd $(SMARTNIC_SCRIPT_DIR); vivado -mode batch -source build.tcl -tclargs -max_pkt_len 9600 -impl 1 -overwrite 1 -board_repo $(BOARD_REPO)
+	cd $(SMARTNIC_SCRIPT_DIR); vivado -mode batch -source build.tcl -tclargs -max_pkt_len 9600 -ernic 0 -impl 1 -overwrite 1 -board_repo $(BOARD_REPO)
 else
-	cd $(SMARTNIC_SCRIPT_DIR); vivado -mode batch -source build.tcl -tclargs -max_pkt_len 9600 -impl 0 -overwrite 1 -board_repo $(BOARD_REPO)
+	cd $(SMARTNIC_SCRIPT_DIR); vivado -mode batch -source build.tcl -tclargs -max_pkt_len 9600 -ernic 0 -impl 0 -overwrite 1 -board_repo $(BOARD_REPO)
 endif
 
 build_reconic: clean_build hls_build
 	mkdir -p $(BUILD_DIR)
+	mkdir -p $(ROCE_BUILD_DIR)
+	mkdir -p $(ROCE_BUILD_DIR)/build
+	mkdir -p $(ROCE_BUILD_DIR)/rocev2_src
+	mkdir -p $(ROCE_BUILD_DIR)/vivado_ip
+	mkdir -p $(ROCE_BUILD_DIR)/wrapper_src
+	mkdir -p $(SMARTNIC_ROCE_DIR)/
 	mkdir -p $(RN_BUILD_DIR)
 	mkdir -p $(RN_BUILD_DIR)/$(LC)
 	cp -rf $(PLUGIN_DIR)/* $(BUILD_DIR)/
@@ -73,6 +86,16 @@ build_reconic: clean_build hls_build
 	cp $(LOOKASIDE_COMP_DIR)/kernel/*.v $(RN_BUILD_DIR)/$(LC)/
 	cd $(BUILD_DIR); $(PYTHON_EXE) $(SCRIPT_DIR)/build_tcl.py -nic rdma-opennic
 	cp -rf $(BUILD_DIR)/* $(SMARTNIC_DIR)/
+	
+	cp -rf $(ROCE_DIR)/build/* $(ROCE_BUILD_DIR)/build/
+	cp -rf $(ROCE_DIR)/rocev2_src/* $(ROCE_BUILD_DIR)/rocev2_src/
+	cp -rf $(ROCE_DIR)/vivado_ip/* $(ROCE_BUILD_DIR)/vivado_ip/
+	cp -rf $(ROCE_DIR)/wrapper_src/* $(ROCE_BUILD_DIR)/wrapper_src/
+	cp -rf $(ROCE_DIR)/build.tcl $(ROCE_BUILD_DIR)/
+	cp -rf $(ROCE_BUILD_DIR)/* $(SMARTNIC_ROCE_DIR)/
+
+	rm -rf $(SMARTNIC_ROCE_DIR)/vivado_ip/sim_vivado_ip.tcl
+
 
 hls_build:
 ifeq ($(GEN_HLS), 1)
@@ -97,6 +120,14 @@ ifeq (,$(wildcard $(LOOKASIDE_COMP_DIR)/kernel/mmult.v))
 else
 	@echo "Use old files in $(LOOKASIDE_COMP_DIR)/kernel"
 endif
+endif
+
+ifeq ($(GEN_ROCEV2), 1)
+	mkdir -p $(ROCE_DIR)/build
+	cd $(ROCE_DIR)/build; \
+		cmake ../fpga-network-stack -DVIVADO_HLS_ROOT_DIR=/opt/Xilinx/Vitis_HLS
+	cd $(ROCE_DIR)/build; \
+		make ip
 endif
 
 clean_build:

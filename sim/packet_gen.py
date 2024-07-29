@@ -1299,6 +1299,8 @@ class GenRoCEClass(pktGenClass):
 
     # Generate rdma2_stat_reg_config for simulation
     if(is_remote_peer):
+      self.rdma1_stat_reg_config.append(format(self.get_rdma_per_q_config_addr(eh.SQPSNi         , qpid), '08x'))
+      self.rdma1_stat_reg_config.append(format(self.get_rdma_per_q_config_addr(eh.LSTRQREQi      , qpid), '08x'))
       self.rdma1_stat_reg_config.append(format(self.get_rdma_per_q_config_addr(eh.CQHEADi        , qpid), '08x'))
       self.rdma1_stat_reg_config.append(format(self.get_rdma_per_q_config_addr(eh.STATSSNi       , qpid), '08x'))
       self.rdma1_stat_reg_config.append(format(self.get_rdma_per_q_config_addr(eh.STATMSNi       , qpid), '08x'))
@@ -1310,6 +1312,8 @@ class GenRoCEClass(pktGenClass):
       self.rdma1_stat_reg_config.append(format(self.get_rdma_per_q_config_addr(eh.STATWQEi       , qpid), '08x'))
       self.rdma1_stat_reg_config.append(format(self.get_rdma_per_q_config_addr(eh.STATRQPIDBi    , qpid), '08x'))
 
+      self.rdma1_debug_stat_reg_config.append('eh.SQPSNi          : ' + format(self.get_rdma_per_q_config_addr(eh.SQPSNi         , qpid), '08x'))
+      self.rdma1_debug_stat_reg_config.append('eh.LSTRQREQi       : ' + format(self.get_rdma_per_q_config_addr(eh.LSTRQREQi      , qpid), '08x'))
       self.rdma1_debug_stat_reg_config.append('eh.CQHEADi         : ' + format(self.get_rdma_per_q_config_addr(eh.CQHEADi        , qpid), '08x'))
       self.rdma1_debug_stat_reg_config.append('eh.STATSSNi        : ' + format(self.get_rdma_per_q_config_addr(eh.STATSSNi       , qpid), '08x'))
       self.rdma1_debug_stat_reg_config.append('eh.STATMSNi        : ' + format(self.get_rdma_per_q_config_addr(eh.STATMSNi       , qpid), '08x'))
@@ -1321,6 +1325,8 @@ class GenRoCEClass(pktGenClass):
       self.rdma1_debug_stat_reg_config.append('eh.STATWQEi        : ' + format(self.get_rdma_per_q_config_addr(eh.STATWQEi       , qpid), '08x'))
       self.rdma1_debug_stat_reg_config.append('eh.STATRQPIDBi     : ' + format(self.get_rdma_per_q_config_addr(eh.STATRQPIDBi    , qpid), '08x'))
 
+      self.rdma2_stat_reg_config.append(format(self.get_rdma_per_q_config_addr(eh.SQPSNi         , qpid), '08x'))
+      self.rdma2_stat_reg_config.append(format(self.get_rdma_per_q_config_addr(eh.LSTRQREQi      , qpid), '08x'))
       self.rdma2_stat_reg_config.append(format(self.get_rdma_per_q_config_addr(eh.CQHEADi        , qpid), '08x'))
       self.rdma2_stat_reg_config.append(format(self.get_rdma_per_q_config_addr(eh.STATSSNi       , qpid), '08x'))
       self.rdma2_stat_reg_config.append(format(self.get_rdma_per_q_config_addr(eh.STATMSNi       , qpid), '08x'))
@@ -1332,6 +1338,8 @@ class GenRoCEClass(pktGenClass):
       self.rdma2_stat_reg_config.append(format(self.get_rdma_per_q_config_addr(eh.STATWQEi       , qpid), '08x'))
       self.rdma2_stat_reg_config.append(format(self.get_rdma_per_q_config_addr(eh.STATRQPIDBi    , qpid), '08x'))
 
+      self.rdma2_debug_stat_reg_config.append('eh.SQPSNi          : ' + format(self.get_rdma_per_q_config_addr(eh.SQPSNi         , qpid), '08x'))
+      self.rdma2_debug_stat_reg_config.append('eh.LSTRQREQi       : ' + format(self.get_rdma_per_q_config_addr(eh.LSTRQREQi      , qpid), '08x'))
       self.rdma2_debug_stat_reg_config.append('eh.CQHEADi         : ' + format(self.get_rdma_per_q_config_addr(eh.CQHEADi        , qpid), '08x'))
       self.rdma2_debug_stat_reg_config.append('eh.STATSSNi        : ' + format(self.get_rdma_per_q_config_addr(eh.STATSSNi       , qpid), '08x'))
       self.rdma2_debug_stat_reg_config.append('eh.STATMSNi        : ' + format(self.get_rdma_per_q_config_addr(eh.STATMSNi       , qpid), '08x'))
