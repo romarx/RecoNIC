@@ -18,17 +18,22 @@ module ram_sp_nc
   (* ram_style = "block" *) reg [DATA_BITS-1:0] ram[DEPTH];
   reg [DATA_BITS-1:0] a_data_reg;
 
-  always_ff @(posedge clk) begin
-    if(a_en) begin
-      for (int i = 0; i < (DATA_BITS/8); i++) begin
-        if(a_we[i]) begin
-          ram[a_addr][(i*8)+:8] <= a_data_in[(i*8)+:8];
-        end
+  always_ff @(posedge clk, negedge rstn_i) begin
+    if(!rstn_i) begin
+      for(int i=0; i < DEPTH; i++) begin
+        ram[i] <= 'd0;
       end
-      a_data_reg <= ram[a_addr];
+    end else begin
+      if(a_en) begin
+        for (int i = 0; i < (DATA_BITS/8); i++) begin
+          if(a_we[i]) begin
+            ram[a_addr][(i*8)+:8] <= a_data_in[(i*8)+:8];
+          end
+        end
+        a_data_reg <= ram[a_addr];
+      end
     end
   end
-  
 
   assign a_data_out = a_data_reg;
 

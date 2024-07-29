@@ -411,6 +411,7 @@ metaIntf #(.STYPE(logic[103:0])) m_axis_dbg_0 ();
 metaIntf #(.STYPE(logic[103:0])) m_axis_dbg_1 ();
 metaIntf #(.STYPE(logic[103:0])) m_axis_dbg_2 ();
 
+
 assign m_axis_dbg_0.ready = 1'b1;
 assign m_axis_dbg_1.ready = 1'b1;
 assign m_axis_dbg_2.ready = 1'b1;
@@ -440,9 +441,10 @@ rocev2_ip rocev2_inst(
     .s_axis_rx_data_TVALID(s_axis_rx.tvalid),
     .s_axis_rx_data_TREADY(s_axis_rx.tready),
     .s_axis_rx_data_TDATA(s_axis_rx.tdata),
-    .s_axis_rx_data_TKEEP(s_axis_rx.tkeep),
     .s_axis_rx_data_TLAST(s_axis_rx.tlast),
-    
+    .s_axis_rx_data_TKEEP(s_axis_rx.tkeep),
+    .s_axis_rx_data_TSTRB(s_axis_rx.tkeep),
+
     // TX
     .m_axis_tx_data_TVALID(roce_to_icrc.tvalid),
     .m_axis_tx_data_TREADY(roce_to_icrc.tready),
@@ -476,8 +478,9 @@ rocev2_ip rocev2_inst(
     .s_axis_mem_read_data_TVALID(s_axis_rdma_rd.tvalid),
     .s_axis_mem_read_data_TREADY(s_axis_rdma_rd.tready),
     .s_axis_mem_read_data_TDATA(s_axis_rdma_rd.tdata),
-    .s_axis_mem_read_data_TKEEP(s_axis_rdma_rd.tkeep),
     .s_axis_mem_read_data_TLAST(s_axis_rdma_rd.tlast),
+    .s_axis_mem_read_data_TKEEP(s_axis_rdma_rd.tkeep),
+    .s_axis_mem_read_data_TSTRB(s_axis_rdma_rd.tkeep),
 
     // QP intf
     .s_axis_qp_interface_TVALID(s_rdma_qp_interface.valid),
@@ -553,8 +556,9 @@ rocev2_ip rocev2_inst(
     .s_axis_rx_data_TVALID(s_axis_rx.tvalid),
     .s_axis_rx_data_TREADY(s_axis_rx.tready),
     .s_axis_rx_data_TDATA(s_axis_rx.tdata),
-    .s_axis_rx_data_TKEEP(s_axis_rx.tkeep),
     .s_axis_rx_data_TLAST(s_axis_rx.tlast),
+    .s_axis_rx_data_TKEEP(s_axis_rx.tkeep),
+    .s_axis_rx_data_TSTRB(s_axis_rx.tkeep),
     
     // TX
     .m_axis_tx_data_TVALID(roce_to_icrc.tvalid),
@@ -589,8 +593,9 @@ rocev2_ip rocev2_inst(
     .s_axis_mem_read_data_TVALID(s_axis_rdma_rd.tvalid),
     .s_axis_mem_read_data_TREADY(s_axis_rdma_rd.tready),
     .s_axis_mem_read_data_TDATA(s_axis_rdma_rd.tdata),
-    .s_axis_mem_read_data_TKEEP(s_axis_rdma_rd.tkeep),
     .s_axis_mem_read_data_TLAST(s_axis_rdma_rd.tlast),
+    .s_axis_mem_read_data_TKEEP(s_axis_rdma_rd.tkeep),
+    .s_axis_mem_read_data_TSTRB(s_axis_rdma_rd.tkeep),
 
     // QP intf
     .s_axis_qp_interface_V_TVALID(s_rdma_qp_interface.valid),

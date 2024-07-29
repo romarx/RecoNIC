@@ -286,7 +286,7 @@ xvlog $xvlog_opts -work reco -sv -L rocev2_ip -L axis_interconnect_v1_1_19 \
 "../../shell/roce_stack/rocev2_src/queue_meta.sv" \
 "../../shell/roce_stack/rocev2_src/rdma_flow.sv" \
 "../../shell/roce_stack/rocev2_src/roce_stack.sv" \
-"../../shell/roce_stack/rocev2_src/sp_ram_nc.sv" \
+"../../shell/roce_stack/rocev2_src/sp_ram_nc_sim.sv" \
 "../../shell/roce_stack/wrapper_src/roce_stack_request_handler.sv" \
 "../../shell/roce_stack/wrapper_src/roce_stack_axis_to_aximm.sv" \
 "../../shell/roce_stack/wrapper_src/roce_stack_csr.sv" \

@@ -559,14 +559,14 @@ roce_stack_axis_to_aximm #(
 
 );
 
-
 mac_ip_encode_ip mac_ip_encode_inst (
 `ifdef VITIS_HLS
     .s_axis_ip_TVALID(axis_tx_roce_to_eth.tvalid),
     .s_axis_ip_TREADY(axis_tx_roce_to_eth.tready),
     .s_axis_ip_TDATA(axis_tx_roce_to_eth.tdata),
-    .s_axis_ip_TKEEP(axis_tx_roce_to_eth.tkeep),
     .s_axis_ip_TLAST(axis_tx_roce_to_eth.tlast),
+    .s_axis_ip_TKEEP(axis_tx_roce_to_eth.tkeep),
+    .s_axis_ip_TSTRB(axis_tx_roce_to_eth.tkeep),
     
     .m_axis_ip_TVALID(axis_tx.tvalid),
     .m_axis_ip_TREADY(axis_tx.tready),
@@ -583,8 +583,10 @@ mac_ip_encode_ip mac_ip_encode_inst (
     .s_axis_ip_TVALID(axis_tx_roce_to_eth.tvalid),
     .s_axis_ip_TREADY(axis_tx_roce_to_eth.tready),
     .s_axis_ip_TDATA(axis_tx_roce_to_eth.tdata),
-    .s_axis_ip_TKEEP(axis_tx_roce_to_eth.tkeep),
     .s_axis_ip_TLAST(axis_tx_roce_to_eth.tlast),
+    .s_axis_ip_TKEEP(axis_tx_roce_to_eth.tkeep),
+    .s_axis_ip_TSTRB(axis_tx_roce_to_eth.tkeep),
+
     
     .m_axis_ip_TVALID(axis_tx.tvalid),
     .m_axis_ip_TREADY(axis_tx.tready),
@@ -608,8 +610,10 @@ ip_handler_ip ip_handler_inst (
     .s_axis_raw_TVALID(axis_rx.tvalid),
     .s_axis_raw_TREADY(axis_rx.tready),
     .s_axis_raw_TDATA(axis_rx.tdata),
-    .s_axis_raw_TKEEP(axis_rx.tkeep),
     .s_axis_raw_TLAST(axis_rx.tlast),
+    .s_axis_raw_TKEEP(axis_rx.tkeep),
+    .s_axis_raw_TSTRB(axis_rx.tkeep),
+
     
     .m_axis_roce_TVALID(axis_rx_handler_to_roce.tvalid),
     .m_axis_roce_TREADY(axis_rx_handler_to_roce.tready),

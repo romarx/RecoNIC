@@ -137,8 +137,9 @@ localparam int RD_LAT = 1;
 //  CDC FIFO  //
 //            //
 ////////////////
-rd_cmd_t cmd_fifo_in = 'd0;
+rd_cmd_t cmd_fifo_in_d, cmd_fifo_in_q;
 rd_cmd_t cmd_fifo_out;
+logic cmd_issued;
 logic cmd_fifo_wr_en, cmd_fifo_rd_en;
 logic cmd_fifo_full, cmd_fifo_empty;
 logic cmd_fifo_out_valid, cmd_fifo_in_ack;
@@ -184,7 +185,7 @@ logic [REG_WIDTH-1:0] GLB_RD_REG_AXIL;
 ///////////////////////
 
 
-typedef enum {A_IDLE, R_GETDATA, R_VALID, W_READY, WRITE, B_RESP} read_write_state;
+typedef enum {A_IDLE, R_GETDATA, R_VALID, W_READY, WRITE, WRITE_CMD, B_RESP} read_write_state;
 read_write_state rw_state_q, rw_state_d;
 
 logic reading, writing;
@@ -233,7 +234,9 @@ always_comb begin
   s_axil_bvalid_o = 1'b0;
   s_axil_wready_o = 1'b0;
   writing = 1'b0;
+  cmd_issued = 1'b0;
   cmd_fifo_wr_en = 1'b0;
+  cmd_fifo_in_d = cmd_fifo_in_q;
   WAddrReg_d = WAddrReg_q;
   WDataReg_d = WDataReg_q;
   WRespReg_d = WRespReg_q;
@@ -516,16 +519,16 @@ always_comb begin
       writing = 1'b1;
       if(~WAddrReg_q[17]) begin
         PD_ADDR_AXIL = WAddrReg_q[15-:8];
-        cmd_fifo_in.region = 'd1;
-        cmd_fifo_in.address = PD_ADDR_AXIL;
+        cmd_fifo_in_d.region = 'd1;
+        cmd_fifo_in_d.address = PD_ADDR_AXIL;
         PD_REG_WEA_AXIL = WStrbReg_q;
         case(WAddrReg_q[7:0])
           ADDR_PDPDNUM: begin
             PD_REG_ENA_AXIL[PDPDNUM_idx] = 1'b1;
             PD_WR_REG_AXIL = WDataReg_q;
-            cmd_fifo_in.read_all = 1'b0;
-            cmd_fifo_in.bram_idx = PDPDNUM_idx;
-            cmd_fifo_wr_en = 1'b1; 
+            cmd_fifo_in_d.read_all = 1'b0;
+            cmd_fifo_in_d.bram_idx = PDPDNUM_idx;
+            cmd_issued = 1'b1; 
           end
           ADDR_VIRTADDRLSB: begin
             PD_REG_ENA_AXIL[VIRTADDRLSB_idx] = 1'b1;
@@ -565,15 +568,15 @@ always_comb begin
           WRespReg_d = 2'b10; //SLVERR
         end else begin
           QP_REG_WEA_AXIL = WStrbReg_q;
-          cmd_fifo_in.region = 'd2;
-          cmd_fifo_in.address = QP_ADDR_AXIL;
+          cmd_fifo_in_d.region = 'd2;
+          cmd_fifo_in_d.address = QP_ADDR_AXIL;
           case(WAddrReg_q[7:0])
             ADDR_QPCONFi: begin
               QP_REG_ENA_AXIL[QPCONFi_idx] = 1'b1;
               QP_WR_REG_AXIL = WDataReg_q;
-              cmd_fifo_in.read_all = 1'b1;
-              cmd_fifo_in.bram_idx = QPCONFi_idx;
-              cmd_fifo_wr_en = 1'b1; 
+              cmd_fifo_in_d.read_all = 1'b1;
+              cmd_fifo_in_d.bram_idx = QPCONFi_idx;
+              cmd_issued = 1'b1; 
             end
             ADDR_QPADVCONFi: begin
               QP_REG_ENA_AXIL[QPADVCONFi_idx] = 1'b1;
@@ -628,9 +631,9 @@ always_comb begin
             ADDR_SQPIi: begin
               QP_REG_ENA_AXIL[SQPIi_idx] = 1'b1;
               QP_WR_REG_AXIL = WDataReg_q;
-              cmd_fifo_in.read_all = 1'b1;
-              cmd_fifo_in.bram_idx = SQPIi_idx;
-              cmd_fifo_wr_en = 1'b1; 
+              cmd_fifo_in_d.read_all = 1'b1;
+              cmd_fifo_in_d.bram_idx = SQPIi_idx;
+              cmd_issued = 1'b1; 
             end
             ADDR_QDEPTHi: begin
               QP_REG_ENA_AXIL[QDEPTHi_idx] = 1'b1;
@@ -639,23 +642,23 @@ always_comb begin
             ADDR_SQPSNi: begin
               QP_REG_ENA_AXIL[SQPSNi_idx] = 1'b1;
               QP_WR_REG_AXIL = WDataReg_q;
-              cmd_fifo_in.read_all = 1'b1;
-              cmd_fifo_in.bram_idx = SQPSNi_idx;
-              cmd_fifo_wr_en = 1'b1; 
+              cmd_fifo_in_d.read_all = 1'b1;
+              cmd_fifo_in_d.bram_idx = SQPSNi_idx;
+              cmd_issued = 1'b1; 
             end
             ADDR_LSTRQREQi: begin
               QP_REG_ENA_AXIL[LSTRQREQi_idx] = 1'b1;
               QP_WR_REG_AXIL = WDataReg_q;
-              cmd_fifo_in.read_all = 1'b1;
-              cmd_fifo_in.bram_idx = LSTRQREQi_idx;
-              cmd_fifo_wr_en = 1'b1; 
+              cmd_fifo_in_d.read_all = 1'b1;
+              cmd_fifo_in_d.bram_idx = LSTRQREQi_idx;
+              cmd_issued = 1'b1; 
             end
             ADDR_DESTQPCONFi: begin
               QP_REG_ENA_AXIL[DESTQPCONFi_idx] = 1'b1;
               QP_WR_REG_AXIL = WDataReg_q;
-              cmd_fifo_in.read_all = 1'b1;
-              cmd_fifo_in.bram_idx = DESTQPCONFi_idx;
-              cmd_fifo_wr_en = 1'b1; 
+              cmd_fifo_in_d.read_all = 1'b1;
+              cmd_fifo_in_d.bram_idx = DESTQPCONFi_idx;
+              cmd_issued = 1'b1; 
             end
             ADDR_MACDESADDLSBi: begin
               QP_REG_ENA_AXIL[MACDESADDLSBi_idx] = 1'b1;
@@ -668,9 +671,9 @@ always_comb begin
             ADDR_IPDESADDR1i: begin
               QP_REG_ENA_AXIL[IPDESADDR1i_idx] = 1'b1;
               QP_WR_REG_AXIL = WDataReg_q;
-              cmd_fifo_in.read_all = 1'b1;
-              cmd_fifo_in.bram_idx = IPDESADDR1i_idx;
-              cmd_fifo_wr_en = 1'b1;             
+              cmd_fifo_in_d.read_all = 1'b1;
+              cmd_fifo_in_d.bram_idx = IPDESADDR1i_idx;
+              cmd_issued = 1'b1;             
             end
             ADDR_IPDESADDR2i: begin
               QP_REG_ENA_AXIL[IPDESADDR2i_idx] = 1'b1;
@@ -700,15 +703,15 @@ always_comb begin
       end else begin
         GLB_REG_WEA_AXIL = WStrbReg_q;
         GLB_ADDR_AXIL = WAddrReg_q >> 2;
-        cmd_fifo_in.region = 'd0;
-        cmd_fifo_in.read_all = 1'b0;
-        cmd_fifo_in.bram_idx = 1'b0;
+        cmd_fifo_in_d.region = 'd0;
+        cmd_fifo_in_d.read_all = 1'b0;
+        cmd_fifo_in_d.bram_idx = 1'b0;
         case (WAddrReg_q[8:0]) 
           ADDR_CONF: begin
             GLB_REG_ENA_AXIL = 1'b1;
             GLB_WR_REG_AXIL = WDataReg_q;
-            cmd_fifo_in.address = GLB_ADDR_AXIL;
-            cmd_fifo_wr_en = 1'b1; 
+            cmd_fifo_in_d.address = GLB_ADDR_AXIL;
+            cmd_issued = 1'b1; 
           end 
           ADDR_ADCONF: begin
             GLB_REG_ENA_AXIL = 1'b1;
@@ -725,14 +728,14 @@ always_comb begin
           ADDR_MACADDLSB: begin
             GLB_REG_ENA_AXIL = 1'b1;
             GLB_WR_REG_AXIL = WDataReg_q;
-            cmd_fifo_in.address = GLB_ADDR_AXIL;
-            cmd_fifo_wr_en = 1'b1; 
+            cmd_fifo_in_d.address = GLB_ADDR_AXIL;
+            cmd_issued = 1'b1; 
           end 
           ADDR_MACADDMSB: begin
             GLB_REG_ENA_AXIL = 1'b1;
             GLB_WR_REG_AXIL = WDataReg_q;
-            cmd_fifo_in.address = GLB_ADDR_AXIL;
-            cmd_fifo_wr_en = 1'b1; 
+            cmd_fifo_in_d.address = GLB_ADDR_AXIL;
+            cmd_issued = 1'b1; 
           end 
           ADDR_BUF_THRESHOLD_NON_ROCE: begin
             GLB_REG_ENA_AXIL = 1'b1;
@@ -769,8 +772,8 @@ always_comb begin
           ADDR_IPv4ADD: begin
             GLB_REG_ENA_AXIL = 1'b1;
             GLB_WR_REG_AXIL = WDataReg_q;
-            cmd_fifo_in.address = GLB_ADDR_AXIL;
-            cmd_fifo_wr_en = 1'b1; 
+            cmd_fifo_in_d.address = GLB_ADDR_AXIL;
+            cmd_issued = 1'b1; 
           end 
           ADDR_OPKTERRQBA: begin
             GLB_REG_ENA_AXIL = 1'b1;
@@ -853,14 +856,22 @@ always_comb begin
       
       //TODO: not sure if needed
       if(hold_wr_q == 'd1) begin
-        rw_state_d = B_RESP;
-        hold_wr_d = 'd0;
+        if(!cmd_issued) begin
+          rw_state_d = B_RESP;
+        end else begin
+          rw_state_d = WRITE_CMD;
+        end
       end else begin
         rw_state_d =  WRITE;
         hold_wr_d = hold_wr_q + 1;
       end
+    end
+    WRITE_CMD: begin
+      writing = 1'b1;
+      cmd_fifo_wr_en = 1'b1;
       if(cmd_fifo_in_ack) begin
         cmd_fifo_wr_en = 1'b0;
+        rw_state_d = B_RESP;
       end
     end
     B_RESP: begin
@@ -880,30 +891,33 @@ end
 
 always_ff @(posedge axil_aclk_i, negedge axil_rstn_i) begin
   if(!axil_rstn_i) begin    
-    rw_state_q  <= A_IDLE;
-    RAddrReg_q  <= 'd0;
-    RDataReg_q  <= 'd0;
-    RRespReg_q  <= 'd0;
-    hold_rd_q   <= 'd0;
+    rw_state_q    <= A_IDLE;
+    RAddrReg_q    <= 'd0;
+    RDataReg_q    <= 'd0;
+    RRespReg_q    <= 'd0;
+    hold_rd_q     <= 'd0;
     
-    WAddrReg_q  <= 'd0;
-    WDataReg_q  <= 'd0;
-    WRespReg_q  <= 'd0;
-    WStrbReg_q  <= 'd0;
-    hold_wr_q   <= 'd0;
+    WAddrReg_q    <= 'd0;
+    WDataReg_q    <= 'd0;
+    WRespReg_q    <= 'd0;
+    WStrbReg_q    <= 'd0;
+    hold_wr_q     <= 'd0;
+    cmd_fifo_in_q <= 'd0;
   
   end else begin
-    rw_state_q  <= rw_state_d;
-    RAddrReg_q  <= RAddrReg_d;
-    RDataReg_q  <= RDataReg_d;
-    RRespReg_q  <= RRespReg_d;
-    hold_rd_q   <= hold_rd_d;
+    rw_state_q    <= rw_state_d;
+    RAddrReg_q    <= RAddrReg_d;
+    RDataReg_q    <= RDataReg_d;
+    RRespReg_q    <= RRespReg_d;
+    hold_rd_q     <= hold_rd_d;
     
-    WAddrReg_q  <= WAddrReg_d;
-    WDataReg_q  <= WDataReg_d;
-    WRespReg_q  <= WRespReg_d;
-    WStrbReg_q  <= WStrbReg_d;
-    hold_wr_q   <= hold_wr_d;
+    WAddrReg_q    <= WAddrReg_d;
+    WDataReg_q    <= WDataReg_d;
+    WRespReg_q    <= WRespReg_d;
+    WStrbReg_q    <= WStrbReg_d;
+    hold_wr_q     <= hold_wr_d;
+    
+    cmd_fifo_in_q <= cmd_fifo_in_d;
   end
 end
 
@@ -1920,7 +1934,7 @@ assign wr_resp_addr_data_o = wr_resp_addr_data_q;
 reg_cmd_cdc_fifo reg_cmd_cdc_fifo_inst (
   //write
   .full(cmd_fifo_full),
-  .din(cmd_fifo_in),
+  .din(cmd_fifo_in_q),
   .wr_en(cmd_fifo_wr_en),
   .wr_ack(cmd_fifo_in_ack),
   //read
