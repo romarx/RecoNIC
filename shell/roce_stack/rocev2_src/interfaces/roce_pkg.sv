@@ -374,7 +374,6 @@ package roceTypes;
         logic [PADDR_BITS-1:0]        sq_base_addr;
         logic [AXIL_DATA_WIDTH-1:0]    sq_prod_idx; //AXI lite data bits for complete regs
         logic [AXIL_DATA_WIDTH-1:0]    cq_head_idx;
-        logic [VADDR_BITS-1:0]        pd_vaddr;
     } SQdata_struct; //232 bits
 
     

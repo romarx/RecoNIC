@@ -1,12 +1,7 @@
 module roce_stack_request_handler #(
     parameter logic READ = 1'b1
 )(
-  input  logic          s_rdma_req_valid_i,
-  output logic          s_rdma_req_ready_o,
-  input  logic  [63:0]  s_rdma_req_vaddr_i,
-  input  logic  [27:0]  s_rdma_req_len_i,
-  input  logic  [15:0]  s_rdma_req_qpn_i,
-  input  logic          s_rdma_req_last_i,
+  metaIntf.s            s_rdma_req,
 
   output logic          req_addr_valid_o,
   input  logic          req_addr_ready_i,
@@ -50,11 +45,9 @@ logic         first_d, first_q;
 
 
 
-//TODO: check accessdesc, check length,
-//TODO: write to FIFO, then create cmd inputs for datamover if s_rdma_req does not handle its requests with a fifo itself
 
 always_comb begin
-  s_rdma_req_ready_o = 1'b1;
+  s_rdma_req.ready = 1'b1;
   resp_addr_ready_o = 1'b1;
   req_addr_valid_o = 1'b0;
   wb_valid_o = 1'b0;
@@ -76,22 +69,38 @@ always_comb begin
   case (req_state_q)
     RQ_IDLE: begin
       resp_addr_ready_o = 1'b0;
-      //A request can only be handled if an incoming request arrives and the request can be taken
-      if (s_rdma_req_valid_i && req_addr_ready_i) begin 
-        len_d = s_rdma_req_len_i;
-        total_len_d = total_len_q + s_rdma_req_len_i;
-        first_d = s_rdma_req_last_i;
-        if(first_q) begin
-          qpn_d = s_rdma_req_qpn_i;
-          base_vaddr_d = s_rdma_req_vaddr_i;
-          req_state_d = RQ_GETPADDR;
-        end else begin
+    
+      if (s_rdma_req.valid) begin
+        len_d = s_rdma_req.data.len;
+        total_len_d = total_len_q + s_rdma_req.data.len;
+        first_d = s_rdma_req.data.last;
+        
+        //If it's a local read or write, the address should be correct
+        if((READ && (s_rdma_req.data.opcode == RC_RDMA_WRITE_MIDDLE || s_rdma_req.data.opcode == RC_RDMA_WRITE_FIRST ||
+			      s_rdma_req.data.opcode == RC_RDMA_WRITE_LAST || s_rdma_req.data.opcode == RC_RDMA_WRITE_ONLY || s_rdma_req.data.opcode == RC_SEND_ONLY ||
+            s_rdma_req.data.opcode == RC_SEND_FIRST || s_rdma_req.data.opcode == RC_SEND_MIDDLE || s_rdma_req.data.opcode == RC_SEND_LAST)) ||
+            (!READ && (s_rdma_req.data.opcode == RC_RDMA_READ_RESP_FIRST || s_rdma_req.data.opcode == RC_RDMA_READ_RESP_MIDDLE || 
+            s_rdma_req.data.opcode == RC_RDMA_READ_RESP_LAST || s_rdma_req.data.opcode == RC_RDMA_READ_RESP_ONLY))) begin
+          if(first_q) begin
+            buflen_d = 'h7FFFFFFFFFFF; //hack so it always works
+            accessdesc_d = 4'b0010; //same
+            paddr_d = s_rdma_req.data.vaddr;
+          end
           req_state_d = RQ_MIDDLE;
+        //if it's not, find the associated protection domain
+        end else if(req_addr_ready_i) begin 
+          if(first_q) begin
+            qpn_d = s_rdma_req.data.qpn;
+            base_vaddr_d = s_rdma_req.data.vaddr;
+            req_state_d = RQ_GETPADDR;
+          end else begin
+            req_state_d = RQ_MIDDLE;
+          end
         end
       end
     end
     RQ_GETPADDR: begin
-      s_rdma_req_ready_o = 1'b0;
+      s_rdma_req.ready = 1'b0;
       req_addr_valid_o = 1'b1;
       if (resp_addr_valid_i) begin
         buflen_d = resp_addr_data_i.buflen;
@@ -109,7 +118,7 @@ always_comb begin
       end
     end
     RQ_MIDDLE: begin
-      s_rdma_req_ready_o = 1'b0;
+      s_rdma_req.ready = 1'b0;
       resp_addr_ready_o = 1'b0;
       if(total_len_q <= buflen_q && (accessdesc_q == 4'b0010) || (READ && accessdesc_q == 4'b0000) || (!READ && accessdesc_q == 4'b0001)) begin
         cmd_data_d = {8'b0, paddr_q, 1'b0, 1'b1, 6'b0, 1'b1, len_q[22:0]};
@@ -120,11 +129,11 @@ always_comb begin
       req_state_d = RQ_SENDCMD;
     end
     RQ_SENDCMD: begin
-      s_rdma_req_ready_o = 1'b0;
+      s_rdma_req.ready = 1'b0;
       resp_addr_ready_o = 1'b0;
       cmd_valid_o = 1'b1;
       if (cmd_ready_i) begin
-        if(first_q) begin //last
+        if(first_q) begin //last!
           total_len_d = 'd0;
           err_st_d = 1'b0;
           if(base_vaddr_q == 'd0 && !READ) begin 

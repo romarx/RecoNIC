@@ -165,8 +165,6 @@ logic [31:0]  SQ_QPCONFi;
 logic [23:0]  SQ_SQPSNi;
 logic [31:0]  SQ_LSTRQREQi;
 
-logic [63:0] VIRTADDR;
-
 
 //write back regs
 logic [39:0]  CQHEADi_wb;
@@ -321,8 +319,6 @@ roce_stack_csr  inst_roce_stack_csr(
   .MACDESADDi_o(MACDESADDi),
   .IPDESADDR1i_o(IPDESADDR1i),
 
-  .VIRTADDR_o(VIRTADDR),
-
   .rd_qp_i(rd_qp),
   .rd_qp_valid_i(rd_qp_valid),
   .rd_qp_ready_o(rd_qp_ready),
@@ -404,7 +400,6 @@ roce_stack_wq_manager #(
   .CQBAi_i(CQBAi),
   .SQPIi_i(SQPIi),
   .CQHEADi_i(CQHEADi),
-  .VIRTADDR_i(VIRTADDR),
    
   .rd_qp_o(rd_qp),
   .rd_qp_valid_o(rd_qp_valid),
@@ -474,19 +469,8 @@ roce_stack_wq_manager #(
 roce_stack_axis_to_aximm #(
   .AXI4_DATA_WIDTH(AXI4S_DATA_WIDTH)
 ) inst_roce_stack_axis_to_aximm (
-  .s_rdma_rd_req_valid_i(rdma_rd_req.valid),
-  .s_rdma_rd_req_ready_o(rdma_rd_req.ready),
-  .s_rdma_rd_req_vaddr_i(rdma_rd_req.data.vaddr),
-  .s_rdma_rd_req_len_i(rdma_rd_req.data.len),
-  .s_rdma_rd_req_qpn_i(rdma_rd_req.data.qpn),
-  .s_rdma_rd_req_last_i(rdma_rd_req.data.last),
-
-  .s_rdma_wr_req_valid_i(rdma_wr_req.valid),
-  .s_rdma_wr_req_ready_o(rdma_wr_req.ready),
-  .s_rdma_wr_req_vaddr_i(rdma_wr_req.data.vaddr),
-  .s_rdma_wr_req_len_i(rdma_wr_req.data.len),
-  .s_rdma_wr_req_qpn_i(rdma_wr_req.data.qpn),
-  .s_rdma_wr_req_last_i(rdma_wr_req.data.last),
+  .s_rdma_wr_req(rdma_wr_req),
+  .s_rdma_rd_req(rdma_rd_req),
 
   .m_axis_rdma_rd_tdata_o(axis_rdma_rd.tdata),
   .m_axis_rdma_rd_tkeep_o(axis_rdma_rd.tkeep),

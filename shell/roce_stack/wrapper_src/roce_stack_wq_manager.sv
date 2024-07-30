@@ -22,7 +22,6 @@ module roce_stack_wq_manager #(
     input  logic [63:0]   CQBAi_i,
     input  logic [31:0]   SQPIi_i,
     input  logic [31:0]   CQHEADi_i,
-    input  logic [63:0]   VIRTADDR_i,
 
     output rd_cmd_t       rd_qp_o,
     output logic          rd_qp_valid_o,
@@ -260,7 +259,6 @@ always_comb begin
         sq_if_input_d.sq_idx = QPidx_i;
         sq_if_input_d.sq_base_addr = SQBAi_i;
         sq_if_input_d.cq_base_addr = CQBAi_i;
-        sq_if_input_d.pd_vaddr = VIRTADDR_i;
         sq_fifo_state_d = SQ_FIFO_VALID;
       end
     end
@@ -272,7 +270,7 @@ always_comb begin
 end
 
 fifo # (
-  .DATA_BITS(264),
+  .DATA_BITS(232),
   .FIFO_SIZE(8)
 ) sq_fifo (
   .rd(sq_fifo_rd),
@@ -300,7 +298,7 @@ logic write_completion;
 logic last_d, last_q;
 logic first_d, first_q;
 logic [31:0] transfer_length_d, transfer_length_q;
-logic [63:0] curr_local_vaddr_d, curr_local_vaddr_q, curr_remote_vaddr_d, curr_remote_vaddr_q;
+logic [63:0] curr_local_paddr_d, curr_local_paddr_q, curr_remote_vaddr_d, curr_remote_vaddr_q;
 logic [31:0] exp_resp_ctr_d, exp_resp_ctr_q, resp_ctr_d, resp_ctr_q;
 logic [31:0] localidx_d, localidx_q;
 
@@ -316,7 +314,7 @@ always_comb begin
   last_d = last_q;
   first_d = first_q;
   transfer_length_d = transfer_length_q;
-  curr_local_vaddr_d = curr_local_vaddr_q;
+  curr_local_paddr_d = curr_local_paddr_q;
   curr_remote_vaddr_d = curr_remote_vaddr_q;
   exp_resp_ctr_d = exp_resp_ctr_q;
   resp_ctr_d = resp_ctr_q;
@@ -367,11 +365,11 @@ always_comb begin
           sq_req_d.req_1.qpn    = {8'b0, sq_if_output_q.sq_idx};
           sq_req_d.req_1.last   = 1'b1;
           sq_req_d.req_1.offs   = 4'b0;
-          sq_req_d.req_1.vaddr  = sq_if_output_q.pd_vaddr;
+          sq_req_d.req_1.vaddr  = WQEReg_q[223:160];
           sq_req_d.req_1.len    = WQEReg_q[127:96];
           sq_req_d.req_1.rsrvd  = 'd0;
 
-          sq_req_d.req_2.vaddr  = WQEReg_q[223:160];
+          sq_req_d.req_2.vaddr  = WQEReg_q[95:32];
           sq_req_d.req_2.offs   = 4'b0;
           sq_req_d.req_2.len    = WQEReg_q[127:96];
           sq_req_d.req_2.rsrvd  = 'd0;
@@ -384,18 +382,18 @@ always_comb begin
           sq_req_d.req_1.qpn    = {8'b0, sq_if_output_q.sq_idx};
           sq_req_d.req_1.last   = 1'b0;
           sq_req_d.req_1.offs   = 4'b0;
-          sq_req_d.req_1.vaddr  = sq_if_output_q.pd_vaddr;
+          sq_req_d.req_1.vaddr  = WQEReg_q[223:160];
           sq_req_d.req_1.len    = mtu_q;
           sq_req_d.req_1.rsrvd  = 'd0;
           
-          sq_req_d.req_2.vaddr  = WQEReg_q[223:160];
+          sq_req_d.req_2.vaddr  = WQEReg_q[95:32];
           sq_req_d.req_2.offs   = 4'b0;
           sq_req_d.req_2.len    = mtu_q;
           sq_req_d.req_2.rsrvd  = 'd0;
 
 
           transfer_length_d = WQEReg_q[127:96] - mtu_q;
-          curr_local_vaddr_d = sq_if_output_q.pd_vaddr + mtu_q;
+          curr_local_paddr_d = WQEReg_q[95:32] + mtu_q;
           curr_remote_vaddr_d = WQEReg_q[223:160] + mtu_q;
           last_d = 1'b0;
           first_d = 1'b0;
@@ -410,11 +408,11 @@ always_comb begin
           sq_req_d.req_1.qpn    = {8'b0, sq_if_output_q.sq_idx};
           sq_req_d.req_1.last   = 1'b1;
           sq_req_d.req_1.offs   = 4'b0;
-          sq_req_d.req_1.vaddr  = curr_local_vaddr_q;
+          sq_req_d.req_1.vaddr  = curr_remote_vaddr_q;
           sq_req_d.req_1.len    = transfer_length_q;
           sq_req_d.req_1.rsrvd  = 'd0;
           
-          sq_req_d.req_2.vaddr  = curr_remote_vaddr_q;
+          sq_req_d.req_2.vaddr  = curr_local_paddr_q;
           sq_req_d.req_2.offs   = 4'b0;
           sq_req_d.req_2.len    = transfer_length_q;
           sq_req_d.req_2.rsrvd  = 'd0;
@@ -428,17 +426,17 @@ always_comb begin
           sq_req_d.req_1.qpn    = {8'b0, sq_if_output_q.sq_idx};
           sq_req_d.req_1.last   = 1'b0;
           sq_req_d.req_1.offs   = 4'b0;
-          sq_req_d.req_1.vaddr  = curr_local_vaddr_q;
+          sq_req_d.req_1.vaddr  = curr_remote_vaddr_q;
           sq_req_d.req_1.len    = mtu_q;
           sq_req_d.req_1.rsrvd  = 'd0;
           
-          sq_req_d.req_2.vaddr  = curr_remote_vaddr_q;
+          sq_req_d.req_2.vaddr  = curr_local_paddr_q;
           sq_req_d.req_2.offs   = 4'b0;
           sq_req_d.req_2.len    = mtu_q;
           sq_req_d.req_2.rsrvd  = 'd0;
           
           transfer_length_d = transfer_length_q - mtu_q;
-          curr_local_vaddr_d = curr_local_vaddr_q + mtu_q;
+          curr_local_paddr_d = curr_local_paddr_q + mtu_q;
           curr_remote_vaddr_d = curr_remote_vaddr_q + mtu_q;
           last_d = 1'b0;
           first_d = 1'b0;
@@ -455,11 +453,11 @@ always_comb begin
           sq_req_d.req_1.qpn    = {8'b0, sq_if_output_q.sq_idx};
           sq_req_d.req_1.last   = 1'b1;
           sq_req_d.req_1.offs   = 4'b0;
-          sq_req_d.req_1.vaddr  = sq_if_output_q.pd_vaddr;
+          sq_req_d.req_1.vaddr  = 'd0;
           sq_req_d.req_1.len    = WQEReg_q[127:96];
           sq_req_d.req_1.rsrvd  = 'd0;
 
-          sq_req_d.req_2.vaddr  = sq_if_output_q.pd_vaddr; //for some reason, in the send case this is the local address
+          sq_req_d.req_2.vaddr  = WQEReg_q[95:32]; //for some reason, in the send case this is the local address
           sq_req_d.req_2.offs   = 4'b0;
           sq_req_d.req_2.len    = WQEReg_q[127:96];
           sq_req_d.req_2.rsrvd        = 'd0;
@@ -472,18 +470,18 @@ always_comb begin
           sq_req_d.req_1.qpn    = {8'b0, sq_if_output_q.sq_idx};
           sq_req_d.req_1.last   = 1'b0;
           sq_req_d.req_1.offs   = 4'b0;
-          sq_req_d.req_1.vaddr  = sq_if_output_q.pd_vaddr;
+          sq_req_d.req_1.vaddr  = 'd0;
           sq_req_d.req_1.len    = mtu_q;
           sq_req_d.req_1.rsrvd  = 'd0;
           
-          sq_req_d.req_2.vaddr  = sq_if_output_q.pd_vaddr;
+          sq_req_d.req_2.vaddr  = WQEReg_q[95:32];
           sq_req_d.req_2.offs   = 4'b0;
           sq_req_d.req_2.len    = mtu_q;
           sq_req_d.req_2.rsrvd  = 'd0;
 
 
           transfer_length_d = WQEReg_q[127:96] - mtu_q;
-          curr_local_vaddr_d = sq_if_output_q.pd_vaddr + mtu_q;
+          curr_local_paddr_d = WQEReg_q[95:32] + mtu_q;
           last_d = 1'b0;
           first_d = 1'b0;
           sq_state_d = SQ_VALID;
@@ -496,11 +494,11 @@ always_comb begin
           sq_req_d.req_1.qpn    = {8'b0, sq_if_output_q.sq_idx};
           sq_req_d.req_1.last   = 1'b1;
           sq_req_d.req_1.offs   = 4'b0;
-          sq_req_d.req_1.vaddr  = curr_local_vaddr_q;
+          sq_req_d.req_1.vaddr  = 'd0;
           sq_req_d.req_1.len    = transfer_length_q;
           sq_req_d.req_1.rsrvd  = 'd0;
           
-          sq_req_d.req_2.vaddr  = curr_local_vaddr_q;
+          sq_req_d.req_2.vaddr  = curr_local_paddr_q;
           sq_req_d.req_2.offs   = 4'b0;
           sq_req_d.req_2.len    = transfer_length_q;
           sq_req_d.req_2.rsrvd  = 'd0;
@@ -513,17 +511,17 @@ always_comb begin
           sq_req_d.req_1.qpn    = {8'b0, sq_if_output_q.sq_idx};
           sq_req_d.req_1.last   = 1'b0;
           sq_req_d.req_1.offs   = 4'b0;
-          sq_req_d.req_1.vaddr  = curr_local_vaddr_q;
+          sq_req_d.req_1.vaddr  = 'd0;
           sq_req_d.req_1.len    = mtu_q;
           sq_req_d.req_1.rsrvd  = 'd0;
           
-          sq_req_d.req_2.vaddr  = curr_local_vaddr_q;
+          sq_req_d.req_2.vaddr  = curr_local_paddr_q;
           sq_req_d.req_2.offs   = 4'b0;
           sq_req_d.req_2.len    = mtu_q;
           sq_req_d.req_2.rsrvd  = 'd0;
           
           transfer_length_d = transfer_length_q - mtu_q;
-          curr_local_vaddr_d = curr_local_vaddr_q + mtu_q;
+          curr_local_paddr_d = curr_local_paddr_q + mtu_q;
           last_d = 1'b0;
           first_d = 1'b0;
           sq_state_d = SQ_VALID;
@@ -536,11 +534,11 @@ always_comb begin
       sq_req_d.req_1.qpn    = {8'b0, sq_if_output_q.sq_idx};
       sq_req_d.req_1.last   = 1'b1;
       sq_req_d.req_1.offs   = 4'b0;
-      sq_req_d.req_1.vaddr  = sq_if_output_q.pd_vaddr;
+      sq_req_d.req_1.vaddr  = WQEReg_q[223:160];
       sq_req_d.req_1.len    = WQEReg_q[127:96];
       sq_req_d.req_1.rsrvd  = 'd0;
           
-      sq_req_d.req_2.vaddr  = WQEReg_q[223:160];
+      sq_req_d.req_2.vaddr  = WQEReg_q[95:32];
       sq_req_d.req_2.offs   = 4'b0;
       sq_req_d.req_2.len    = WQEReg_q[127:96];
       sq_req_d.req_2.rsrvd  = 'd0;
@@ -834,7 +832,7 @@ always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
     Read_State_q        <= RD_IDLE;
     WQEReg_q            <= 'd0;
     
-    curr_local_vaddr_q  <= 'd0;
+    curr_local_paddr_q  <= 'd0;
     curr_remote_vaddr_q <= 'd0;
     transfer_length_q   <= 'd0;
     last_q              <= 1'b0;
@@ -869,7 +867,7 @@ always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
     Read_State_q        <= Read_State_d;
     WQEReg_q            <= WQEReg_d;
     
-    curr_local_vaddr_q  <= curr_local_vaddr_d;
+    curr_local_paddr_q  <= curr_local_paddr_d;
     curr_remote_vaddr_q <= curr_remote_vaddr_d;
     transfer_length_q   <= transfer_length_d;
     last_q              <= last_d;

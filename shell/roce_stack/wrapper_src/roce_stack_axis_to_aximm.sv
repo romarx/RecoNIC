@@ -3,19 +3,8 @@ import roceTypes::*;
 module roce_stack_axis_to_aximm #(
   parameter int AXI4_DATA_WIDTH = 512
 )(
-  input  logic                          s_rdma_rd_req_valid_i,
-  output logic                          s_rdma_rd_req_ready_o,
-  input  logic  [63:0]                  s_rdma_rd_req_vaddr_i,
-  input  logic  [27:0]                  s_rdma_rd_req_len_i,
-  input  logic  [15:0]                  s_rdma_rd_req_qpn_i,
-  input  logic                          s_rdma_rd_req_last_i,
-
-  input  logic                          s_rdma_wr_req_valid_i,
-  output logic                          s_rdma_wr_req_ready_o,
-  input  logic  [63:0]                  s_rdma_wr_req_vaddr_i,
-  input  logic  [27:0]                  s_rdma_wr_req_len_i,
-  input  logic  [15:0]                  s_rdma_wr_req_qpn_i,
-  input  logic                          s_rdma_wr_req_last_i,
+  metaIntf.s                            s_rdma_wr_req,
+  metaIntf.s                            s_rdma_rd_req,
 
   output logic  [AXI4_DATA_WIDTH-1:0]   m_axis_rdma_rd_tdata_o,
   output logic  [AXI4_DATA_WIDTH/8-1:0] m_axis_rdma_rd_tkeep_o,
@@ -103,12 +92,7 @@ assign mm2s_sts_ready = 1'b1;
 roce_stack_request_handler #(
   .READ(1'b1)
 ) roce_stack_request_handler_read_inst (
-    .s_rdma_req_valid_i(s_rdma_rd_req_valid_i),
-    .s_rdma_req_ready_o(s_rdma_rd_req_ready_o),
-    .s_rdma_req_vaddr_i(s_rdma_rd_req_vaddr_i),
-    .s_rdma_req_len_i(s_rdma_rd_req_len_i),
-    .s_rdma_req_qpn_i(s_rdma_rd_req_qpn_i),
-    .s_rdma_req_last_i(s_rdma_rd_req_last_i),
+    .s_rdma_req(s_rdma_rd_req),
     .req_addr_valid_o(rd_req_addr_valid_o),
     .req_addr_ready_i(rd_req_addr_ready_i),
     .req_addr_vaddr_o(rd_req_addr_vaddr_o),
@@ -129,12 +113,7 @@ roce_stack_request_handler #(
 roce_stack_request_handler #(
   .READ(1'b0)
 ) roce_stack_request_handler_write_inst (
-    .s_rdma_req_valid_i(s_rdma_wr_req_valid_i),
-    .s_rdma_req_ready_o(s_rdma_wr_req_ready_o),
-    .s_rdma_req_vaddr_i(s_rdma_wr_req_vaddr_i),
-    .s_rdma_req_len_i(s_rdma_wr_req_len_i),
-    .s_rdma_req_qpn_i(s_rdma_wr_req_qpn_i),
-    .s_rdma_req_last_i(s_rdma_wr_req_last_i),
+    .s_rdma_req(s_rdma_wr_req),
     .req_addr_valid_o(wr_req_addr_valid_o),
     .req_addr_ready_i(wr_req_addr_ready_i),
     .req_addr_vaddr_o(wr_req_addr_vaddr_o),

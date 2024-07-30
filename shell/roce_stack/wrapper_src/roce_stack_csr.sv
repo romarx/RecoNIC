@@ -65,7 +65,6 @@ module roce_stack_csr (
   output logic [47:0]                     MACDESADDi_o,             
   output logic [31:0]                     IPDESADDR1i_o, //for IPv4 only
 
-  output logic [63:0]                     VIRTADDR_o,
 
   input rd_cmd_t                          rd_qp_i,
   input logic                             rd_qp_valid_i,
@@ -958,7 +957,7 @@ logic [NUM_PD-1:0][23:0] pdnum_table_d, pdnum_table_q;
 
 
 //Control signals for r/w fsm
-typedef enum {L_IDLE, L_READ_CMD, L_READ_SINGLE, L_READ_MULTI, L_WRITE, L_READ_READY, L_READ_VADDR, L_HOLD} logic_reg_state_t;
+typedef enum {L_IDLE, L_READ_CMD, L_READ_SINGLE, L_READ_MULTI, L_WRITE, L_READ_READY, L_HOLD} logic_reg_state_t;
 logic_reg_state_t l_reg_st_d, l_reg_st_q;
 rd_cmd_t l_rd_cmd_d, l_rd_cmd_q;
 logic [1:0] hold_axis_d, hold_axis_q;
@@ -1338,7 +1337,6 @@ end
 
 rd_cmd_t rd_sq_vaddr_d, rd_sq_vaddr_q;
 logic rd_sq_vaddr_valid_d, rd_sq_vaddr_valid_q;
-logic config_sq;
 
 logic [7:0] pd_addr_d, pd_addr_q;
 logic find_pd_addr_rd, find_pd_addr_wr;
@@ -1357,7 +1355,6 @@ always_comb begin
   qp_configured_o = 1'b0;
   conn_configured_o = 1'b0;
   sq_updated_o = 1'b0;
-  config_sq = 1'b0;
   rd_qp_ready_o = 1'b0;
   find_pd_rd_ready = 1'b0;
   find_pd_wr_ready = 1'b0;
@@ -1566,8 +1563,8 @@ always_comb begin
           conn_configured_o = 1'b1;
           l_reg_st_d = L_IDLE;
         end else if(l_rd_cmd_q.bram_idx == SQPIi_idx) begin
-          config_sq = 1'b1;
-          l_reg_st_d = L_READ_VADDR;
+          sq_updated_o = 1'b1;
+          l_reg_st_d = L_IDLE;
         end else if (l_rd_cmd_q.bram_idx == NUM_QP_REGS) begin
           rd_qp_ready_o = 1'b1;
           l_reg_st_d = L_HOLD;
@@ -1581,8 +1578,6 @@ always_comb begin
       end else if(l_rd_cmd_q.region == 'd1) begin
         if (l_rd_cmd_q.bram_idx == PDPDNUM_idx) begin
           pdnum_table_d[l_rd_cmd_q.address] = {l_rd_cmd_q.address, PD_RD_REG_AXIS_Q[PDPDNUM_idx][23:0]};
-        end else if(l_rd_cmd_q.bram_idx == VIRTADDRLSB_idx) begin
-          sq_updated_o = 1'b1;
         end else if (l_rd_cmd_q.bram_idx == PDNUMi_idx) begin //abuse PDNUMi_idx for ready signal in phys addr lookup
           find_pd_rd_ready = 1'b1;
           find_pd_wr_ready = 1'b1;
@@ -1591,14 +1586,6 @@ always_comb begin
       end else begin
         l_reg_st_d = L_IDLE;
       end
-    end
-    L_READ_VADDR: begin
-      rd_sq_vaddr_d.region = 'd1;
-      rd_sq_vaddr_d.read_all = 1'b1;
-      rd_sq_vaddr_d.bram_idx = VIRTADDRLSB_idx;
-      rd_sq_vaddr_d.address = pd_addr_q;
-      rd_sq_vaddr_valid_d = 1'b1;
-      l_reg_st_d = L_IDLE;
     end
     L_WRITE: begin
       if(l_wr_cmd_q.region == 'd0) begin
@@ -1640,7 +1627,7 @@ end
 
 always_comb begin
   pd_addr_d = pd_addr_q;
-  if(find_pd_addr_rd | find_pd_addr_wr | config_sq) begin
+  if(find_pd_addr_rd | find_pd_addr_wr) begin
     for(int i=0; i < NUM_PD; i++) begin
       if(pdnum_table_q[i] == QP_RD_REG_AXIS_Q[PDNUMi_idx][23:0]) begin
         pd_addr_d = i;
@@ -2075,8 +2062,6 @@ assign DESTQPCONFi_o  = QP_RD_REG_AXIS_Q[DESTQPCONFi_idx][23:0];
 
 assign MACDESADDi_o   = {QP_RD_REG_AXIS_Q[MACDESADDMSBi_idx][15:0], QP_RD_REG_AXIS_Q[MACDESADDLSBi_idx]};
 assign IPDESADDR1i_o  = QP_RD_REG_AXIS_Q[IPDESADDR1i_idx];
-
-assign VIRTADDR_o = {PD_RD_REG_AXIS_Q[VIRTADDRMSB_idx], PD_RD_REG_AXIS_Q[VIRTADDRLSB_idx]};
 
 
 endmodule: roce_stack_csr
