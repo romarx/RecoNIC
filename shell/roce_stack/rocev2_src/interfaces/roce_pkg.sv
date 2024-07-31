@@ -93,7 +93,7 @@ package roceTypes;
     parameter integer RDMA_MSG_BITS = 192;
     parameter integer RDMA_N_RD_OUTSTANDING = 8;
     parameter integer RDMA_N_WR_OUTSTANDING = 16;
-    parameter integer RDMA_BASE_REQ_BITS = 160;
+    parameter integer RDMA_BASE_REQ_BITS = 192;
     
 
     parameter integer RDMA_QP_INTF_BITS = 200;
@@ -329,6 +329,7 @@ package roceTypes;
 
         // DESC
         logic [VADDR_BITS-1:0] vaddr;
+        logic [TAG_BITS-1:0] tag;
         logic [LEN_BITS-1:0] len;
 
         // RSRVD
@@ -401,8 +402,9 @@ package roceTypes;
     } wr_cmd_t;
 
     typedef struct packed {
-        logic [ACCESDESC_BITS-1:0] accesdesc;
         logic [BUFLEN_BITS-1:0] buflen;
+        logic [VADDR_BITS-1:0] base_vaddr;
+        logic [ACCESDESC_BITS-1:0] accesdesc;
         logic [PADDR_BITS-1:0] paddr;
         logic [TAG_BITS-1:0] rkey;
     }dma_req_t;

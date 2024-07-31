@@ -130,11 +130,12 @@ xvlog $xvlog_opts -work reco -L rocev2_ip --include "../build/ip/rocev2_ip/hdl/v
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w138_d2_S.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w145_d4_S.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w145_d8_A.v" \
-"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w152_d2_S.v" \
-"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w152_d512_A.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w153_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w177_d8_A.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w178_d4_S.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w178_d512_A.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w184_d2_S.v" \
+"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w184_d512_A.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w192_d8_A.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w256_d2_S.v" \
 "../build/ip/rocev2_ip/hdl/verilog/rocev2_top_fifo_w256_d8_A.v" \
