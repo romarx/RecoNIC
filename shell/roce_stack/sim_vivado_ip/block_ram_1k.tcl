@@ -14,7 +14,7 @@ set_property -dict {
     CONFIG.Register_PortB_Output_of_Memory_Primitives {false}
     CONFIG.Use_RSTA_Pin {true}
     CONFIG.Use_RSTB_Pin {false}
-    CONFIG.Port_B_Clock {200}
+    CONFIG.Port_B_Clock {250}
     CONFIG.Port_B_Write_Rate {50}
     CONFIG.Port_B_Enable_Rate {100}
     CONFIG.EN_SAFETY_CKT {true}

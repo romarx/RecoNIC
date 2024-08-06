@@ -30,11 +30,11 @@ string cl_ctl_cmd_filename     = "cl_ctl_cmd";
 string cl_golden_data_filename = "cl_golden_data";
 string cl_init_mem_filename    = "cl_init_mem";
 
-localparam CLK_PERIOD     = 10ns;
+localparam CLK_PERIOD     = 4000ps;
+localparam CLK_PERIOD_125 = 8000ps;
 localparam CLK_PERIOD_75  = 12048ps;
 localparam CLK_PERIOD_300 = 3012ps;
 localparam CLK_PERIOD_400 = 2500ps;
-localparam CLK_PERIOD_200 = 5000ps;
 
 logic axil_clk;
 logic axil_rstn;
@@ -732,7 +732,7 @@ end
 
 initial begin
   axis_clk  = 1'b0;
-  forever #(CLK_PERIOD_200/2) axis_clk = ~axis_clk;
+  forever #(CLK_PERIOD_125/2) axis_clk = ~axis_clk;
 end
 
 initial begin

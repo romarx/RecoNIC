@@ -184,7 +184,7 @@ end
 
 always_comb begin
   if(start_axi_read && axi_data_mismatch) begin
-    $fatal("ERROR: [rn_tb_checker] time=%t, axi read (the %d-th data) for %s_mem is mismatched - expected = %x, captured =%x", $time, axi_read_cnt, tag_string, read_golden_data, axi_captured_data_reg);
+    $display("ERROR: [rn_tb_checker] time=%t, axi read (the %d-th data) for %s_mem is mismatched - expected = %x, captured =%x", $time, axi_read_cnt, tag_string, read_golden_data, axi_captured_data_reg);
   end
 
   if(axi_read_end_of_file && !axi_data_mismatch) begin

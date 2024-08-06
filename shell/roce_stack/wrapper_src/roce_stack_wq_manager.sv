@@ -169,12 +169,14 @@ always_comb begin
   qp_intf_done = 1'b0;
   rd_qp_valid_o = 1'b0;
 
-  case(qp_state_q) //TODO: two things can happen here.....
+  case(qp_state_q)
     QP_IDLE: begin
       if(qp_configured_i) begin
         if(QPCONFi_i[0] && QPCONFi_i[10:8] <= 3'b100) begin
-          mtu_d = 'd256 << QPCONFi_i[10:8];
-          log_mtu_d = 'd8 + {1'b0, QPCONFi_i[10:8]};
+          //mtu_d = 'd256 << QPCONFi_i[10:8];
+          //log_mtu_d = 'd8 + {1'b0, QPCONFi_i[10:8]};
+          mtu_d = 'd4096; //fix values for IP.
+          log_mtu_d = 'd12;
           //these values are not necessary for the receiving side
           qp_ctx_d.vaddr = 'd0;
           qp_ctx_d.r_key = 'd0;
@@ -199,8 +201,10 @@ always_comb begin
       rd_qp_valid_o = 1'b1;
       if( rd_qp_ready_i ) begin
         if(QPCONFi_i[0] && QPCONFi_i[10:8] <= 3'b100) begin
-          mtu_d = 'd256 << QPCONFi_i[10:8];
-          log_mtu_d = 'd8 + {1'b0, QPCONFi_i[10:8]};
+          //mtu_d = 'd256 << QPCONFi_i[10:8];
+          //log_mtu_d = 'd8 + {1'b0, QPCONFi_i[10:8]};
+          mtu_d = 'd4096;
+          log_mtu_d = 'd12;
           //update vaddr and RKEY of receciving side
           qp_ctx_d.vaddr = WQEReg_q[223:160];
           qp_ctx_d.r_key = WQEReg_q[255:224];
