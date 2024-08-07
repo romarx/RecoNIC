@@ -4153,7 +4153,7 @@ index 0000000..f2c6344
 +  .ctl_tx_resend_pause               (ctl_tx_resend_pause),
 +  .o_global_dbg_cnt_en               (o_global_dbg_cnt_en),
 +  .o_global_dbg_cnt_clr              (o_global_dbg_cnt_clr)
-+); 
++);
 +
 +end else begin
 +
@@ -4189,7 +4189,6 @@ index 0000000..f2c6344
 +  .m_rdma2cmac_axis_tlast_o  (m_rdma2cmac_axis_tlast),
 +  .m_rdma2cmac_axis_tready_i (m_rdma2cmac_axis_tready),
 +
-+
 +  // Non-RDMA packets from QDMA TX bypassing RDMA TX
 +  .s_qdma2rdma_non_roce_axis_tdata_i    (s_qdma2rdma_non_roce_axis_tdata),
 +  .s_qdma2rdma_non_roce_axis_tkeep_i    (s_qdma2rdma_non_roce_axis_tkeep),
@@ -4203,7 +4202,6 @@ index 0000000..f2c6344
 +  .s_cmac2rdma_roce_axis_tvalid_i       (s_cmac2rdma_roce_axis_tvalid),
 +  .s_cmac2rdma_roce_axis_tlast_i        (s_cmac2rdma_roce_axis_tlast),
 +  .s_cmac2rdma_roce_axis_tuser_i        (s_cmac2rdma_roce_axis_tuser),
-+  
 +
 +  //AXI Master to fetch WQEs and write completions
 +  .m_axi_qp_get_wqe_awid_o    (m_axi_qp_get_wqe_awid),
@@ -4241,7 +4239,7 @@ index 0000000..f2c6344
 +  .m_axi_qp_get_wqe_rlast_i   (m_axi_qp_get_wqe_rlast),
 +  .m_axi_qp_get_wqe_rvalid_i  (m_axi_qp_get_wqe_rvalid),
 +  .m_axi_qp_get_wqe_rready_o  (m_axi_qp_get_wqe_rready),
-+  
++
 +  //AXI Master memory interface for writing send, write and reading read commands
 +  .m_axi_data_bus_awid_o      (m_axi_pktgen_get_payload_awid),
 +  .m_axi_data_bus_awaddr_o    (m_axi_pktgen_get_payload_awaddr),
