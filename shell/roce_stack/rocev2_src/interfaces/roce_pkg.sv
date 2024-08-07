@@ -417,7 +417,8 @@ package roceTypes;
         logic [DEST_BITS-1:0] dest;
         logic [PID_BITS-1:0] pid;
         logic [DEST_BITS-1:0] vfid;
-        logic [32-RDMA_OPCODE_BITS-STRM_BITS-2-DEST_BITS-PID_BITS-DEST_BITS-1:0] rsrvd;
+        logic [RDMA_QPN_BITS-1:0] qp_num;
+        logic [48-RDMA_OPCODE_BITS-STRM_BITS-2-DEST_BITS-PID_BITS-RDMA_QPN_BITS-DEST_BITS-1:0] rsrvd;
     } ack_t;
 
     typedef struct packed {

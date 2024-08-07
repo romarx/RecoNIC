@@ -185,7 +185,7 @@ metaIntf #(.STYPE(req_t)) rdma_wr_req ();
 metaIntf #(.STYPE(rdma_qp_conn_t)) rdma_conn_interface();
 metaIntf #(.STYPE(rdma_qp_ctx_t)) rdma_qp_interface();
 metaIntf #(.STYPE(dreq_t)) rdma_sq();
-metaIntf #(.STYPE(dack_t)) rdma_ack();
+metaIntf #(.STYPE(ack_t)) rdma_ack();
 
 AXI4S #(.AXI4S_DATA_BITS(AXI4S_DATA_WIDTH)) axis_rdma_rd ();
 AXI4S #(.AXI4S_DATA_BITS(AXI4S_DATA_WIDTH)) axis_rdma_wr ();
@@ -411,10 +411,6 @@ roce_stack_wq_manager #(
   .WB_CQHEADi_o(CQHEADi_wb),
   .WB_CQHEADi_valid_o(CQHEADi_wb_valid),
 
-  .rx_ack_valid_i(rx_ack_valid),
-  .rx_nack_valid_i(rx_nack_valid),
-  .rx_dat_valid_i(rx_srr_valid),
-
   .m_rdma_conn_interface_valid_o(rdma_conn_interface.valid), 
   .m_rdma_conn_interface_ready_i(rdma_conn_interface.ready),
   .m_rdma_conn_interface_data_o(rdma_conn_interface.data),
@@ -426,6 +422,10 @@ roce_stack_wq_manager #(
   .m_rdma_sq_interface_valid_o(rdma_sq.valid),
   .m_rdma_sq_interface_ready_i(rdma_sq.ready),
   .m_rdma_sq_interface_data_o(rdma_sq.data),
+
+  .s_rdma_ack_valid_i(rdma_ack.valid),
+  .s_rdma_ack_ready_o(rdma_ack.ready),
+  .s_rdma_ack_data_i(rdma_ack.data),
 
   .m_axi_qp_get_wqe_awid_o(m_axi_qp_get_wqe_awid_o),
   .m_axi_qp_get_wqe_awaddr_o(m_axi_qp_get_wqe_awaddr_o),
@@ -627,8 +627,6 @@ ip_handler_ip ip_handler_inst (
 ); 
 
 
-assign rdma_ack.ready = 1'b1;
-//TODO: definitions for AXI4S, metaIntf....
 roce_stack inst_roce_stack (
   .nclk(axis_aclk_i),
   .nresetn(axis_rstn_i),

@@ -126,6 +126,7 @@ assign rdma_ack.data.ack.opcode = ack_meta_data[0+:RDMA_OPCODE_BITS];
 assign rdma_ack.data.ack.remote = 1'b1;
 assign rdma_ack.data.ack.pid    = ack_meta_data[32+:PID_BITS];
 assign rdma_ack.data.ack.vfid   = ack_meta_data[32+PID_BITS+:DEST_BITS];
+assign rdma_ack.data.ack.qp_num = ack_meta_data[32+:RDMA_QPN_BITS];
 assign rdma_ack.data.ack.host   = ack_meta_data[32+RDMA_QPN_BITS+:1];
 assign rdma_ack.data.ack.dest   = ack_meta_data[32+RDMA_QPN_BITS+1+:DEST_BITS];
 assign rdma_ack.data.ack.strm   = ack_meta_data[32+RDMA_QPN_BITS+1+DEST_BITS+:STRM_BITS];
