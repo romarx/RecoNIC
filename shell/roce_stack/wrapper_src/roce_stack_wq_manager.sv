@@ -161,9 +161,8 @@ qp_state qp_state_d, qp_state_q;
 
 always_comb begin
   qp_state_d = qp_state_q;
-  mtu_d = mtu_q;
+  
   rd_qp_d = rd_qp_q;
-  log_mtu_d = log_mtu_q;
   qp_ctx_d = qp_ctx_q;
   m_rdma_qp_interface_valid_o = 1'b0;
   qp_intf_done = 1'b0;
@@ -173,10 +172,6 @@ always_comb begin
     QP_IDLE: begin
       if(qp_configured_i) begin
         if(QPCONFi_i[0] && QPCONFi_i[10:8] <= 3'b100) begin
-          //mtu_d = 'd256 << QPCONFi_i[10:8];
-          //log_mtu_d = 'd8 + {1'b0, QPCONFi_i[10:8]};
-          mtu_d = 'd4096; //fix values for IP, not configurable yet :(.
-          log_mtu_d = 'd12; 
           //these values are not necessary for the receiving side
           qp_ctx_d.vaddr = 'd0;
           qp_ctx_d.r_key = 'd0;
@@ -200,11 +195,7 @@ always_comb begin
     QP_SQ_RD_QP: begin
       rd_qp_valid_o = 1'b1;
       if( rd_qp_ready_i ) begin
-        if(QPCONFi_i[0] && QPCONFi_i[10:8] <= 3'b100) begin
-          //mtu_d = 'd256 << QPCONFi_i[10:8];
-          //log_mtu_d = 'd8 + {1'b0, QPCONFi_i[10:8]};
-          mtu_d = 'd4096;
-          log_mtu_d = 'd12;
+        if(QPCONFi_i[0] && QPCONFi_i[10:8] <= 3'b100) begin //TODO: add QPCONFi to SQ if and change it here too
           //update vaddr and RKEY of receciving side
           qp_ctx_d.vaddr = WQEReg_q[223:160];
           qp_ctx_d.r_key = WQEReg_q[255:224];
@@ -263,6 +254,7 @@ always_comb begin
         sq_if_input_d.sq_idx = QPidx_i;
         sq_if_input_d.sq_base_addr = SQBAi_i;
         sq_if_input_d.cq_base_addr = CQBAi_i;
+        sq_if_input_d.qp_conf = QPCONFi_i;
         sq_fifo_state_d = SQ_FIFO_VALID;
       end
     end
@@ -274,7 +266,7 @@ always_comb begin
 end
 
 fifo # (
-  .DATA_BITS(232),
+  .DATA_BITS(264),
   .FIFO_SIZE(8)
 ) sq_fifo (
   .rd(sq_fifo_rd),
@@ -292,12 +284,11 @@ fifo # (
 
 
 
-typedef enum {SQ_IDLE, SQ_FIFO_READY, SQ_WAIT_QP, SQ_VALID, SQ_WRITE, SQ_SEND, SQ_READ, SQ_WAIT_RESP, SQ_WRITE_COMPLETION, SQ_UPDATE_CQHEAD} sq_state;
+typedef enum {SQ_IDLE, SQ_FIFO_READY, SQ_WAIT_QP, SQ_VALID, SQ_WRITE, SQ_SEND, SQ_READ, SQ_WAIT_RESP, SQ_WRITE_COMPLETION, SQ_UPDATE_CQHEAD, SQ_FINISH} sq_state;
 sq_state sq_state_d, sq_state_q;
 
 
 
-//TODO: wait for ack or check if first sqe
 logic write_completion;
 logic last_d, last_q;
 logic first_d, first_q;
@@ -322,6 +313,8 @@ always_comb begin
   curr_remote_vaddr_d = curr_remote_vaddr_q;
   localidx_d = localidx_q;
   sq_if_output_d = sq_if_output_q;
+  mtu_d = mtu_q;
+  log_mtu_d = log_mtu_q;
 
   case(sq_state_q)
     SQ_IDLE: begin
@@ -336,6 +329,10 @@ always_comb begin
         sq_state_d = SQ_IDLE;
       end else begin
         localidx_d = sq_if_output_q.cq_head_idx;
+        //mtu_d = 'd256 << sq_if_output_q.qp_conf[10:8];
+        //log_mtu_d = 'd8 + {1'b0, sq_if_output_q.qp_conf[10:8]};
+        mtu_d = 'd4096; //fix to configured mtu in cmake of roce stack
+        log_mtu_d = 'd12;
         fetch_wqe = 1'b1;
         sq_state_d = SQ_WAIT_QP;
       end
@@ -403,7 +400,6 @@ always_comb begin
       end else begin
         //case last
         if(transfer_length_q <= mtu_q) begin
-          //TODO: vaddr handling
           sq_req_d.req_1.opcode = RC_RDMA_WRITE_LAST;
           sq_req_d.req_1.qpn    = {8'b0, sq_if_output_q.sq_idx};
           sq_req_d.req_1.last   = 1'b1;
@@ -421,7 +417,6 @@ always_comb begin
           sq_state_d = SQ_VALID;
         //case middle
         end else begin
-          //TODO: vaddr handling
           sq_req_d.req_1.opcode = RC_RDMA_WRITE_MIDDLE;
           sq_req_d.req_1.qpn    = {8'b0, sq_if_output_q.sq_idx};
           sq_req_d.req_1.last   = 1'b0;
@@ -574,23 +569,28 @@ always_comb begin
         sq_state_d = SQ_UPDATE_CQHEAD;
       end
     end
-    
     SQ_UPDATE_CQHEAD: begin
       WB_CQHEADi_valid_o = 1'b1;
-      write_completion = 1'b1;
-      sq_state_d = SQ_WRITE_COMPLETION;
+      if(sq_if_output_q.qp_conf[5]) begin
+        write_completion = 1'b1;
+        sq_state_d = SQ_WRITE_COMPLETION;
+      end else begin
+        sq_state_d = SQ_FINISH;
+      end
     end
     SQ_WRITE_COMPLETION: begin
       if(completion_written) begin
-        if(localidx_q < sq_if_output_q.sq_prod_idx) begin
-          fetch_wqe = 1'b1;
-          sq_state_d = SQ_WAIT_QP;
-        end else begin
-          sq_state_d = SQ_IDLE;
-        end
+        sq_state_d = SQ_FINISH;
       end
     end
-    
+    SQ_FINISH: begin
+      if(localidx_q < sq_if_output_q.sq_prod_idx) begin
+        fetch_wqe = 1'b1;
+        sq_state_d = SQ_WAIT_QP;
+      end else begin
+        sq_state_d = SQ_IDLE;
+      end
+    end
   endcase
 end
 
@@ -683,7 +683,6 @@ rd_state Read_State_d, Read_State_q;
 
 
 //TODO: read all wqe's in a burst and put them in a FIFO
-//TODO: this fsm might have unnecessary states...
 always_comb begin
   m_axi_qp_get_wqe_arvalid_o = 1'b0;
   RdAddrReg_d = RdAddrReg_q;
@@ -713,7 +712,6 @@ always_comb begin
 end
 
 //AXI read ctl logic
-//TODO: this needs some logic from the rdma core 
 
 always_comb begin
   m_axi_qp_get_wqe_rready_o = 1'b0;

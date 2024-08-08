@@ -373,9 +373,10 @@ package roceTypes;
         logic [RDMA_QP_IDX_BITS-1:0]  sq_idx;
         logic [PADDR_BITS-1:0]        cq_base_addr;
         logic [PADDR_BITS-1:0]        sq_base_addr;
-        logic [AXIL_DATA_WIDTH-1:0]    sq_prod_idx; //AXI lite data bits for complete regs
-        logic [AXIL_DATA_WIDTH-1:0]    cq_head_idx;
-    } SQdata_struct; //232 bits
+        logic [AXIL_DATA_WIDTH-1:0]   sq_prod_idx; //AXI lite data bits for complete regs
+        logic [AXIL_DATA_WIDTH-1:0]   cq_head_idx;
+        logic [AXIL_DATA_WIDTH-1:0]   qp_conf;  
+    } SQdata_struct; //264 bits
 
     
     typedef struct packed { 
