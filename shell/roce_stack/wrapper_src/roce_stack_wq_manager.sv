@@ -845,9 +845,4 @@ always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
   end
 end
 
-
-
-
-
-
 endmodule: roce_stack_wq_manager
