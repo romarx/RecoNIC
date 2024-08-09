@@ -1,7 +1,7 @@
-From a4cc12735732755ac466f391f135bc12251e9ff3 Mon Sep 17 00:00:00 2001
+From 80eebf303d16f4bb9545236187cb8a3816a9079a Mon Sep 17 00:00:00 2001
 From: Roman Marquart <maroman@student.ethz.ch>
-Date: Wed, 7 Aug 2024 20:27:38 +0200
-Subject: [PATCH] patch
+Date: Fri, 9 Aug 2024 09:51:14 +0200
+Subject: [PATCH] patch again
 
 ---
  constr/au250/general.xdc                      |    9 +-
@@ -3477,7 +3477,7 @@ index 1159969..3f0c1b7 100644
  }
 diff --git a/src/rdma_subsystem/rdma_subsystem.sv b/src/rdma_subsystem/rdma_subsystem.sv
 new file mode 100644
-index 0000000..f2c6344
+index 0000000..44933b7
 --- /dev/null
 +++ b/src/rdma_subsystem/rdma_subsystem.sv
 @@ -0,0 +1,940 @@
@@ -4153,7 +4153,7 @@ index 0000000..f2c6344
 +  .ctl_tx_resend_pause               (ctl_tx_resend_pause),
 +  .o_global_dbg_cnt_en               (o_global_dbg_cnt_en),
 +  .o_global_dbg_cnt_clr              (o_global_dbg_cnt_clr)
-+); 
++);
 +
 +end else begin
 +
@@ -4203,7 +4203,7 @@ index 0000000..f2c6344
 +  .s_cmac2rdma_roce_axis_tvalid_i       (s_cmac2rdma_roce_axis_tvalid),
 +  .s_cmac2rdma_roce_axis_tlast_i        (s_cmac2rdma_roce_axis_tlast),
 +  .s_cmac2rdma_roce_axis_tuser_i        (s_cmac2rdma_roce_axis_tuser),
-+  
++
 +
 +  //AXI Master to fetch WQEs and write completions
 +  .m_axi_qp_get_wqe_awid_o    (m_axi_qp_get_wqe_awid),
@@ -4241,7 +4241,7 @@ index 0000000..f2c6344
 +  .m_axi_qp_get_wqe_rlast_i   (m_axi_qp_get_wqe_rlast),
 +  .m_axi_qp_get_wqe_rvalid_i  (m_axi_qp_get_wqe_rvalid),
 +  .m_axi_qp_get_wqe_rready_o  (m_axi_qp_get_wqe_rready),
-+  
++
 +  //AXI Master memory interface for writing send, write and reading read commands
 +  .m_axi_data_bus_awid_o      (m_axi_pktgen_get_payload_awid),
 +  .m_axi_data_bus_awaddr_o    (m_axi_pktgen_get_payload_awaddr),
@@ -4285,7 +4285,6 @@ index 0000000..f2c6344
 +  .axis_rstn_i(axis_rstn)
 +);
 +
-+assign m_axi_rdma_send_write_payload_store_awuser = 'd0;
 +
 +assign m_axi_rdma_rsp_payload_awid = 1'b0;
 +assign m_axi_rdma_rsp_payload_awaddr = 'd0;
@@ -4339,6 +4338,7 @@ index 0000000..f2c6344
 +
 +assign m_axi_rdma_send_write_payload_store_awid = 'd0;
 +assign m_axi_rdma_send_write_payload_store_awaddr = 'd0;
++assign m_axi_rdma_send_write_payload_store_awuser = 'd0;
 +assign m_axi_rdma_send_write_payload_store_awlen = 'd0;
 +assign m_axi_rdma_send_write_payload_store_awsize = 'd0;
 +assign m_axi_rdma_send_write_payload_store_awburst = 'd0;
