@@ -1,7 +1,7 @@
-From a8d2132f7f01f07287c1c35c681b13c521741d66 Mon Sep 17 00:00:00 2001
+From 80eebf303d16f4bb9545236187cb8a3816a9079a Mon Sep 17 00:00:00 2001
 From: Roman Marquart <maroman@student.ethz.ch>
-Date: Mon, 15 Jul 2024 15:40:52 +0200
-Subject: [PATCH] create patch
+Date: Fri, 9 Aug 2024 09:51:14 +0200
+Subject: [PATCH] patch again
 
 ---
  constr/au250/general.xdc                      |    9 +-
@@ -3477,7 +3477,7 @@ index 1159969..3f0c1b7 100644
  }
 diff --git a/src/rdma_subsystem/rdma_subsystem.sv b/src/rdma_subsystem/rdma_subsystem.sv
 new file mode 100644
-index 0000000..f787dc9
+index 0000000..44933b7
 --- /dev/null
 +++ b/src/rdma_subsystem/rdma_subsystem.sv
 @@ -0,0 +1,940 @@
@@ -4153,7 +4153,7 @@ index 0000000..f787dc9
 +  .ctl_tx_resend_pause               (ctl_tx_resend_pause),
 +  .o_global_dbg_cnt_en               (o_global_dbg_cnt_en),
 +  .o_global_dbg_cnt_clr              (o_global_dbg_cnt_clr)
-+); 
++);
 +
 +end else begin
 +
@@ -4203,7 +4203,7 @@ index 0000000..f787dc9
 +  .s_cmac2rdma_roce_axis_tvalid_i       (s_cmac2rdma_roce_axis_tvalid),
 +  .s_cmac2rdma_roce_axis_tlast_i        (s_cmac2rdma_roce_axis_tlast),
 +  .s_cmac2rdma_roce_axis_tuser_i        (s_cmac2rdma_roce_axis_tuser),
-+  
++
 +
 +  //AXI Master to fetch WQEs and write completions
 +  .m_axi_qp_get_wqe_awid_o    (m_axi_qp_get_wqe_awid),
@@ -4241,43 +4241,43 @@ index 0000000..f787dc9
 +  .m_axi_qp_get_wqe_rlast_i   (m_axi_qp_get_wqe_rlast),
 +  .m_axi_qp_get_wqe_rvalid_i  (m_axi_qp_get_wqe_rvalid),
 +  .m_axi_qp_get_wqe_rready_o  (m_axi_qp_get_wqe_rready),
-+  
++
 +  //AXI Master memory interface for writing send, write and reading read commands
-+  .m_axi_data_bus_awid_o      (m_axi_rdma_send_write_payload_store_awid),
-+  .m_axi_data_bus_awaddr_o    (m_axi_rdma_send_write_payload_store_awaddr),
-+  .m_axi_data_bus_awlen_o     (m_axi_rdma_send_write_payload_store_awlen),
-+  .m_axi_data_bus_awsize_o    (m_axi_rdma_send_write_payload_store_awsize),
-+  .m_axi_data_bus_awburst_o   (m_axi_rdma_send_write_payload_store_awburst),
-+  .m_axi_data_bus_awcache_o   (m_axi_rdma_send_write_payload_store_awcache),
-+  .m_axi_data_bus_awprot_o    (m_axi_rdma_send_write_payload_store_awprot),
-+  .m_axi_data_bus_awvalid_o   (m_axi_rdma_send_write_payload_store_awvalid),
-+  .m_axi_data_bus_awready_i   (m_axi_rdma_send_write_payload_store_awready),
-+  .m_axi_data_bus_wdata_o     (m_axi_rdma_send_write_payload_store_wdata),
-+  .m_axi_data_bus_wstrb_o     (m_axi_rdma_send_write_payload_store_wstrb),
-+  .m_axi_data_bus_wlast_o     (m_axi_rdma_send_write_payload_store_wlast),
-+  .m_axi_data_bus_wvalid_o    (m_axi_rdma_send_write_payload_store_wvalid),
-+  .m_axi_data_bus_wready_i    (m_axi_rdma_send_write_payload_store_wready),
-+  .m_axi_data_bus_awlock_o    (m_axi_rdma_send_write_payload_store_awlock),
-+  .m_axi_data_bus_bid_i       (m_axi_rdma_send_write_payload_store_bid),
-+  .m_axi_data_bus_bresp_i     (m_axi_rdma_send_write_payload_store_bresp),
-+  .m_axi_data_bus_bvalid_i    (m_axi_rdma_send_write_payload_store_bvalid),
-+  .m_axi_data_bus_bready_o    (m_axi_rdma_send_write_payload_store_bready),
-+  .m_axi_data_bus_arid_o      (m_axi_rdma_send_write_payload_store_arid),
-+  .m_axi_data_bus_araddr_o    (m_axi_rdma_send_write_payload_store_araddr),
-+  .m_axi_data_bus_arlen_o     (m_axi_rdma_send_write_payload_store_arlen),
-+  .m_axi_data_bus_arsize_o    (m_axi_rdma_send_write_payload_store_arsize),
-+  .m_axi_data_bus_arburst_o   (m_axi_rdma_send_write_payload_store_arburst),
-+  .m_axi_data_bus_arcache_o   (m_axi_rdma_send_write_payload_store_arcache),
-+  .m_axi_data_bus_arprot_o    (m_axi_rdma_send_write_payload_store_arprot),
-+  .m_axi_data_bus_arvalid_o   (m_axi_rdma_send_write_payload_store_arvalid),
-+  .m_axi_data_bus_arready_i   (m_axi_rdma_send_write_payload_store_arready),
-+  .m_axi_data_bus_arlock_o    (m_axi_rdma_send_write_payload_store_arlock),
-+  .m_axi_data_bus_rid_i       (m_axi_rdma_send_write_payload_store_rid),
-+  .m_axi_data_bus_rdata_i     (m_axi_rdma_send_write_payload_store_rdata),
-+  .m_axi_data_bus_rresp_i     (m_axi_rdma_send_write_payload_store_rresp),
-+  .m_axi_data_bus_rlast_i     (m_axi_rdma_send_write_payload_store_rlast),
-+  .m_axi_data_bus_rvalid_i    (m_axi_rdma_send_write_payload_store_rvalid),
-+  .m_axi_data_bus_rready_o    (m_axi_rdma_send_write_payload_store_rready),
++  .m_axi_data_bus_awid_o      (m_axi_pktgen_get_payload_awid),
++  .m_axi_data_bus_awaddr_o    (m_axi_pktgen_get_payload_awaddr),
++  .m_axi_data_bus_awlen_o     (m_axi_pktgen_get_payload_awlen),
++  .m_axi_data_bus_awsize_o    (m_axi_pktgen_get_payload_awsize),
++  .m_axi_data_bus_awburst_o   (m_axi_pktgen_get_payload_awburst),
++  .m_axi_data_bus_awcache_o   (m_axi_pktgen_get_payload_awcache),
++  .m_axi_data_bus_awprot_o    (m_axi_pktgen_get_payload_awprot),
++  .m_axi_data_bus_awvalid_o   (m_axi_pktgen_get_payload_awvalid),
++  .m_axi_data_bus_awready_i   (m_axi_pktgen_get_payload_awready),
++  .m_axi_data_bus_wdata_o     (m_axi_pktgen_get_payload_wdata),
++  .m_axi_data_bus_wstrb_o     (m_axi_pktgen_get_payload_wstrb),
++  .m_axi_data_bus_wlast_o     (m_axi_pktgen_get_payload_wlast),
++  .m_axi_data_bus_wvalid_o    (m_axi_pktgen_get_payload_wvalid),
++  .m_axi_data_bus_wready_i    (m_axi_pktgen_get_payload_wready),
++  .m_axi_data_bus_awlock_o    (m_axi_pktgen_get_payload_awlock),
++  .m_axi_data_bus_bid_i       (m_axi_pktgen_get_payload_bid),
++  .m_axi_data_bus_bresp_i     (m_axi_pktgen_get_payload_bresp),
++  .m_axi_data_bus_bvalid_i    (m_axi_pktgen_get_payload_bvalid),
++  .m_axi_data_bus_bready_o    (m_axi_pktgen_get_payload_bready),
++  .m_axi_data_bus_arid_o      (m_axi_pktgen_get_payload_arid),
++  .m_axi_data_bus_araddr_o    (m_axi_pktgen_get_payload_araddr),
++  .m_axi_data_bus_arlen_o     (m_axi_pktgen_get_payload_arlen),
++  .m_axi_data_bus_arsize_o    (m_axi_pktgen_get_payload_arsize),
++  .m_axi_data_bus_arburst_o   (m_axi_pktgen_get_payload_arburst),
++  .m_axi_data_bus_arcache_o   (m_axi_pktgen_get_payload_arcache),
++  .m_axi_data_bus_arprot_o    (m_axi_pktgen_get_payload_arprot),
++  .m_axi_data_bus_arvalid_o   (m_axi_pktgen_get_payload_arvalid),
++  .m_axi_data_bus_arready_i   (m_axi_pktgen_get_payload_arready),
++  .m_axi_data_bus_arlock_o    (m_axi_pktgen_get_payload_arlock),
++  .m_axi_data_bus_rid_i       (m_axi_pktgen_get_payload_rid),
++  .m_axi_data_bus_rdata_i     (m_axi_pktgen_get_payload_rdata),
++  .m_axi_data_bus_rresp_i     (m_axi_pktgen_get_payload_rresp),
++  .m_axi_data_bus_rlast_i     (m_axi_pktgen_get_payload_rlast),
++  .m_axi_data_bus_rvalid_i    (m_axi_pktgen_get_payload_rvalid),
++  .m_axi_data_bus_rready_o    (m_axi_pktgen_get_payload_rready),
 +
 +  .axil_aclk_i(axil_clk),
 +  .axis_aclk_i(axis_clk),
@@ -4285,7 +4285,6 @@ index 0000000..f787dc9
 +  .axis_rstn_i(axis_rstn)
 +);
 +
-+assign m_axi_rdma_send_write_payload_store_awuser = 'd0;
 +
 +assign m_axi_rdma_rsp_payload_awid = 1'b0;
 +assign m_axi_rdma_rsp_payload_awaddr = 'd0;
@@ -4337,30 +4336,31 @@ index 0000000..f787dc9
 +assign m_axi_payload_to_retry_buf_rready = 'd0;
 +assign m_axi_payload_to_retry_buf_arlock = 'd0;
 +
-+assign m_axi_pktgen_get_payload_awid = 'd0;
-+assign m_axi_pktgen_get_payload_awaddr = 'd0;
-+assign m_axi_pktgen_get_payload_awlen = 'd0;
-+assign m_axi_pktgen_get_payload_awsize = 'd0;
-+assign m_axi_pktgen_get_payload_awburst = 'd0;
-+assign m_axi_pktgen_get_payload_awcache = 'd0;
-+assign m_axi_pktgen_get_payload_awprot = 'd0;
-+assign m_axi_pktgen_get_payload_awvalid = 'd0;
-+assign m_axi_pktgen_get_payload_wdata = 'd0;
-+assign m_axi_pktgen_get_payload_wstrb = 'd0;
-+assign m_axi_pktgen_get_payload_wlast = 'd0;
-+assign m_axi_pktgen_get_payload_wvalid = 'd0;
-+assign m_axi_pktgen_get_payload_awlock = 'd0;
-+assign m_axi_pktgen_get_payload_bready = 'd1;
-+assign m_axi_pktgen_get_payload_arid = 'd0;
-+assign m_axi_pktgen_get_payload_araddr = 'd0;
-+assign m_axi_pktgen_get_payload_arlen = 'd0;
-+assign m_axi_pktgen_get_payload_arsize = 'd0;
-+assign m_axi_pktgen_get_payload_arburst = 'd0;
-+assign m_axi_pktgen_get_payload_arcache = 'd0;
-+assign m_axi_pktgen_get_payload_arprot = 'd0;
-+assign m_axi_pktgen_get_payload_arvalid = 'd0;
-+assign m_axi_pktgen_get_payload_rready = 'd0;
-+assign m_axi_pktgen_get_payload_arlock = 'd0;
++assign m_axi_rdma_send_write_payload_store_awid = 'd0;
++assign m_axi_rdma_send_write_payload_store_awaddr = 'd0;
++assign m_axi_rdma_send_write_payload_store_awuser = 'd0;
++assign m_axi_rdma_send_write_payload_store_awlen = 'd0;
++assign m_axi_rdma_send_write_payload_store_awsize = 'd0;
++assign m_axi_rdma_send_write_payload_store_awburst = 'd0;
++assign m_axi_rdma_send_write_payload_store_awcache = 'd0;
++assign m_axi_rdma_send_write_payload_store_awprot = 'd0;
++assign m_axi_rdma_send_write_payload_store_awvalid = 'd0;
++assign m_axi_rdma_send_write_payload_store_wdata = 'd0;
++assign m_axi_rdma_send_write_payload_store_wstrb = 'd0;
++assign m_axi_rdma_send_write_payload_store_wlast = 'd0;
++assign m_axi_rdma_send_write_payload_store_wvalid = 'd0;
++assign m_axi_rdma_send_write_payload_store_awlock = 'd0;
++assign m_axi_rdma_send_write_payload_store_bready = 'd1;
++assign m_axi_rdma_send_write_payload_store_arid = 'd0;
++assign m_axi_rdma_send_write_payload_store_araddr = 'd0;
++assign m_axi_rdma_send_write_payload_store_arlen = 'd0;
++assign m_axi_rdma_send_write_payload_store_arsize = 'd0;
++assign m_axi_rdma_send_write_payload_store_arburst = 'd0;
++assign m_axi_rdma_send_write_payload_store_arcache = 'd0;
++assign m_axi_rdma_send_write_payload_store_arprot = 'd0;
++assign m_axi_rdma_send_write_payload_store_arvalid = 'd0;
++assign m_axi_rdma_send_write_payload_store_rready = 'd0;
++assign m_axi_rdma_send_write_payload_store_arlock = 'd0;
 +
 +assign m_axi_write_completion_awid = 'd0;
 +assign m_axi_write_completion_awaddr = 'd0;

@@ -13,8 +13,8 @@ set_property -dict {
         CONFIG.Data_Count_Width {9}
         CONFIG.Write_Data_Count_Width {9}
         CONFIG.Read_Data_Count_Width {9}
-        CONFIG.Read_Clock_Frequency {200}
-        CONFIG.Write_Clock_Frequency {100}
+        CONFIG.Read_Clock_Frequency {250}
+        CONFIG.Write_Clock_Frequency {125}
         CONFIG.Programmable_Full_Type {No_Programmable_Full_Threshold}
         CONFIG.Full_Threshold_Assert_Value {511}
         CONFIG.Full_Threshold_Negate_Value {510}

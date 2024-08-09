@@ -93,7 +93,7 @@ package roceTypes;
     parameter integer RDMA_MSG_BITS = 192;
     parameter integer RDMA_N_RD_OUTSTANDING = 8;
     parameter integer RDMA_N_WR_OUTSTANDING = 16;
-    parameter integer RDMA_BASE_REQ_BITS = 160;
+    parameter integer RDMA_BASE_REQ_BITS = 192;
     
 
     parameter integer RDMA_QP_INTF_BITS = 200;
@@ -329,6 +329,7 @@ package roceTypes;
 
         // DESC
         logic [VADDR_BITS-1:0] vaddr;
+        logic [TAG_BITS-1:0] tag;
         logic [LEN_BITS-1:0] len;
 
         // RSRVD
@@ -372,10 +373,10 @@ package roceTypes;
         logic [RDMA_QP_IDX_BITS-1:0]  sq_idx;
         logic [PADDR_BITS-1:0]        cq_base_addr;
         logic [PADDR_BITS-1:0]        sq_base_addr;
-        logic [AXIL_DATA_WIDTH-1:0]    sq_prod_idx; //AXI lite data bits for complete regs
-        logic [AXIL_DATA_WIDTH-1:0]    cq_head_idx;
-        logic [VADDR_BITS-1:0]        pd_vaddr;
-    } SQdata_struct; //232 bits
+        logic [AXIL_DATA_WIDTH-1:0]   sq_prod_idx; //AXI lite data bits for complete regs
+        logic [AXIL_DATA_WIDTH-1:0]   cq_head_idx;
+        logic [AXIL_DATA_WIDTH-1:0]   qp_conf;  
+    } SQdata_struct; //264 bits
 
     
     typedef struct packed { 
@@ -402,8 +403,9 @@ package roceTypes;
     } wr_cmd_t;
 
     typedef struct packed {
-        logic [ACCESDESC_BITS-1:0] accesdesc;
         logic [BUFLEN_BITS-1:0] buflen;
+        logic [VADDR_BITS-1:0] base_vaddr;
+        logic [ACCESDESC_BITS-1:0] accesdesc;
         logic [PADDR_BITS-1:0] paddr;
         logic [TAG_BITS-1:0] rkey;
     }dma_req_t;
@@ -416,7 +418,8 @@ package roceTypes;
         logic [DEST_BITS-1:0] dest;
         logic [PID_BITS-1:0] pid;
         logic [DEST_BITS-1:0] vfid;
-        logic [32-RDMA_OPCODE_BITS-STRM_BITS-2-DEST_BITS-PID_BITS-DEST_BITS-1:0] rsrvd;
+        logic [RDMA_QPN_BITS-1:0] qp_num;
+        logic [48-RDMA_OPCODE_BITS-STRM_BITS-2-DEST_BITS-PID_BITS-RDMA_QPN_BITS-DEST_BITS-1:0] rsrvd;
     } ack_t;
 
     typedef struct packed {

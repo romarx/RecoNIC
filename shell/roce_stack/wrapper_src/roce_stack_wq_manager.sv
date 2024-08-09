@@ -22,7 +22,6 @@ module roce_stack_wq_manager #(
     input  logic [63:0]   CQBAi_i,
     input  logic [31:0]   SQPIi_i,
     input  logic [31:0]   CQHEADi_i,
-    input  logic [63:0]   VIRTADDR_i,
 
     output rd_cmd_t       rd_qp_o,
     output logic          rd_qp_valid_o,
@@ -30,10 +29,6 @@ module roce_stack_wq_manager #(
     
     output logic [39:0]   WB_CQHEADi_o,
     output logic          WB_CQHEADi_valid_o,
-
-    input logic           rx_ack_valid_i,
-    input logic           rx_nack_valid_i,
-    input logic           rx_dat_valid_i,
 
     output logic          m_rdma_conn_interface_valid_o, 
     input  logic          m_rdma_conn_interface_ready_i,
@@ -46,6 +41,10 @@ module roce_stack_wq_manager #(
     output logic          m_rdma_sq_interface_valid_o, 
     input  logic          m_rdma_sq_interface_ready_i,
     output dreq_t         m_rdma_sq_interface_data_o,
+
+    input  logic          s_rdma_ack_valid_i,
+    output logic          s_rdma_ack_ready_o,
+    input  ack_t          s_rdma_ack_data_i,
 
     output logic          m_axi_qp_get_wqe_awid_o,
     output logic  [63:0]  m_axi_qp_get_wqe_awaddr_o,
@@ -162,20 +161,17 @@ qp_state qp_state_d, qp_state_q;
 
 always_comb begin
   qp_state_d = qp_state_q;
-  mtu_d = mtu_q;
+  
   rd_qp_d = rd_qp_q;
-  log_mtu_d = log_mtu_q;
   qp_ctx_d = qp_ctx_q;
   m_rdma_qp_interface_valid_o = 1'b0;
   qp_intf_done = 1'b0;
   rd_qp_valid_o = 1'b0;
 
-  case(qp_state_q) //TODO: two things can happen here.....
+  case(qp_state_q)
     QP_IDLE: begin
       if(qp_configured_i) begin
         if(QPCONFi_i[0] && QPCONFi_i[10:8] <= 3'b100) begin
-          mtu_d = 'd256 << QPCONFi_i[10:8];
-          log_mtu_d = 'd8 + {1'b0, QPCONFi_i[10:8]};
           //these values are not necessary for the receiving side
           qp_ctx_d.vaddr = 'd0;
           qp_ctx_d.r_key = 'd0;
@@ -199,9 +195,7 @@ always_comb begin
     QP_SQ_RD_QP: begin
       rd_qp_valid_o = 1'b1;
       if( rd_qp_ready_i ) begin
-        if(QPCONFi_i[0] && QPCONFi_i[10:8] <= 3'b100) begin
-          mtu_d = 'd256 << QPCONFi_i[10:8];
-          log_mtu_d = 'd8 + {1'b0, QPCONFi_i[10:8]};
+        if(QPCONFi_i[0] && QPCONFi_i[10:8] <= 3'b100) begin //TODO: add QPCONFi to SQ if and change it here too
           //update vaddr and RKEY of receciving side
           qp_ctx_d.vaddr = WQEReg_q[223:160];
           qp_ctx_d.r_key = WQEReg_q[255:224];
@@ -260,7 +254,7 @@ always_comb begin
         sq_if_input_d.sq_idx = QPidx_i;
         sq_if_input_d.sq_base_addr = SQBAi_i;
         sq_if_input_d.cq_base_addr = CQBAi_i;
-        sq_if_input_d.pd_vaddr = VIRTADDR_i;
+        sq_if_input_d.qp_conf = QPCONFi_i;
         sq_fifo_state_d = SQ_FIFO_VALID;
       end
     end
@@ -290,24 +284,23 @@ fifo # (
 
 
 
-typedef enum {SQ_IDLE, SQ_FIFO_READY, SQ_WAIT_QP, SQ_VALID, SQ_WRITE, SQ_SEND, SQ_READ, SQ_WAIT_RESP_READ, SQ_WAIT_RESP_WRITE_SEND, SQ_WRITE_COMPLETION, SQ_UPDATE_CQHEAD} sq_state;
+typedef enum {SQ_IDLE, SQ_FIFO_READY, SQ_WAIT_QP, SQ_VALID, SQ_WRITE, SQ_SEND, SQ_READ, SQ_WAIT_RESP, SQ_WRITE_COMPLETION, SQ_UPDATE_CQHEAD, SQ_FINISH} sq_state;
 sq_state sq_state_d, sq_state_q;
 
 
 
-//TODO: wait for ack or check if first sqe
 logic write_completion;
 logic last_d, last_q;
 logic first_d, first_q;
 logic [31:0] transfer_length_d, transfer_length_q;
-logic [63:0] curr_local_vaddr_d, curr_local_vaddr_q, curr_remote_vaddr_d, curr_remote_vaddr_q;
-logic [31:0] exp_resp_ctr_d, exp_resp_ctr_q, resp_ctr_d, resp_ctr_q;
+logic [63:0] curr_local_paddr_d, curr_local_paddr_q, curr_remote_vaddr_d, curr_remote_vaddr_q;
 logic [31:0] localidx_d, localidx_q;
 
 always_comb begin
   sq_state_d = sq_state_q;
   WB_CQHEADi_valid_o = 1'b0;
   m_rdma_sq_interface_valid_o = 1'b0;
+  s_rdma_ack_ready_o = 1'b0;
   sq_fifo_rd = 1'b0;
   fetch_wqe = 1'b0;
   write_completion = 1'b0;
@@ -316,12 +309,12 @@ always_comb begin
   last_d = last_q;
   first_d = first_q;
   transfer_length_d = transfer_length_q;
-  curr_local_vaddr_d = curr_local_vaddr_q;
+  curr_local_paddr_d = curr_local_paddr_q;
   curr_remote_vaddr_d = curr_remote_vaddr_q;
-  exp_resp_ctr_d = exp_resp_ctr_q;
-  resp_ctr_d = resp_ctr_q;
   localidx_d = localidx_q;
   sq_if_output_d = sq_if_output_q;
+  mtu_d = mtu_q;
+  log_mtu_d = log_mtu_q;
 
   case(sq_state_q)
     SQ_IDLE: begin
@@ -336,6 +329,10 @@ always_comb begin
         sq_state_d = SQ_IDLE;
       end else begin
         localidx_d = sq_if_output_q.cq_head_idx;
+        //mtu_d = 'd256 << sq_if_output_q.qp_conf[10:8];
+        //log_mtu_d = 'd8 + {1'b0, sq_if_output_q.qp_conf[10:8]};
+        mtu_d = 'd4096; //fix to configured mtu in cmake of roce stack
+        log_mtu_d = 'd12;
         fetch_wqe = 1'b1;
         sq_state_d = SQ_WAIT_QP;
       end
@@ -349,7 +346,6 @@ always_comb begin
           $display("write command");
           sq_state_d = SQ_WRITE;
         end else if(WQEReg_q[135:128] == 8'h02) begin
-          //TODO: SEND, is this even supported by the rdma stack?
           $display("send command");
           sq_state_d = SQ_SEND;
         end else if(WQEReg_q[135:128] == 8'h04) begin
@@ -367,11 +363,11 @@ always_comb begin
           sq_req_d.req_1.qpn    = {8'b0, sq_if_output_q.sq_idx};
           sq_req_d.req_1.last   = 1'b1;
           sq_req_d.req_1.offs   = 4'b0;
-          sq_req_d.req_1.vaddr  = sq_if_output_q.pd_vaddr;
+          sq_req_d.req_1.vaddr  = WQEReg_q[223:160];
           sq_req_d.req_1.len    = WQEReg_q[127:96];
           sq_req_d.req_1.rsrvd  = 'd0;
 
-          sq_req_d.req_2.vaddr  = WQEReg_q[223:160];
+          sq_req_d.req_2.vaddr  = WQEReg_q[95:32];
           sq_req_d.req_2.offs   = 4'b0;
           sq_req_d.req_2.len    = WQEReg_q[127:96];
           sq_req_d.req_2.rsrvd  = 'd0;
@@ -384,37 +380,35 @@ always_comb begin
           sq_req_d.req_1.qpn    = {8'b0, sq_if_output_q.sq_idx};
           sq_req_d.req_1.last   = 1'b0;
           sq_req_d.req_1.offs   = 4'b0;
-          sq_req_d.req_1.vaddr  = sq_if_output_q.pd_vaddr;
+          sq_req_d.req_1.vaddr  = WQEReg_q[223:160];
           sq_req_d.req_1.len    = mtu_q;
           sq_req_d.req_1.rsrvd  = 'd0;
           
-          sq_req_d.req_2.vaddr  = WQEReg_q[223:160];
+          sq_req_d.req_2.vaddr  = WQEReg_q[95:32];
           sq_req_d.req_2.offs   = 4'b0;
           sq_req_d.req_2.len    = mtu_q;
           sq_req_d.req_2.rsrvd  = 'd0;
 
 
           transfer_length_d = WQEReg_q[127:96] - mtu_q;
-          curr_local_vaddr_d = sq_if_output_q.pd_vaddr + mtu_q;
+          curr_local_paddr_d = WQEReg_q[95:32] + mtu_q;
           curr_remote_vaddr_d = WQEReg_q[223:160] + mtu_q;
           last_d = 1'b0;
           first_d = 1'b0;
           sq_state_d = SQ_VALID;
         end
-        exp_resp_ctr_d = 'd1;
       end else begin
         //case last
         if(transfer_length_q <= mtu_q) begin
-          //TODO: vaddr handling
           sq_req_d.req_1.opcode = RC_RDMA_WRITE_LAST;
           sq_req_d.req_1.qpn    = {8'b0, sq_if_output_q.sq_idx};
           sq_req_d.req_1.last   = 1'b1;
           sq_req_d.req_1.offs   = 4'b0;
-          sq_req_d.req_1.vaddr  = curr_local_vaddr_q;
+          sq_req_d.req_1.vaddr  = curr_remote_vaddr_q;
           sq_req_d.req_1.len    = transfer_length_q;
           sq_req_d.req_1.rsrvd  = 'd0;
           
-          sq_req_d.req_2.vaddr  = curr_remote_vaddr_q;
+          sq_req_d.req_2.vaddr  = curr_local_paddr_q;
           sq_req_d.req_2.offs   = 4'b0;
           sq_req_d.req_2.len    = transfer_length_q;
           sq_req_d.req_2.rsrvd  = 'd0;
@@ -423,28 +417,26 @@ always_comb begin
           sq_state_d = SQ_VALID;
         //case middle
         end else begin
-          //TODO: vaddr handling
           sq_req_d.req_1.opcode = RC_RDMA_WRITE_MIDDLE;
           sq_req_d.req_1.qpn    = {8'b0, sq_if_output_q.sq_idx};
           sq_req_d.req_1.last   = 1'b0;
           sq_req_d.req_1.offs   = 4'b0;
-          sq_req_d.req_1.vaddr  = curr_local_vaddr_q;
+          sq_req_d.req_1.vaddr  = curr_remote_vaddr_q;
           sq_req_d.req_1.len    = mtu_q;
           sq_req_d.req_1.rsrvd  = 'd0;
           
-          sq_req_d.req_2.vaddr  = curr_remote_vaddr_q;
+          sq_req_d.req_2.vaddr  = curr_local_paddr_q;
           sq_req_d.req_2.offs   = 4'b0;
           sq_req_d.req_2.len    = mtu_q;
           sq_req_d.req_2.rsrvd  = 'd0;
           
           transfer_length_d = transfer_length_q - mtu_q;
-          curr_local_vaddr_d = curr_local_vaddr_q + mtu_q;
+          curr_local_paddr_d = curr_local_paddr_q + mtu_q;
           curr_remote_vaddr_d = curr_remote_vaddr_q + mtu_q;
           last_d = 1'b0;
           first_d = 1'b0;
           sq_state_d = SQ_VALID;
         end
-        exp_resp_ctr_d = exp_resp_ctr_q + 'd1;
       end
     end
     SQ_SEND: begin
@@ -455,11 +447,11 @@ always_comb begin
           sq_req_d.req_1.qpn    = {8'b0, sq_if_output_q.sq_idx};
           sq_req_d.req_1.last   = 1'b1;
           sq_req_d.req_1.offs   = 4'b0;
-          sq_req_d.req_1.vaddr  = sq_if_output_q.pd_vaddr;
+          sq_req_d.req_1.vaddr  = 'd0;
           sq_req_d.req_1.len    = WQEReg_q[127:96];
           sq_req_d.req_1.rsrvd  = 'd0;
 
-          sq_req_d.req_2.vaddr  = sq_if_output_q.pd_vaddr; //for some reason, in the send case this is the local address
+          sq_req_d.req_2.vaddr  = WQEReg_q[95:32]; //for some reason, in the send case this is the local address
           sq_req_d.req_2.offs   = 4'b0;
           sq_req_d.req_2.len    = WQEReg_q[127:96];
           sq_req_d.req_2.rsrvd        = 'd0;
@@ -472,23 +464,22 @@ always_comb begin
           sq_req_d.req_1.qpn    = {8'b0, sq_if_output_q.sq_idx};
           sq_req_d.req_1.last   = 1'b0;
           sq_req_d.req_1.offs   = 4'b0;
-          sq_req_d.req_1.vaddr  = sq_if_output_q.pd_vaddr;
+          sq_req_d.req_1.vaddr  = 'd0;
           sq_req_d.req_1.len    = mtu_q;
           sq_req_d.req_1.rsrvd  = 'd0;
           
-          sq_req_d.req_2.vaddr  = sq_if_output_q.pd_vaddr;
+          sq_req_d.req_2.vaddr  = WQEReg_q[95:32];
           sq_req_d.req_2.offs   = 4'b0;
           sq_req_d.req_2.len    = mtu_q;
           sq_req_d.req_2.rsrvd  = 'd0;
 
 
           transfer_length_d = WQEReg_q[127:96] - mtu_q;
-          curr_local_vaddr_d = sq_if_output_q.pd_vaddr + mtu_q;
+          curr_local_paddr_d = WQEReg_q[95:32] + mtu_q;
           last_d = 1'b0;
           first_d = 1'b0;
           sq_state_d = SQ_VALID;
         end
-        exp_resp_ctr_d = 'd1;
       end else begin
         //case last
         if(transfer_length_q <= mtu_q) begin
@@ -496,11 +487,11 @@ always_comb begin
           sq_req_d.req_1.qpn    = {8'b0, sq_if_output_q.sq_idx};
           sq_req_d.req_1.last   = 1'b1;
           sq_req_d.req_1.offs   = 4'b0;
-          sq_req_d.req_1.vaddr  = curr_local_vaddr_q;
+          sq_req_d.req_1.vaddr  = 'd0;
           sq_req_d.req_1.len    = transfer_length_q;
           sq_req_d.req_1.rsrvd  = 'd0;
           
-          sq_req_d.req_2.vaddr  = curr_local_vaddr_q;
+          sq_req_d.req_2.vaddr  = curr_local_paddr_q;
           sq_req_d.req_2.offs   = 4'b0;
           sq_req_d.req_2.len    = transfer_length_q;
           sq_req_d.req_2.rsrvd  = 'd0;
@@ -513,22 +504,21 @@ always_comb begin
           sq_req_d.req_1.qpn    = {8'b0, sq_if_output_q.sq_idx};
           sq_req_d.req_1.last   = 1'b0;
           sq_req_d.req_1.offs   = 4'b0;
-          sq_req_d.req_1.vaddr  = curr_local_vaddr_q;
+          sq_req_d.req_1.vaddr  = 'd0;
           sq_req_d.req_1.len    = mtu_q;
           sq_req_d.req_1.rsrvd  = 'd0;
           
-          sq_req_d.req_2.vaddr  = curr_local_vaddr_q;
+          sq_req_d.req_2.vaddr  = curr_local_paddr_q;
           sq_req_d.req_2.offs   = 4'b0;
           sq_req_d.req_2.len    = mtu_q;
           sq_req_d.req_2.rsrvd  = 'd0;
           
           transfer_length_d = transfer_length_q - mtu_q;
-          curr_local_vaddr_d = curr_local_vaddr_q + mtu_q;
+          curr_local_paddr_d = curr_local_paddr_q + mtu_q;
           last_d = 1'b0;
           first_d = 1'b0;
           sq_state_d = SQ_VALID;
         end
-        exp_resp_ctr_d = exp_resp_ctr_q + 'd1;
       end
     end
     SQ_READ: begin
@@ -536,18 +526,16 @@ always_comb begin
       sq_req_d.req_1.qpn    = {8'b0, sq_if_output_q.sq_idx};
       sq_req_d.req_1.last   = 1'b1;
       sq_req_d.req_1.offs   = 4'b0;
-      sq_req_d.req_1.vaddr  = sq_if_output_q.pd_vaddr;
+      sq_req_d.req_1.vaddr  = WQEReg_q[223:160];
       sq_req_d.req_1.len    = WQEReg_q[127:96];
       sq_req_d.req_1.rsrvd  = 'd0;
           
-      sq_req_d.req_2.vaddr  = WQEReg_q[223:160];
+      sq_req_d.req_2.vaddr  = WQEReg_q[95:32];
       sq_req_d.req_2.offs   = 4'b0;
       sq_req_d.req_2.len    = WQEReg_q[127:96];
       sq_req_d.req_2.rsrvd  = 'd0;
       
       last_d = 1'b1;
-      //if len % mtu > 0, exp_resp is len >> log2(mtu) + 1
-      exp_resp_ctr_d = ((WQEReg_q[127:96] - ((WQEReg_q[127:96]>>log_mtu_q)<<log_mtu_q)) > 0) ? (WQEReg_q[127:96] >> log_mtu_q) + 'd1 : WQEReg_q[127:96] >> log_mtu_q;
       sq_state_d = SQ_VALID;
     end
     SQ_VALID: begin
@@ -561,11 +549,11 @@ always_comb begin
           CQReg_d[31:24] = 'd0; //TODO: errors??
           
           if(WQEReg_q[135:128] == 8'h00) begin
-            sq_state_d = SQ_WAIT_RESP_WRITE_SEND;
+            sq_state_d = SQ_WAIT_RESP;
           end else if (WQEReg_q[135:128] == 8'h02) begin
-            sq_state_d = SQ_WAIT_RESP_WRITE_SEND;
+            sq_state_d = SQ_WAIT_RESP;
           end else if (WQEReg_q[135:128] == 8'h04) begin
-            sq_state_d = SQ_WAIT_RESP_READ;
+            sq_state_d = SQ_WAIT_RESP;
           end 
         end else if(WQEReg_q[135:128] == 8'h00) begin
           sq_state_d = SQ_WRITE;
@@ -574,41 +562,28 @@ always_comb begin
         end
       end
     end
-    SQ_WAIT_RESP_WRITE_SEND: begin
-      if (rx_ack_valid_i) begin
-        resp_ctr_d =  resp_ctr_q + 'd1;
-      end
-      if (rx_nack_valid_i) begin
-        resp_ctr_d = 1'b0;
-      end
-
-      if(resp_ctr_q == exp_resp_ctr_q) begin
-        write_completion = 1'b1;
-        sq_state_d = SQ_WRITE_COMPLETION;
-      end
-    end
-    SQ_WAIT_RESP_READ: begin
-      if(rx_dat_valid_i) begin
-        resp_ctr_d = resp_ctr_q + 'd1;
-      end
-      if (rx_nack_valid_i) begin
-        resp_ctr_d = 1'b0;
-      end
-
-      if(resp_ctr_q == exp_resp_ctr_q) begin
-        write_completion = 1'b1;
-        sq_state_d = SQ_WRITE_COMPLETION;
-      end
-    end
-    SQ_WRITE_COMPLETION: begin
-      resp_ctr_d = 'd0;
-      if(completion_written) begin
+    SQ_WAIT_RESP: begin
+      if(s_rdma_ack_valid_i) begin
+        s_rdma_ack_ready_o = 1'b1;
         localidx_d = localidx_q + 1;
         sq_state_d = SQ_UPDATE_CQHEAD;
       end
     end
     SQ_UPDATE_CQHEAD: begin
       WB_CQHEADi_valid_o = 1'b1;
+      if(sq_if_output_q.qp_conf[5]) begin
+        write_completion = 1'b1;
+        sq_state_d = SQ_WRITE_COMPLETION;
+      end else begin
+        sq_state_d = SQ_FINISH;
+      end
+    end
+    SQ_WRITE_COMPLETION: begin
+      if(completion_written) begin
+        sq_state_d = SQ_FINISH;
+      end
+    end
+    SQ_FINISH: begin
       if(localidx_q < sq_if_output_q.sq_prod_idx) begin
         fetch_wqe = 1'b1;
         sq_state_d = SQ_WAIT_QP;
@@ -616,7 +591,6 @@ always_comb begin
         sq_state_d = SQ_IDLE;
       end
     end
-    
   endcase
 end
 
@@ -709,7 +683,6 @@ rd_state Read_State_d, Read_State_q;
 
 
 //TODO: read all wqe's in a burst and put them in a FIFO
-//TODO: this fsm might have unnecessary states...
 always_comb begin
   m_axi_qp_get_wqe_arvalid_o = 1'b0;
   RdAddrReg_d = RdAddrReg_q;
@@ -739,7 +712,6 @@ always_comb begin
 end
 
 //AXI read ctl logic
-//TODO: this needs some logic from the rdma core 
 
 always_comb begin
   m_axi_qp_get_wqe_rready_o = 1'b0;
@@ -821,8 +793,6 @@ always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
     sq_if_output_q      <= 'd0;
     sq_state_q          <= SQ_IDLE;
     sq_req_q            <= 'd0;
-    exp_resp_ctr_q      <= 'd0;
-    resp_ctr_q          <= 'd0;
     
     AddrWr_State_q      <= AW_IDLE;
     WrAddrReg_q         <= 'd0;
@@ -834,7 +804,7 @@ always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
     Read_State_q        <= RD_IDLE;
     WQEReg_q            <= 'd0;
     
-    curr_local_vaddr_q  <= 'd0;
+    curr_local_paddr_q  <= 'd0;
     curr_remote_vaddr_q <= 'd0;
     transfer_length_q   <= 'd0;
     last_q              <= 1'b0;
@@ -856,8 +826,6 @@ always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
     sq_if_output_q      <= sq_if_output_d;
     sq_state_q          <= sq_state_d;
     sq_req_q            <= sq_req_d;
-    exp_resp_ctr_q      <= exp_resp_ctr_d;
-    resp_ctr_q          <= resp_ctr_d;
     
     AddrWr_State_q      <= AddrWr_State_d;
     WrAddrReg_q         <= WrAddrReg_d;
@@ -869,17 +837,12 @@ always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
     Read_State_q        <= Read_State_d;
     WQEReg_q            <= WQEReg_d;
     
-    curr_local_vaddr_q  <= curr_local_vaddr_d;
+    curr_local_paddr_q  <= curr_local_paddr_d;
     curr_remote_vaddr_q <= curr_remote_vaddr_d;
     transfer_length_q   <= transfer_length_d;
     last_q              <= last_d;
     first_q             <= first_d;
   end
 end
-
-
-
-
-
 
 endmodule: roce_stack_wq_manager

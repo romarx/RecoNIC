@@ -65,7 +65,6 @@ module roce_stack_csr (
   output logic [47:0]                     MACDESADDi_o,             
   output logic [31:0]                     IPDESADDR1i_o, //for IPv4 only
 
-  output logic [63:0]                     VIRTADDR_o,
 
   input rd_cmd_t                          rd_qp_i,
   input logic                             rd_qp_valid_i,
@@ -104,6 +103,7 @@ module roce_stack_csr (
   input  logic                            rd_req_addr_valid_i,
   output logic                            rd_req_addr_ready_o,
   input  logic [63:0]                     rd_req_addr_vaddr_i,
+  input  logic [23:0]                     rd_req_addr_pdidx_i,
   input  logic [15:0]                     rd_req_addr_qpn_i,
   output logic                            rd_resp_addr_valid_o,
   input  logic                            rd_resp_addr_ready_i,
@@ -112,6 +112,7 @@ module roce_stack_csr (
   input  logic                            wr_req_addr_valid_i,
   output logic                            wr_req_addr_ready_o,
   input  logic [63:0]                     wr_req_addr_vaddr_i,
+  input  logic [23:0]                     wr_req_addr_pdidx_i,
   input  logic [15:0]                     wr_req_addr_qpn_i,
   output logic                            wr_resp_addr_valid_o,
   input  logic                            wr_resp_addr_ready_i,
@@ -953,12 +954,11 @@ logic [7:0] GLB_ADDR_AXIS;
 logic [REG_WIDTH-1:0] GLB_RD_REG_AXIS;
 logic [REG_WIDTH-1:0] GLB_WR_REG_AXIS;
 
-//huge table to lookup pdnum
-logic [NUM_PD-1:0][23:0] pdnum_table_d, pdnum_table_q; 
+
 
 
 //Control signals for r/w fsm
-typedef enum {L_IDLE, L_READ_CMD, L_READ_SINGLE, L_READ_MULTI, L_WRITE, L_READ_READY, L_READ_VADDR, L_HOLD} logic_reg_state_t;
+typedef enum {L_IDLE, L_READ_CMD, L_READ_SINGLE, L_READ_MULTI, L_WRITE, L_READ_READY, L_HOLD} logic_reg_state_t;
 logic_reg_state_t l_reg_st_d, l_reg_st_q;
 rd_cmd_t l_rd_cmd_d, l_rd_cmd_q;
 logic [1:0] hold_axis_d, hold_axis_q;
@@ -973,6 +973,7 @@ virt_to_phys_state rd_vtp_st_d, rd_vtp_st_q, wr_vtp_st_d, wr_vtp_st_q;
 rd_cmd_t find_pd_rd_d, find_pd_rd_q, find_pd_wr_d, find_pd_wr_q;
 logic find_pd_rd_valid_d, find_pd_rd_valid_q, find_pd_wr_valid_d, find_pd_wr_valid_q, find_pd_rd_ready, find_pd_wr_ready;
 dma_req_t rd_resp_addr_data_d, rd_resp_addr_data_q, wr_resp_addr_data_d, wr_resp_addr_data_q;
+logic [23:0] wr_qp_pdnum_d, wr_qp_pdnum_q, rd_qp_pdnum_d, rd_qp_pdnum_q;
 
 
 
@@ -1338,10 +1339,7 @@ end
 
 rd_cmd_t rd_sq_vaddr_d, rd_sq_vaddr_q;
 logic rd_sq_vaddr_valid_d, rd_sq_vaddr_valid_q;
-logic config_sq;
 
-logic [7:0] pd_addr_d, pd_addr_q;
-logic find_pd_addr_rd, find_pd_addr_wr;
 
 always_comb begin
   rd_sq_vaddr_d = rd_sq_vaddr_q;
@@ -1349,15 +1347,13 @@ always_comb begin
   l_reg_st_d = l_reg_st_q;
   l_rd_cmd_d = l_rd_cmd_q;
   l_wr_cmd_d = l_wr_cmd_q;
-
-  pdnum_table_d = pdnum_table_q;
+  
   QPidx_d = QPidx_q;
   hold_axis_d = hold_axis_q;
   cmd_fifo_rd_en = 1'b0;
   qp_configured_o = 1'b0;
   conn_configured_o = 1'b0;
   sq_updated_o = 1'b0;
-  config_sq = 1'b0;
   rd_qp_ready_o = 1'b0;
   find_pd_rd_ready = 1'b0;
   find_pd_wr_ready = 1'b0;
@@ -1566,24 +1562,20 @@ always_comb begin
           conn_configured_o = 1'b1;
           l_reg_st_d = L_IDLE;
         end else if(l_rd_cmd_q.bram_idx == SQPIi_idx) begin
-          config_sq = 1'b1;
-          l_reg_st_d = L_READ_VADDR;
+          sq_updated_o = 1'b1;
+          l_reg_st_d = L_IDLE;
         end else if (l_rd_cmd_q.bram_idx == NUM_QP_REGS) begin
           rd_qp_ready_o = 1'b1;
           l_reg_st_d = L_HOLD;
         end else if (l_rd_cmd_q.bram_idx == PDNUMi_idx) begin
           find_pd_rd_ready = 1'b1;
           find_pd_wr_ready = 1'b1;
-          l_reg_st_d = L_IDLE; //don't directly co back to idle in this case or else it breaks
+          l_reg_st_d = L_IDLE;
         end else begin
           l_reg_st_d = L_IDLE;
         end
       end else if(l_rd_cmd_q.region == 'd1) begin
-        if (l_rd_cmd_q.bram_idx == PDPDNUM_idx) begin
-          pdnum_table_d[l_rd_cmd_q.address] = {l_rd_cmd_q.address, PD_RD_REG_AXIS_Q[PDPDNUM_idx][23:0]};
-        end else if(l_rd_cmd_q.bram_idx == VIRTADDRLSB_idx) begin
-          sq_updated_o = 1'b1;
-        end else if (l_rd_cmd_q.bram_idx == PDNUMi_idx) begin //abuse PDNUMi_idx for ready signal in phys addr lookup
+        if (l_rd_cmd_q.bram_idx == PDNUMi_idx) begin //abuse PDNUMi_idx for ready signal in phys addr lookup
           find_pd_rd_ready = 1'b1;
           find_pd_wr_ready = 1'b1;
         end
@@ -1591,14 +1583,6 @@ always_comb begin
       end else begin
         l_reg_st_d = L_IDLE;
       end
-    end
-    L_READ_VADDR: begin
-      rd_sq_vaddr_d.region = 'd1;
-      rd_sq_vaddr_d.read_all = 1'b1;
-      rd_sq_vaddr_d.bram_idx = VIRTADDRLSB_idx;
-      rd_sq_vaddr_d.address = pd_addr_q;
-      rd_sq_vaddr_valid_d = 1'b1;
-      l_reg_st_d = L_IDLE;
     end
     L_WRITE: begin
       if(l_wr_cmd_q.region == 'd0) begin
@@ -1637,42 +1621,26 @@ end
 
 
 
-
-always_comb begin
-  pd_addr_d = pd_addr_q;
-  if(find_pd_addr_rd | find_pd_addr_wr | config_sq) begin
-    for(int i=0; i < NUM_PD; i++) begin
-      if(pdnum_table_q[i] == QP_RD_REG_AXIS_Q[PDNUMi_idx][23:0]) begin
-        pd_addr_d = i;
-      end
-    end
-  end
-end
-
 always_comb begin
   rd_vtp_st_d = rd_vtp_st_q;
   rd_resp_addr_data_d = rd_resp_addr_data_q;
   find_pd_rd_valid_d = find_pd_rd_valid_q;
   find_pd_rd_d = find_pd_rd_q;
+  rd_qp_pdnum_d = rd_qp_pdnum_q;
   rd_req_addr_ready_o = 1'b1;
   rd_resp_addr_valid_o = 1'b0;
-  find_pd_addr_rd = 1'b0;
 
 
   case(rd_vtp_st_q)
   VTP_IDLE: begin
     if(rd_req_addr_valid_i && rd_req_addr_ready_o) begin
       rd_req_addr_ready_o = 1'b0;
-      rd_resp_addr_data_d.accesdesc = ~0;
-      rd_resp_addr_data_d.rkey = ~0;
-      rd_resp_addr_data_d.buflen = ~0;
-      rd_resp_addr_data_d.paddr = ~0;
-
       if(rd_req_addr_vaddr_i == 'd0) begin
         rd_resp_addr_data_d.accesdesc = 'd0;
         rd_resp_addr_data_d.buflen = ~0;
         rd_resp_addr_data_d.rkey = ~0;
         rd_resp_addr_data_d.paddr = 'd0;
+        rd_resp_addr_data_d.base_vaddr = 64'h0;
         rd_vtp_st_d = VTP_VALID;
       end else begin
         find_pd_rd_d.region = 'd2;
@@ -1688,7 +1656,7 @@ always_comb begin
     rd_req_addr_ready_o = 1'b0;
     if(find_pd_rd_ready) begin
       find_pd_rd_valid_d = 1'b0;
-      find_pd_addr_rd = 1'b1;
+      rd_qp_pdnum_d = QP_RD_REG_AXIS[PDNUMi_idx];
       rd_vtp_st_d = VTP_REQ_PD;
     end
   end
@@ -1697,7 +1665,7 @@ always_comb begin
     find_pd_rd_d.region = 'd1;
     find_pd_rd_d.read_all = 1'b1;
     find_pd_rd_d.bram_idx = PDNUMi_idx;
-    find_pd_rd_d.address = pd_addr_q;
+    find_pd_rd_d.address = rd_req_addr_pdidx_i[7:0];
     find_pd_rd_valid_d = 1'b1;
     rd_vtp_st_d = VTP_PREP_RESP;
   end
@@ -1705,12 +1673,16 @@ always_comb begin
     rd_req_addr_ready_o = 1'b0;
     if(find_pd_rd_ready) begin
       find_pd_rd_valid_d = 1'b0;
-      if(rd_req_addr_vaddr_i == {PD_RD_REG_AXIS_Q[VIRTADDRMSB_idx], PD_RD_REG_AXIS_Q[VIRTADDRLSB_idx]}) begin
-        rd_resp_addr_data_d.accesdesc = PD_RD_REG_AXIS_Q[ACCESSDESC_idx][3:0];
-        rd_resp_addr_data_d.buflen = {PD_RD_REG_AXIS_Q[ACCESSDESC_idx][31:16], PD_RD_REG_AXIS_Q[WRRDBUFLEN_idx]};
-        rd_resp_addr_data_d.rkey[7:0] = PD_RD_REG_AXIS_Q[BUFRKEY_idx][7:0];
-        rd_resp_addr_data_d.paddr = {PD_RD_REG_AXIS_Q[BUFBASEADDRMSB_idx], PD_RD_REG_AXIS_Q[BUFBASEADDRLSB_idx]};
+      if(rd_qp_pdnum_q != PD_RD_REG_AXIS_Q[PDPDNUM_idx][23:0]) begin
+        rd_resp_addr_data_d.rkey[8] = 1'b1; //err state pdnum invalid
+      end else begin
+      rd_resp_addr_data_d.rkey[8] = 1'b0;
       end
+      rd_resp_addr_data_d.accesdesc = PD_RD_REG_AXIS_Q[ACCESSDESC_idx][3:0];
+      rd_resp_addr_data_d.buflen = {PD_RD_REG_AXIS_Q[ACCESSDESC_idx][31:16], PD_RD_REG_AXIS_Q[WRRDBUFLEN_idx]};
+      rd_resp_addr_data_d.rkey[7:0] = PD_RD_REG_AXIS_Q[BUFRKEY_idx][7:0];
+      rd_resp_addr_data_d.paddr = {PD_RD_REG_AXIS_Q[BUFBASEADDRMSB_idx], PD_RD_REG_AXIS_Q[BUFBASEADDRLSB_idx]};
+      rd_resp_addr_data_d.base_vaddr = {PD_RD_REG_AXIS_Q[VIRTADDRMSB_idx], PD_RD_REG_AXIS_Q[VIRTADDRLSB_idx]};
       rd_vtp_st_d = VTP_VALID;
     end
   end
@@ -1731,20 +1703,15 @@ always_comb begin
   wr_resp_addr_data_d = wr_resp_addr_data_q;
   find_pd_wr_valid_d = find_pd_wr_valid_q;
   find_pd_wr_d = find_pd_wr_q;
+  wr_qp_pdnum_d = wr_qp_pdnum_q;
   wr_req_addr_ready_o = 1'b1;
   wr_resp_addr_valid_o = 1'b0;
-  find_pd_addr_wr = 1'b0;
 
 
   case(wr_vtp_st_q)
   VTP_IDLE: begin
     if(wr_req_addr_valid_i && wr_req_addr_ready_o) begin
       wr_req_addr_ready_o = 1'b0;
-      wr_resp_addr_data_d.accesdesc = ~0;
-      wr_resp_addr_data_d.rkey = ~0;
-      wr_resp_addr_data_d.buflen = ~0;
-      wr_resp_addr_data_d.paddr = ~0;
-
       //lookup defined qpn of the request of the request
       find_pd_wr_d.region = 'd2;
       find_pd_wr_d.read_all = 1'b1;
@@ -1763,10 +1730,11 @@ always_comb begin
           wr_resp_addr_data_d.accesdesc = 4'b0001;
           wr_resp_addr_data_d.buflen = QP_RD_REG_AXIS[QPCONFi_idx][31:16] << 8;
           wr_resp_addr_data_d.rkey = QP_RD_REG_AXIS[STATRQPIDBi_idx]; // use rkey field for doorbell idx
-          wr_resp_addr_data_d.paddr = {QP_RD_REG_AXIS_Q[STATRQBUFCAMSBi_idx], QP_RD_REG_AXIS[STATRQBUFCAi_idx]}; // probably not how it's meant to be implemented
+          wr_resp_addr_data_d.paddr = {QP_RD_REG_AXIS_Q[STATRQBUFCAMSBi_idx], QP_RD_REG_AXIS[STATRQBUFCAi_idx]};
+          wr_resp_addr_data_d.base_vaddr = 64'h0;
           wr_vtp_st_d = VTP_VALID;
       end else begin
-        find_pd_addr_wr = 1'b1;
+        wr_qp_pdnum_d = QP_RD_REG_AXIS[PDNUMi_idx];
         wr_vtp_st_d = VTP_REQ_PD;
       end
     end
@@ -1776,7 +1744,7 @@ always_comb begin
     find_pd_wr_d.region = 'd1;
     find_pd_wr_d.read_all = 1'b1;
     find_pd_wr_d.bram_idx = PDNUMi_idx;
-    find_pd_wr_d.address = pd_addr_q;
+    find_pd_wr_d.address = wr_req_addr_pdidx_i[7:0];
     wr_vtp_st_d = VTP_PREP_RESP;
     find_pd_wr_valid_d = 1'b1;
   end
@@ -1784,12 +1752,16 @@ always_comb begin
     wr_req_addr_ready_o = 1'b0;
     if(find_pd_wr_ready) begin
       find_pd_wr_valid_d = 1'b0;
-      if(wr_req_addr_vaddr_i == {PD_RD_REG_AXIS_Q[VIRTADDRMSB_idx], PD_RD_REG_AXIS_Q[VIRTADDRLSB_idx]}) begin
-        wr_resp_addr_data_d.accesdesc = PD_RD_REG_AXIS_Q[ACCESSDESC_idx][3:0];
-        wr_resp_addr_data_d.buflen = {PD_RD_REG_AXIS_Q[ACCESSDESC_idx][31:16], PD_RD_REG_AXIS_Q[WRRDBUFLEN_idx]};
-        wr_resp_addr_data_d.rkey[7:0] = PD_RD_REG_AXIS_Q[BUFRKEY_idx][7:0];
-        wr_resp_addr_data_d.paddr = {PD_RD_REG_AXIS_Q[BUFBASEADDRMSB_idx], PD_RD_REG_AXIS_Q[BUFBASEADDRLSB_idx]};
-      end  
+      if(wr_qp_pdnum_q != PD_RD_REG_AXIS_Q[PDPDNUM_idx][23:0]) begin
+        wr_resp_addr_data_d.rkey[8] = 1'b1;
+      end else begin
+        wr_resp_addr_data_d.rkey[8] = 1'b0;
+      end
+      wr_resp_addr_data_d.accesdesc = PD_RD_REG_AXIS_Q[ACCESSDESC_idx][3:0];
+      wr_resp_addr_data_d.buflen = {PD_RD_REG_AXIS_Q[ACCESSDESC_idx][31:16], PD_RD_REG_AXIS_Q[WRRDBUFLEN_idx]};
+      wr_resp_addr_data_d.rkey[7:0] = PD_RD_REG_AXIS_Q[BUFRKEY_idx][7:0];
+      wr_resp_addr_data_d.paddr = {PD_RD_REG_AXIS_Q[BUFBASEADDRMSB_idx], PD_RD_REG_AXIS_Q[BUFBASEADDRLSB_idx]};
+      wr_resp_addr_data_d.base_vaddr = {PD_RD_REG_AXIS_Q[VIRTADDRMSB_idx], PD_RD_REG_AXIS_Q[VIRTADDRLSB_idx]};
       wr_vtp_st_d = VTP_VALID;
     end
   end
@@ -1830,10 +1802,10 @@ always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
 
     find_pd_rd_q                <= 'd0;
     find_pd_rd_valid_q          <= 1'b0;
+    rd_qp_pdnum_q               <= 'd0;
     find_pd_wr_q                <= 'd0;
     find_pd_wr_valid_q          <= 1'b0;
-    pdnum_table_q               <= ~0;
-    pd_addr_q                   <= ~0;
+    wr_qp_pdnum_q               <= 'd0;
 
     wb_CQHEADi_valid_q          <= 1'b0;
     wb_CQHEADi_cmd_q            <= 'd0;
@@ -1887,10 +1859,10 @@ always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
 
     find_pd_rd_q                <= find_pd_rd_d;
     find_pd_rd_valid_q          <= find_pd_rd_valid_d;
+    rd_qp_pdnum_q               <= rd_qp_pdnum_d;
     find_pd_wr_q                <= find_pd_wr_d;
     find_pd_wr_valid_q          <= find_pd_wr_valid_d;
-    pdnum_table_q               <= pdnum_table_d;
-    pd_addr_q                   <= pd_addr_d;
+    wr_qp_pdnum_q               <= wr_qp_pdnum_d;
 
     wb_CQHEADi_valid_q          <= wb_CQHEADi_valid_d;
     wb_CQHEADi_cmd_q            <= wb_CQHEADi_cmd_d;
@@ -2075,8 +2047,6 @@ assign DESTQPCONFi_o  = QP_RD_REG_AXIS_Q[DESTQPCONFi_idx][23:0];
 
 assign MACDESADDi_o   = {QP_RD_REG_AXIS_Q[MACDESADDMSBi_idx][15:0], QP_RD_REG_AXIS_Q[MACDESADDLSBi_idx]};
 assign IPDESADDR1i_o  = QP_RD_REG_AXIS_Q[IPDESADDR1i_idx];
-
-assign VIRTADDR_o = {PD_RD_REG_AXIS_Q[VIRTADDRMSB_idx], PD_RD_REG_AXIS_Q[VIRTADDRLSB_idx]};
 
 
 endmodule: roce_stack_csr

@@ -165,8 +165,6 @@ logic [31:0]  SQ_QPCONFi;
 logic [23:0]  SQ_SQPSNi;
 logic [31:0]  SQ_LSTRQREQi;
 
-logic [63:0] VIRTADDR;
-
 
 //write back regs
 logic [39:0]  CQHEADi_wb;
@@ -187,7 +185,7 @@ metaIntf #(.STYPE(req_t)) rdma_wr_req ();
 metaIntf #(.STYPE(rdma_qp_conn_t)) rdma_conn_interface();
 metaIntf #(.STYPE(rdma_qp_ctx_t)) rdma_qp_interface();
 metaIntf #(.STYPE(dreq_t)) rdma_sq();
-metaIntf #(.STYPE(dack_t)) rdma_ack();
+metaIntf #(.STYPE(ack_t)) rdma_ack();
 
 AXI4S #(.AXI4S_DATA_BITS(AXI4S_DATA_WIDTH)) axis_rdma_rd ();
 AXI4S #(.AXI4S_DATA_BITS(AXI4S_DATA_WIDTH)) axis_rdma_wr ();
@@ -200,6 +198,7 @@ AXI4S #(.AXI4S_DATA_BITS(512)) axis_rx_handler_to_roce ();
 //address requests
 logic rd_req_addr_valid, rd_req_addr_ready, wr_req_addr_valid, wr_req_addr_ready;
 logic [63:0] rd_req_addr_vaddr, wr_req_addr_vaddr;
+logic [23:0] rd_req_addr_pdidx, wr_req_addr_pdidx;
 logic [15:0] rd_req_addr_qpn, wr_req_addr_qpn;
 //address response
 logic rd_resp_addr_valid, rd_resp_addr_ready, wr_resp_addr_valid, wr_resp_addr_ready;
@@ -321,8 +320,6 @@ roce_stack_csr  inst_roce_stack_csr(
   .MACDESADDi_o(MACDESADDi),
   .IPDESADDR1i_o(IPDESADDR1i),
 
-  .VIRTADDR_o(VIRTADDR),
-
   .rd_qp_i(rd_qp),
   .rd_qp_valid_i(rd_qp_valid),
   .rd_qp_ready_o(rd_qp_ready),
@@ -359,6 +356,7 @@ roce_stack_csr  inst_roce_stack_csr(
   .rd_req_addr_valid_i(rd_req_addr_valid),
   .rd_req_addr_ready_o(rd_req_addr_ready),
   .rd_req_addr_vaddr_i(rd_req_addr_vaddr),
+  .rd_req_addr_pdidx_i(rd_req_addr_pdidx),
   .rd_req_addr_qpn_i(rd_req_addr_qpn),
   .rd_resp_addr_valid_o(rd_resp_addr_valid),
   .rd_resp_addr_ready_i(rd_resp_addr_ready),
@@ -367,6 +365,7 @@ roce_stack_csr  inst_roce_stack_csr(
   .wr_req_addr_valid_i(wr_req_addr_valid),
   .wr_req_addr_ready_o(wr_req_addr_ready),
   .wr_req_addr_vaddr_i(wr_req_addr_vaddr),
+  .wr_req_addr_pdidx_i(wr_req_addr_pdidx),
   .wr_req_addr_qpn_i(wr_req_addr_qpn),
   .wr_resp_addr_valid_o(wr_resp_addr_valid),
   .wr_resp_addr_ready_i(wr_resp_addr_ready),
@@ -404,7 +403,6 @@ roce_stack_wq_manager #(
   .CQBAi_i(CQBAi),
   .SQPIi_i(SQPIi),
   .CQHEADi_i(CQHEADi),
-  .VIRTADDR_i(VIRTADDR),
    
   .rd_qp_o(rd_qp),
   .rd_qp_valid_o(rd_qp_valid),
@@ -412,10 +410,6 @@ roce_stack_wq_manager #(
    
   .WB_CQHEADi_o(CQHEADi_wb),
   .WB_CQHEADi_valid_o(CQHEADi_wb_valid),
-
-  .rx_ack_valid_i(rx_ack_valid),
-  .rx_nack_valid_i(rx_nack_valid),
-  .rx_dat_valid_i(rx_srr_valid),
 
   .m_rdma_conn_interface_valid_o(rdma_conn_interface.valid), 
   .m_rdma_conn_interface_ready_i(rdma_conn_interface.ready),
@@ -428,6 +422,10 @@ roce_stack_wq_manager #(
   .m_rdma_sq_interface_valid_o(rdma_sq.valid),
   .m_rdma_sq_interface_ready_i(rdma_sq.ready),
   .m_rdma_sq_interface_data_o(rdma_sq.data),
+
+  .s_rdma_ack_valid_i(rdma_ack.valid),
+  .s_rdma_ack_ready_o(rdma_ack.ready),
+  .s_rdma_ack_data_i(rdma_ack.data),
 
   .m_axi_qp_get_wqe_awid_o(m_axi_qp_get_wqe_awid_o),
   .m_axi_qp_get_wqe_awaddr_o(m_axi_qp_get_wqe_awaddr_o),
@@ -474,19 +472,8 @@ roce_stack_wq_manager #(
 roce_stack_axis_to_aximm #(
   .AXI4_DATA_WIDTH(AXI4S_DATA_WIDTH)
 ) inst_roce_stack_axis_to_aximm (
-  .s_rdma_rd_req_valid_i(rdma_rd_req.valid),
-  .s_rdma_rd_req_ready_o(rdma_rd_req.ready),
-  .s_rdma_rd_req_vaddr_i(rdma_rd_req.data.vaddr),
-  .s_rdma_rd_req_len_i(rdma_rd_req.data.len),
-  .s_rdma_rd_req_qpn_i(rdma_rd_req.data.qpn),
-  .s_rdma_rd_req_last_i(rdma_rd_req.data.last),
-
-  .s_rdma_wr_req_valid_i(rdma_wr_req.valid),
-  .s_rdma_wr_req_ready_o(rdma_wr_req.ready),
-  .s_rdma_wr_req_vaddr_i(rdma_wr_req.data.vaddr),
-  .s_rdma_wr_req_len_i(rdma_wr_req.data.len),
-  .s_rdma_wr_req_qpn_i(rdma_wr_req.data.qpn),
-  .s_rdma_wr_req_last_i(rdma_wr_req.data.last),
+  .s_rdma_wr_req(rdma_wr_req),
+  .s_rdma_rd_req(rdma_rd_req),
 
   .m_axis_rdma_rd_tdata_o(axis_rdma_rd.tdata),
   .m_axis_rdma_rd_tkeep_o(axis_rdma_rd.tkeep),
@@ -503,6 +490,7 @@ roce_stack_axis_to_aximm #(
   .rd_req_addr_valid_o(rd_req_addr_valid),
   .rd_req_addr_ready_i(rd_req_addr_ready),
   .rd_req_addr_vaddr_o(rd_req_addr_vaddr),
+  .rd_req_addr_pdidx_o(rd_req_addr_pdidx),
   .rd_req_addr_qpn_o(rd_req_addr_qpn),
   .rd_resp_addr_valid_i(rd_resp_addr_valid),
   .rd_resp_addr_ready_o(rd_resp_addr_ready),
@@ -511,6 +499,7 @@ roce_stack_axis_to_aximm #(
   .wr_req_addr_valid_o(wr_req_addr_valid),
   .wr_req_addr_ready_i(wr_req_addr_ready),
   .wr_req_addr_vaddr_o(wr_req_addr_vaddr),
+  .wr_req_addr_pdidx_o(wr_req_addr_pdidx),
   .wr_req_addr_qpn_o(wr_req_addr_qpn),
   .wr_resp_addr_valid_i(wr_resp_addr_valid),
   .wr_resp_addr_ready_o(wr_resp_addr_ready),
@@ -638,8 +627,6 @@ ip_handler_ip ip_handler_inst (
 ); 
 
 
-assign rdma_ack.ready = 1'b1;
-//TODO: definitions for AXI4S, metaIntf....
 roce_stack inst_roce_stack (
   .nclk(axis_aclk_i),
   .nresetn(axis_rstn_i),

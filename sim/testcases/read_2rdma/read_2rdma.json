@@ -4,7 +4,7 @@
   "pkt_op"                : "read",
   "non_roce_traffic"      : "no",
   "noise_roce_en"         : "no",
-  "payload_size"          : 10240,
+  "payload_size"          : 64,
   "src_baseaddr_location" :"dev_mem",
   "src_baseaddr"          : 2048,
   "dst_baseaddr"          : 512,

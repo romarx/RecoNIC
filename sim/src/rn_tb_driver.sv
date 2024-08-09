@@ -89,10 +89,11 @@ logic                       m_axis_tvalid_reg;
 logic [USER_SIZE_WIDTH-1:0] m_axis_tuser_size_reg;
 logic                       m_axis_tlast_reg;
 
-localparam CLK_PERIOD = 10ns;
+localparam CLK_PERIOD = 4000ps;
 localparam CLK_PERIOD_75  = 12048ps;
 localparam CLK_PERIOD_300 = 3012ps;
 localparam CLK_PERIOD_400 = 2500ps;
+localparam CLK_PERIOD_125 = 8000ps;
 localparam CLK_PERIOD_200 = 5000ps;
 
 initial begin
@@ -108,7 +109,7 @@ end
 
 initial begin
   axis_clk  = 1'b0;
-  forever #(CLK_PERIOD_200/2) axis_clk = ~axis_clk;
+  forever #(CLK_PERIOD_125/2) axis_clk = ~axis_clk;
 end
 
 initial begin
