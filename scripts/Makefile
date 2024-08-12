@@ -62,6 +62,13 @@ SMARTNIC_SCRIPT_DIR := $(ROOT_DIR)/base_nics/open-nic-shell/script
 
 build_nic: build_reconic
 ifeq ($(IMPL), 1)
+	cd $(SMARTNIC_SCRIPT_DIR); vivado -mode batch -source build.tcl -tclargs -max_pkt_len 9600 -impl 1 -overwrite 1 -board_repo $(BOARD_REPO)
+else
+	cd $(SMARTNIC_SCRIPT_DIR); vivado -mode batch -source build.tcl -tclargs -max_pkt_len 9600 -impl 0 -overwrite 1 -board_repo $(BOARD_REPO)
+endif
+
+build_nic_rv2: build_reconic build_rocev2
+ifeq ($(IMPL), 1)
 	cd $(SMARTNIC_SCRIPT_DIR); vivado -mode batch -source build.tcl -tclargs -max_pkt_len 9600 -ernic 0 -impl 1 -overwrite 1 -board_repo $(BOARD_REPO)
 else
 	cd $(SMARTNIC_SCRIPT_DIR); vivado -mode batch -source build.tcl -tclargs -max_pkt_len 9600 -ernic 0 -impl 0 -overwrite 1 -board_repo $(BOARD_REPO)
@@ -69,12 +76,6 @@ endif
 
 build_reconic: clean_build hls_build
 	mkdir -p $(BUILD_DIR)
-	mkdir -p $(ROCE_BUILD_DIR)
-	mkdir -p $(ROCE_BUILD_DIR)/build
-	mkdir -p $(ROCE_BUILD_DIR)/rocev2_src
-	mkdir -p $(ROCE_BUILD_DIR)/vivado_ip
-	mkdir -p $(ROCE_BUILD_DIR)/wrapper_src
-	mkdir -p $(SMARTNIC_ROCE_DIR)/
 	mkdir -p $(RN_BUILD_DIR)
 	mkdir -p $(RN_BUILD_DIR)/$(LC)
 	cp -rf $(PLUGIN_DIR)/* $(BUILD_DIR)/
@@ -86,16 +87,23 @@ build_reconic: clean_build hls_build
 	cp $(LOOKASIDE_COMP_DIR)/kernel/*.v $(RN_BUILD_DIR)/$(LC)/
 	cd $(BUILD_DIR); $(PYTHON_EXE) $(SCRIPT_DIR)/build_tcl.py -nic rdma-opennic
 	cp -rf $(BUILD_DIR)/* $(SMARTNIC_DIR)/
-	
+
+build_rocev2: rv2_build
+	mkdir -p $(ROCE_BUILD_DIR)
+	mkdir -p $(ROCE_BUILD_DIR)/build
+	mkdir -p $(ROCE_BUILD_DIR)/rocev2_src
+	mkdir -p $(ROCE_BUILD_DIR)/vivado_ip
+	mkdir -p $(ROCE_BUILD_DIR)/wrapper_src
+	mkdir -p $(SMARTNIC_ROCE_DIR)/
 	cp -rf $(ROCE_DIR)/build/* $(ROCE_BUILD_DIR)/build/
 	cp -rf $(ROCE_DIR)/rocev2_src/* $(ROCE_BUILD_DIR)/rocev2_src/
 	cp -rf $(ROCE_DIR)/vivado_ip/* $(ROCE_BUILD_DIR)/vivado_ip/
 	cp -rf $(ROCE_DIR)/wrapper_src/* $(ROCE_BUILD_DIR)/wrapper_src/
 	cp -rf $(ROCE_DIR)/build.tcl $(ROCE_BUILD_DIR)/
 	cp -rf $(ROCE_BUILD_DIR)/* $(SMARTNIC_ROCE_DIR)/
-
 	rm -rf $(SMARTNIC_ROCE_DIR)/vivado_ip/sim_vivado_ip.tcl
 
+build_sim: hls_build rv2_build
 
 hls_build:
 ifeq ($(GEN_HLS), 1)
@@ -122,10 +130,11 @@ else
 endif
 endif
 
+rv2_build:
 ifeq ($(GEN_ROCEV2), 1)
 	mkdir -p $(ROCE_DIR)/build
 	cd $(ROCE_DIR)/build; \
-		cmake ../fpga-network-stack -DVIVADO_HLS_ROOT_DIR=/opt/Xilinx/Vitis_HLS
+		cmake ../fpga-network-stack -DVIVADO_HLS_ROOT_DIR=$(XILINX_VITIS)
 	cd $(ROCE_DIR)/build; \
 		make ip
 endif
@@ -136,3 +145,4 @@ clean_build:
 clean:
 	rm -rf $(BUILD_DIR)/*
 	rm -rf $(SMARTNIC_DIR)/*
+	rm -rf $(SMARTNIC_ROCE_DIR)/*
