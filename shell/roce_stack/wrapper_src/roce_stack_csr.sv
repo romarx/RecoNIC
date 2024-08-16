@@ -1971,7 +1971,7 @@ block_ram_1k GLBCONF_inst (
   .clkb(axis_aclk_i)
 );
 
-//Per QP config //TODO: make a for loop
+//Per QP config
 generate
   for (genvar i = 0; i < NUM_QP_REGS; i++) begin : qp_regs
     block_ram_1k PER_QP_inst (

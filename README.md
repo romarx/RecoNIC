@@ -45,14 +45,21 @@ RecoNIC leverages [OpenNIC](https://github.com/Xilinx/open-nic) as its basic NIC
 
 * Obtain the modified OpenNIC shell with the RDMA engine
 ```
-$ git submodule update --init base_nics/open-nic-shell
+$ git submodule update --init --recursive
 $ cp -r base_nics/open-nic-shell/board_files/Xilinx/au250 $BOARD_REPO/boards/Xilinx/
 ```
 * Integrate RecoNIC into the modified OpenNIC shell and generate bitstream
 ```
 $ cd ./scripts
 $ ./gen_base_nic.sh
+```
+For RecoNIC with ERNIC
+```
 $ make build_nic
+```
+For RecoNIC with the open-source RoCE stack from the Systems Group @ETH Zurich
+```
+$ make build_nic_rv2
 ```
 If you encounter the error below, please specify your python version when generating bitstream by "*make PYTHON_EXE=python3.8 build_nic*"
 ```
@@ -425,6 +432,8 @@ $ export COMPILED_LIB_DIR=/your/vivado/compiled_lib_dir/for/questasim
 1. Generate vivado IPs
 
 ```
+$ cd ./scripts
+$ make build_sim
 $ cd ./sim/scripts
 $ vivado -mode batch -source gen_vivado_ip.tcl
 ```
@@ -454,8 +463,10 @@ INFO:run_testcase:  -gui       : Use gui mode with the simulator
 Here is an example showing how to use the script to simulate 'read_2rdma' testcase under ./sim/testcases/read_2rdma folder
 ```
 $ cd ../sim
-# start simulation with xsim
+# start simulation with xsim and ERNIC
 $ python run_testcase.py -roce -tc read_2rdma -gui
+# start simulation with xsim and the open-source RoCEv2 stack
+$ python run_testcase.py -roce -tc read_2rdma -gui -rv2
 # start simulation with questasim
 $ python run_testcase.py -roce -tc read_2rdma -questasim -gui
 ```

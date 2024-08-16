@@ -5,8 +5,8 @@
 #==============================================================================
 array set build_options {
   -board_repo ""
-  -sim_sources ""
-  -roce_stack_sources ""
+  -sim_sources "1"
+  -roce_stack_sources "1"
 }
 
 # Expect arguments in the form of `-argument value`
