@@ -442,6 +442,7 @@ package roceTypes;
     } rdma_qp_ctx_t;
 
     typedef struct packed {
+        logic [47:0] dest_mac_addr;
         logic [15:0] remote_udp_port;
         logic [127:0] remote_ip_address;
         logic [23:0] remote_qpn;

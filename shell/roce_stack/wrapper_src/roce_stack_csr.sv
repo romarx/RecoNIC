@@ -664,10 +664,16 @@ always_comb begin
             ADDR_MACDESADDLSBi: begin
               QP_REG_ENA_AXIL[MACDESADDLSBi_idx] = 1'b1;
               QP_WR_REG_AXIL = WDataReg_q;
+              cmd_fifo_in_d.read_all = 1'b1;
+              cmd_fifo_in_d.bram_idx = MACDESADDLSBi_idx;
+              cmd_issued = 1'b1;             
             end
             ADDR_MACDESADDMSBi: begin
               QP_REG_ENA_AXIL[MACDESADDMSBi_idx] = 1'b1;
               QP_WR_REG_AXIL = WDataReg_q;
+              cmd_fifo_in_d.read_all = 1'b1;
+              cmd_fifo_in_d.bram_idx = MACDESADDMSBi_idx;
+              cmd_issued = 1'b1;             
             end
             ADDR_IPDESADDR1i: begin
               QP_REG_ENA_AXIL[IPDESADDR1i_idx] = 1'b1;
@@ -1558,7 +1564,7 @@ always_comb begin
         if(l_rd_cmd_q.bram_idx == SQPSNi_idx || l_rd_cmd_q.bram_idx == LSTRQREQi_idx) begin
           qp_configured_o = 1'b1;
           l_reg_st_d = L_IDLE;
-        end else if (l_rd_cmd_q.bram_idx == DESTQPCONFi_idx || l_rd_cmd_q.bram_idx == IPDESADDR1i_idx) begin
+        end else if (l_rd_cmd_q.bram_idx == DESTQPCONFi_idx || l_rd_cmd_q.bram_idx == IPDESADDR1i_idx || l_rd_cmd_q.bram_idx == MACDESADDLSBi_idx || l_rd_cmd_q.bram_idx == MACDESADDMSBi_idx) begin
           conn_configured_o = 1'b1;
           l_reg_st_d = L_IDLE;
         end else if(l_rd_cmd_q.bram_idx == SQPIi_idx) begin

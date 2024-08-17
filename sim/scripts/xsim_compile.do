@@ -88,6 +88,7 @@ xvlog $xvlog_opts -sv -L xpm -L ernic_v3_1_1 -L axi_bram_ctrl_v4_1_6 -d DEBUG -w
 #xvlog $xvlog_opts -work reco -L rocev2_ip --include "../build/ip/rocev2_ip/hdl/verilog" \
 #"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_append_payload_512_0_s.v" \
 #"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_Block_split49_proc.v" \
+#"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_conn_table_0_s_conn_table_dest_mac_address_V_RAM_AUTO_1R1W.v" \
 #"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_conn_table_0_s_conn_table_remote_ip_address_V_RAM_AUTO_1R1W.v" \
 #"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_conn_table_0_s_conn_table_remote_qpn_V_RAM_AUTO_1R1W.v" \
 #"../build/ip/rocev2_ip/hdl/verilog/rocev2_top_conn_table_0_s_conn_table_remote_udp_port_V_RAM_AUTO_1R1W.v" \

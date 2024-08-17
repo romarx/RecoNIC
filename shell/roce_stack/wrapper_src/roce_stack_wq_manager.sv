@@ -15,6 +15,7 @@ module roce_stack_wq_manager #(
     input  logic [31:0]   QPCONFi_i,
     input  logic [23:0]   DESTQPCONFi_i,
     input  logic [31:0]   IPDESADDR1i_i,
+    input  logic [47:0]   MACDESADDi_i,
     input  logic [23:0]   SQPSNi_i,
     input  logic [31:0]   LSTRQREQi_i,
 
@@ -132,6 +133,7 @@ always_comb begin
       //should be safe, updating a reg takes a few cycles
       if(conn_configured_i) begin
         if(IPDESADDR1i_i != 'd0) begin
+          conn_ctx_d.dest_mac_addr = MACDESADDi_i;
           conn_ctx_d.remote_udp_port = CONF_i[31:16];
           conn_ctx_d.remote_ip_address = {IPDESADDR1i_i, IPDESADDR1i_i, IPDESADDR1i_i, IPDESADDR1i_i};
           conn_ctx_d.remote_qpn = DESTQPCONFi_i;
@@ -266,7 +268,7 @@ always_comb begin
 end
 
 fifo # (
-  .DATA_BITS(264),
+  .DATA_BITS(232),
   .FIFO_SIZE(8)
 ) sq_fifo (
   .rd(sq_fifo_rd),
