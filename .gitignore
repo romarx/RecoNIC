@@ -2,3 +2,4 @@ build/*
 roce_build/*
 *.jou
 *.log
+.vscode/*

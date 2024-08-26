@@ -89,7 +89,7 @@ module roce_stack_wq_manager #(
 
 
 
-SQdata_struct sq_if_input_d, sq_if_input_q, sq_if_output, sq_if_output_d, sq_if_output_q;
+SQdata_struct sq_if_input_d, sq_if_input_q, sq_if_output, sq_if_output_d, sq_if_output_q, sq_fifo_batch_output;
 rd_cmd_t rd_qp_d, rd_qp_q;
 
 
@@ -197,7 +197,7 @@ always_comb begin
     QP_SQ_RD_QP: begin
       rd_qp_valid_o = 1'b1;
       if( rd_qp_ready_i ) begin
-        if(QPCONFi_i[0] && QPCONFi_i[10:8] <= 3'b100) begin //TODO: add QPCONFi to SQ if and change it here too
+        if(QPCONFi_i[0] && QPCONFi_i[10:8] <= 3'b100) begin 
           //update vaddr and RKEY of receciving side
           qp_ctx_d.vaddr = WQEReg_q[223:160];
           qp_ctx_d.r_key = WQEReg_q[255:224];
@@ -236,6 +236,15 @@ assign rd_qp_o = rd_qp_q;
 //  SQ INTERFACE  //
 //                //
 ////////////////////
+
+logic sq_fifo_batch_ready_rd, sq_fifo_batch_rd, sq_fifo_batch_ready_wr, sq_fifo_batch_wr;
+logic sq_c_ena, sq_c_wea, cq_c_ena, cq_c_wea;
+SQdata_struct sq_c_douta, sq_c_douta_d, sq_c_douta_q;
+logic sq_c_enb, sq_c_web, cq_c_enb;
+SQdata_struct sq_c_doutb, sq_c_doutb_d, sq_c_doutb_q;
+logic[31:0] cq_c_doutb, cq_c_doutb_d, cq_c_doutb_q;
+
+
 
 
 typedef enum {SQ_FIFO_IDLE, SQ_FIFO_VALID } sq_fifo_st;
@@ -284,9 +293,68 @@ fifo # (
   .aresetn(axis_rstn_i)
 );
 
+fifo # (
+  .DATA_BITS(232),
+  .FIFO_SIZE(8)
+) sq_fifo_batch (
+  .rd(sq_fifo_batch_rd),
+	.wr(sq_fifo_batch_wr),
+
+	.ready_rd(sq_fifo_batch_ready_rd),
+	.ready_wr(sq_fifo_batch_ready_wr),
+
+	.data_in(sq_c_doutb_q),
+  .data_out(sq_fifo_batch_output),
+
+  .aclk(axis_aclk_i),
+  .aresetn(axis_rstn_i)
+);
+
+dp_bram #(
+  .DATA_WIDTH(232),
+  .BRAM_DEPTH(256),
+  .ADDR_WIDTH(8)
+) sq_cache_inst (
+  .ena_i(sq_c_ena),
+  .wea_i(sq_c_wea),
+  .addra_i(sq_if_output_q.sq_idx),
+  .dia_i(sq_if_output_q),
+  .douta_o(sq_c_douta),
+  
+  .enb_i(sq_c_enb),
+  .web_i(sq_c_web),
+  .addrb_i(curr_ack_q.qp_num[7:0]),
+  .dib_i(sq_c_doutb_q),
+  .doutb_o(sq_c_doutb),
+  
+  .clk_i(axis_aclk_i),
+  .rstn_i(axis_rstn_i)
+);
+
+dp_bram #(
+  .DATA_WIDTH(32),
+  .BRAM_DEPTH(256),
+  .ADDR_WIDTH(8)
+) cq_cache_inst (
+  .ena_i(cq_c_ena),
+  .wea_i(cq_c_wea),
+  .addra_i(sq_if_output_q.sq_idx),
+  .dia_i(CQReg_q),
+  .douta_o(),
+  
+  .enb_i(cq_c_enb),
+  .web_i(1'b0),
+  .addrb_i(curr_ack_q.qp_num[7:0]),
+  .dib_i('d0),
+  .doutb_o(cq_c_doutb),
+  
+  .clk_i(axis_aclk_i),
+  .rstn_i(axis_rstn_i)
+);
 
 
-typedef enum {SQ_IDLE, SQ_FIFO_READY, SQ_WAIT_QP, SQ_VALID, SQ_WRITE, SQ_SEND, SQ_READ, SQ_WAIT_RESP, SQ_WRITE_COMPLETION, SQ_UPDATE_CQHEAD, SQ_FINISH} sq_state;
+
+typedef enum {SQ_IDLE, SQ_GET_QUEUE, SQ_READ_CACHE, SQ_CHECK_QUEUE_BUSY, SQ_IF_READY, SQ_WAIT_QP, SQ_VALID, SQ_WRITE, SQ_SEND, SQ_READ, SQ_WRITE_CQ_CACHE, SQ_WAIT_RESP, SQ_WRITE_COMPLETION, SQ_UPDATE_CQHEAD, SQ_FINISH} sq_state;
 sq_state sq_state_d, sq_state_q;
 
 
@@ -300,12 +368,15 @@ logic [31:0] localidx_d, localidx_q;
 
 always_comb begin
   sq_state_d = sq_state_q;
-  WB_CQHEADi_valid_o = 1'b0;
   m_rdma_sq_interface_valid_o = 1'b0;
-  s_rdma_ack_ready_o = 1'b0;
   sq_fifo_rd = 1'b0;
+  sq_fifo_batch_rd = 1'b1;
   fetch_wqe = 1'b0;
-  write_completion = 1'b0;
+  sq_c_ena = 1'b0;
+  sq_c_wea = 1'b0;
+  sq_c_douta_d = sq_c_douta_q;
+  cq_c_ena = 1'b0;
+  cq_c_wea = 1'b0;
   CQReg_d = CQReg_q;
   sq_req_d = sq_req_q;
   last_d = last_q;
@@ -320,13 +391,37 @@ always_comb begin
 
   case(sq_state_q)
     SQ_IDLE: begin
-      if(sq_fifo_ready_rd) begin
+      if(sq_fifo_ready_rd) begin // this is SQ data updated by the user
         sq_fifo_rd = 1'b1;
-        sq_if_output_d = sq_if_output; // maybe modify fifo to read in next cycle
-        sq_state_d = SQ_FIFO_READY;
+        sq_if_output_d = sq_if_output; 
+        sq_state_d = SQ_GET_QUEUE;
+      end else if (sq_fifo_batch_ready_rd) begin
+        sq_fifo_batch_rd = 1'b1;
+        sq_if_output_d = sq_fifo_batch_output;
+        sq_state_d = SQ_IF_READY;
       end
     end
-    SQ_FIFO_READY: begin
+    SQ_GET_QUEUE: begin
+      sq_c_ena = 1'b1;
+      sq_state_d = SQ_READ_CACHE;
+    end
+    SQ_READ_CACHE: begin
+      sq_c_douta_d = sq_c_douta;
+      if(sq_c_douta.sq_prod_idx != 0) begin //cq head idx might be out of sync
+        sq_if_output_d.cq_head_idx = sq_c_douta.cq_head_idx;
+      end
+      sq_state_d = SQ_CHECK_QUEUE_BUSY;
+    end
+    SQ_CHECK_QUEUE_BUSY: begin
+      if(sq_c_douta_q.sq_prod_idx == 'd0) begin //the last actions of the queue were successful or its the first time this queue is used
+        sq_state_d = SQ_IF_READY;
+      end else begin //in this case, something was updated
+        sq_state_d = SQ_IDLE;
+      end
+      sq_c_ena = 1'b1;
+      sq_c_wea = 1'b1;
+    end
+    SQ_IF_READY: begin
       if(sq_if_output_q.sq_prod_idx <= sq_if_output_q.cq_head_idx) begin //sanity check
         sq_state_d = SQ_IDLE;
       end else begin
@@ -340,7 +435,7 @@ always_comb begin
       end
     end
     SQ_WAIT_QP: begin
-      //TODO: FIFO for all WQE's fetched in current execution
+      //TODO: FIFO for all WQE's fetched in current execution, use burst feature of AXI MM
       //A new WQE is fetched, start examining it...
       if(qp_intf_done) begin
         if(WQEReg_q[135:128] == 8'h00) begin
@@ -453,7 +548,7 @@ always_comb begin
           sq_req_d.req_1.len    = WQEReg_q[127:96];
           sq_req_d.req_1.rsrvd  = 'd0;
 
-          sq_req_d.req_2.vaddr  = WQEReg_q[95:32]; //for some reason, in the send case this is the local address
+          sq_req_d.req_2.vaddr  = WQEReg_q[95:32]; 
           sq_req_d.req_2.offs   = 4'b0;
           sq_req_d.req_2.len    = WQEReg_q[127:96];
           sq_req_d.req_2.rsrvd        = 'd0;
@@ -549,14 +644,7 @@ always_comb begin
           CQReg_d[15:0] = WQEReg_q[15:0];
           CQReg_d[23:16] = WQEReg_q[135:128];
           CQReg_d[31:24] = 'd0; //TODO: errors??
-          
-          if(WQEReg_q[135:128] == 8'h00) begin
-            sq_state_d = SQ_WAIT_RESP;
-          end else if (WQEReg_q[135:128] == 8'h02) begin
-            sq_state_d = SQ_WAIT_RESP;
-          end else if (WQEReg_q[135:128] == 8'h04) begin
-            sq_state_d = SQ_WAIT_RESP;
-          end 
+          sq_state_d = SQ_WRITE_CQ_CACHE;
         end else if(WQEReg_q[135:128] == 8'h00) begin
           sq_state_d = SQ_WRITE;
         end else if(WQEReg_q[135:128] == 8'h02) begin
@@ -564,40 +652,94 @@ always_comb begin
         end
       end
     end
-    SQ_WAIT_RESP: begin
-      if(s_rdma_ack_valid_i) begin
-        s_rdma_ack_ready_o = 1'b1;
-        localidx_d = localidx_q + 1;
-        sq_state_d = SQ_UPDATE_CQHEAD;
-      end
-    end
-    SQ_UPDATE_CQHEAD: begin
-      WB_CQHEADi_valid_o = 1'b1;
-      if(sq_if_output_q.qp_conf[5]) begin
-        write_completion = 1'b1;
-        sq_state_d = SQ_WRITE_COMPLETION;
-      end else begin
-        sq_state_d = SQ_FINISH;
-      end
-    end
-    SQ_WRITE_COMPLETION: begin
-      if(completion_written) begin
-        sq_state_d = SQ_FINISH;
-      end
-    end
-    SQ_FINISH: begin
-      if(localidx_q < sq_if_output_q.sq_prod_idx) begin
-        fetch_wqe = 1'b1;
-        sq_state_d = SQ_WAIT_QP;
-      end else begin
-        sq_state_d = SQ_IDLE;
-      end
+    SQ_WRITE_CQ_CACHE: begin
+      cq_c_ena = 1'b1;
+      cq_c_wea = 1'b1;
+      sq_state_d = SQ_IDLE;
     end
   endcase
 end
 
-assign WB_CQHEADi_o[39:32] = sq_if_output_q.sq_idx;
-assign WB_CQHEADi_o[31:0]  = localidx_q;
+
+
+ack_t curr_ack_d, curr_ack_q;
+
+typedef enum {ACK_IDLE, ACK_GET_CACHES, ACK_READ_CACHES, ACK_UPDATE_CQHEAD, ACK_WRITE_COMPLETION, ACK_WB_FIFO_CACHE, ACK_FINISH} cq_state;
+cq_state cq_state_d, cq_state_q;
+
+always_comb begin
+  WB_CQHEADi_valid_o = 1'b0;
+  s_rdma_ack_ready_o = 1'b0;
+  write_completion = 1'b0;
+  sq_c_enb = 1'b0;
+  sq_c_web = 1'b0;
+  cq_c_enb = 1'b0;
+  sq_fifo_batch_wr = 1'b0;
+  curr_ack_d = curr_ack_q;
+  sq_c_doutb_d = sq_c_doutb_q;
+  cq_c_doutb_d = cq_c_doutb_q;
+  cq_state_d = cq_state_q;
+
+  case(cq_state_q)
+    ACK_IDLE: begin
+      if(s_rdma_ack_valid_i) begin
+        curr_ack_d = s_rdma_ack_data_i;
+        s_rdma_ack_ready_o = 1'b1;
+        cq_state_d = ACK_GET_CACHES;
+      end
+    end
+    ACK_GET_CACHES: begin
+      sq_c_enb = 1'b1;
+      cq_c_enb = 1'b1;
+      cq_state_d = ACK_READ_CACHES;
+    end
+    ACK_READ_CACHES: begin
+      sq_c_doutb_d = sq_c_doutb;
+      sq_c_doutb_d.cq_head_idx = sq_c_doutb.cq_head_idx + 1;
+      cq_c_doutb_d = cq_c_doutb;
+      cq_state_d = ACK_UPDATE_CQHEAD;
+    end
+    ACK_UPDATE_CQHEAD: begin
+      WB_CQHEADi_valid_o = 1'b1;
+      if(sq_c_doutb_q.qp_conf[5] & 1'b0) begin //TODO: fix write completion, disabled atm
+        write_completion = 1'b1;
+        cq_state_d = ACK_WRITE_COMPLETION;
+      end else begin
+        cq_state_d = ACK_WB_FIFO_CACHE;
+      end
+    end
+    ACK_WRITE_COMPLETION: begin
+      if(completion_written) begin 
+        cq_state_d = ACK_WB_FIFO_CACHE;
+      end
+    end
+    ACK_WB_FIFO_CACHE: begin
+      if(sq_c_doutb_q.cq_head_idx >= sq_c_doutb_q.sq_prod_idx) begin
+        sq_c_doutb_d.sq_prod_idx = 'd0; //batch finished, sq prod idx has to be updated by the user
+      end
+      cq_state_d = ACK_FINISH;
+    end
+    ACK_FINISH:begin
+      sq_c_enb = 1'b1;
+      sq_c_web = 1'b1;
+      if(sq_c_doutb_q.sq_prod_idx != 'd0) begin
+        if(sq_fifo_batch_ready_wr) begin
+          sq_fifo_batch_wr = 1'b1;
+          cq_state_d = ACK_IDLE;
+        end
+      end else begin
+        cq_state_d = ACK_IDLE;
+      end
+
+    end
+
+
+  endcase
+end
+
+
+assign WB_CQHEADi_o[39:32] = sq_c_doutb_q.sq_idx;
+assign WB_CQHEADi_o[31:0]  = sq_c_doutb_q.cq_head_idx;
 
 
 
@@ -615,7 +757,7 @@ logic wr_ready;
 
 typedef enum {WR_IDLE, WR_WRITING, WR_BRESP, WR_DONE} wr_state;
 wr_state Write_State_d, Write_State_q;
-
+//TODO: use strb instead of address here (512bits => 64 bytes, here only 4 bytes are written per transaction)
 always_comb begin
   m_axi_qp_get_wqe_awvalid_o = 1'b0;
   WrAddrReg_d = WrAddrReg_q;
@@ -629,7 +771,7 @@ always_comb begin
       end
     end
     AW_CALC_ADDR: begin
-      WrAddrReg_d = {sq_if_output_q.cq_base_addr[63:34], sq_if_output_q.cq_base_addr[33:2] + localidx_q, sq_if_output_q[1:0]};
+      WrAddrReg_d = {sq_c_doutb_q.cq_base_addr[63:34], (sq_c_doutb_q.cq_base_addr[33:2] + (sq_c_doutb_q.cq_head_idx - 1)), sq_c_doutb_q.cq_base_addr[1:0]};
       AddrWr_State_d = AW_VALID;
     end
     AW_VALID: begin
@@ -729,7 +871,7 @@ always_comb begin
       end
     end
     RD_READING: begin
-      //TODO: implement fifo for  burst transactions
+      //TODO: implement fifo for burst transactions
       m_axi_qp_get_wqe_rready_o = 1'b1;
       if(m_axi_qp_get_wqe_rvalid_i) begin
         WQEReg_d = m_axi_qp_get_wqe_rdata_i;
@@ -758,7 +900,7 @@ assign m_axi_qp_get_wqe_awprot_o = 3'b010;
 assign m_axi_qp_get_wqe_awlock_o = 1'b0;
 
 
-assign m_axi_qp_get_wqe_wdata_o = {480'd0, CQReg_q};
+assign m_axi_qp_get_wqe_wdata_o = {480'd0, cq_c_doutb_q};
 assign m_axi_qp_get_wqe_wstrb_o = 'h0000000F;
 
 
@@ -795,6 +937,13 @@ always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
     sq_if_output_q      <= 'd0;
     sq_state_q          <= SQ_IDLE;
     sq_req_q            <= 'd0;
+    sq_c_douta_q        <= 'd0;
+
+    curr_ack_q          <= 'd0;
+    sq_c_doutb_q        <= 'd0;
+    cq_c_doutb_q        <= 'd0;
+    cq_state_q          <= ACK_IDLE;
+
     
     AddrWr_State_q      <= AW_IDLE;
     WrAddrReg_q         <= 'd0;
@@ -828,6 +977,13 @@ always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
     sq_if_output_q      <= sq_if_output_d;
     sq_state_q          <= sq_state_d;
     sq_req_q            <= sq_req_d;
+    sq_c_douta_q        <= sq_c_douta_d;
+
+    curr_ack_q          <= curr_ack_d;
+    sq_c_doutb_q        <= sq_c_doutb_d;
+    cq_c_doutb_q        <= cq_c_doutb_d;
+    cq_state_q          <= cq_state_d;
+
     
     AddrWr_State_q      <= AddrWr_State_d;
     WrAddrReg_q         <= WrAddrReg_d;

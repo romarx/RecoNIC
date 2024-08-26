@@ -13,3 +13,4 @@ add_files ./wrapper_src/roce_stack_csr.sv
 add_files ./wrapper_src/roce_stack_request_handler.sv
 add_files ./wrapper_src/roce_stack_wq_manager.sv
 add_files ./wrapper_src/roce_stack_wrapper.sv
+add_files ./wrapper_src/dp_bram.sv
