@@ -143,6 +143,13 @@ logic [31:0]  CONF;
 logic [47:0]  MACADD;
 logic [47:0]  MACADD_net;
 
+logic [47:0]  macadd_to_fifo;
+logic         macadd_to_fifo_valid;
+logic mac_fifo_ready_rd, mac_fifo_ready_wr, mac_fifo_rd, mac_fifo_wr;
+logic pkt_sent_d, pkt_sent_q;
+logic last_last_d, last_last_q;
+logic [47:0]  macadd_to_encode, macadd_to_encode_d, macadd_to_encode_q;
+
 logic [31:0]  QPCONFi;
 logic [31:0]  QPADVCONFi;
 logic [63:0]  RQBAi;
@@ -395,6 +402,7 @@ roce_stack_wq_manager #(
   .QPCONFi_i(QPCONFi),
   .DESTQPCONFi_i(DESTQPCONFi),
   .IPDESADDR1i_i(IPDESADDR1i_net),
+  .MACDESADDi_i(MACDESADDi_net),
   .SQPSNi_i(SQPSNi),
   .LSTRQREQi_i(LSTRQREQi),
 
@@ -564,7 +572,7 @@ mac_ip_encode_ip mac_ip_encode_inst (
     .m_axis_ip_TLAST(axis_tx.tlast),
   
     .myMacAddress(MACADD_net),
-    .theirMacAddress(MACDESADDi_net),
+    .theirMacAddress(macadd_to_encode_q),
     
     .ap_clk(axis_aclk_i), // input aclk
     .ap_rst_n(axis_rstn_i) // input aresetn
@@ -584,7 +592,7 @@ mac_ip_encode_ip mac_ip_encode_inst (
     .m_axis_ip_TLAST(axis_tx.tlast),
     
     .myMacAddress_V(MACADD_net),
-    .theirMacAddress_V(MACDESADDi_net),
+    .theirMacAddress_V(macadd_to_encode_q),
     
     .ap_clk(axis_aclk_i), // input aclk
     .ap_rst_n(axis_rstn_i) // input aresetn
@@ -627,6 +635,41 @@ ip_handler_ip ip_handler_inst (
 ); 
 
 
+//fifo for dest mac addresses for each packet
+fifo # (
+  .DATA_BITS(48),
+  .FIFO_SIZE(32)
+) mac_addr_fifo (
+  .rd(mac_fifo_rd),
+	.wr(mac_fifo_wr),
+
+	.ready_rd(mac_fifo_ready_rd),
+	.ready_wr(mac_fifo_ready_wr),
+
+	.data_in(macadd_to_fifo),
+  .data_out(macadd_to_encode),
+
+  .aclk(axis_aclk_i),
+  .aresetn(axis_rstn_i)
+);
+
+
+always_comb begin
+  pkt_sent_d = pkt_sent_q;
+  last_last_d = axis_tx_roce_to_eth.tlast & axis_tx_roce_to_eth.tvalid;
+  macadd_to_encode_d = macadd_to_encode_q;
+  mac_fifo_rd = 1'b0;
+  if(last_last_q == 1'b0 && (axis_tx_roce_to_eth.tlast & axis_tx_roce_to_eth.tvalid) == 1'b1) begin
+    pkt_sent_d = 1'b1;
+  end
+  if(pkt_sent_q && mac_fifo_ready_rd) begin
+    pkt_sent_d = 1'b0;
+    mac_fifo_rd = 1'b1;
+    macadd_to_encode_d = macadd_to_encode;
+  end
+end
+
+
 roce_stack inst_roce_stack (
   .nclk(axis_aclk_i),
   .nresetn(axis_rstn_i),
@@ -643,6 +686,8 @@ roce_stack inst_roce_stack (
   .s_rdma_qp_interface(rdma_qp_interface),
   .s_rdma_conn_interface(rdma_conn_interface),
   .local_ip_address(IPv4ADD_net),
+  .dest_mac_address(macadd_to_fifo),
+  .dest_mac_address_valid(macadd_to_fifo_valid),
 
    // Memory
   .m_rdma_rd_req(rdma_rd_req),
@@ -700,5 +745,19 @@ assign IPv4ADD_net = {IPv4ADD[7:0], IPv4ADD[15:8], IPv4ADD[23:16], IPv4ADD[31:24
 assign IPDESADDR1i_net = {IPDESADDR1i[7:0], IPDESADDR1i[15:8], IPDESADDR1i[23:16], IPDESADDR1i[31:24]};
 assign MACADD_net = {MACADD[7:0], MACADD[15:8], MACADD[23:16], MACADD[31:24], MACADD[39:32], MACADD[47:40]};
 assign MACDESADDi_net = {MACDESADDi[7:0], MACDESADDi[15:8], MACDESADDi[23:16], MACDESADDi[31:24], MACDESADDi[39:32], MACDESADDi[47:40]};
+
+assign mac_fifo_wr = mac_fifo_ready_wr & macadd_to_fifo_valid;
+
+always_ff @(posedge axis_aclk_i, negedge axis_rstn_i) begin
+  if(!axis_rstn_i) begin
+    last_last_q         <= 1'b0;
+    pkt_sent_q          <= 1'b1;
+    macadd_to_encode_q  <= 'd0;
+  end else begin
+    last_last_q         <= last_last_d;
+    pkt_sent_q          <= pkt_sent_d;
+    macadd_to_encode_q  <= macadd_to_encode_d;
+  end
+end
 
 endmodule: roce_stack_wrapper

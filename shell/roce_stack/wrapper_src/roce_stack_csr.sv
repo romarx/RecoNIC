@@ -664,10 +664,16 @@ always_comb begin
             ADDR_MACDESADDLSBi: begin
               QP_REG_ENA_AXIL[MACDESADDLSBi_idx] = 1'b1;
               QP_WR_REG_AXIL = WDataReg_q;
+              cmd_fifo_in_d.read_all = 1'b1;
+              cmd_fifo_in_d.bram_idx = MACDESADDLSBi_idx;
+              cmd_issued = 1'b1;             
             end
             ADDR_MACDESADDMSBi: begin
               QP_REG_ENA_AXIL[MACDESADDMSBi_idx] = 1'b1;
               QP_WR_REG_AXIL = WDataReg_q;
+              cmd_fifo_in_d.read_all = 1'b1;
+              cmd_fifo_in_d.bram_idx = MACDESADDMSBi_idx;
+              cmd_issued = 1'b1;             
             end
             ADDR_IPDESADDR1i: begin
               QP_REG_ENA_AXIL[IPDESADDR1i_idx] = 1'b1;
@@ -1067,7 +1073,9 @@ logic [REG_WIDTH-1:0] IPv4ADD_d, IPv4ADD_q;
 //logic [REG_WIDTH-1:0] CNPSCHDSTS8REG_d, CNPSCHDSTS8REG_q;
 
 
+//TODO: this writeback and address request stuff is probably best implemented with another fifo
 
+//Writeback Reg FSMs
 
 wr_cmd_t wb_CQHEADi_cmd_d, wb_CQHEADi_cmd_q;
 logic wb_CQHEADi_valid_d, wb_CQHEADi_valid_q;
@@ -1558,7 +1566,7 @@ always_comb begin
         if(l_rd_cmd_q.bram_idx == SQPSNi_idx || l_rd_cmd_q.bram_idx == LSTRQREQi_idx) begin
           qp_configured_o = 1'b1;
           l_reg_st_d = L_IDLE;
-        end else if (l_rd_cmd_q.bram_idx == DESTQPCONFi_idx || l_rd_cmd_q.bram_idx == IPDESADDR1i_idx) begin
+        end else if (l_rd_cmd_q.bram_idx == DESTQPCONFi_idx || l_rd_cmd_q.bram_idx == IPDESADDR1i_idx || l_rd_cmd_q.bram_idx == MACDESADDLSBi_idx || l_rd_cmd_q.bram_idx == MACDESADDMSBi_idx) begin
           conn_configured_o = 1'b1;
           l_reg_st_d = L_IDLE;
         end else if(l_rd_cmd_q.bram_idx == SQPIi_idx) begin
@@ -1567,7 +1575,7 @@ always_comb begin
         end else if (l_rd_cmd_q.bram_idx == NUM_QP_REGS) begin
           rd_qp_ready_o = 1'b1;
           l_reg_st_d = L_HOLD;
-        end else if (l_rd_cmd_q.bram_idx == PDNUMi_idx) begin
+        end else if (l_rd_cmd_q.bram_idx == PDNUMi_idx) begin //abuse PDNUMi_idx for ready signal in phys addr lookup, case qpnum lookup
           find_pd_rd_ready = 1'b1;
           find_pd_wr_ready = 1'b1;
           l_reg_st_d = L_IDLE;
@@ -1575,7 +1583,7 @@ always_comb begin
           l_reg_st_d = L_IDLE;
         end
       end else if(l_rd_cmd_q.region == 'd1) begin
-        if (l_rd_cmd_q.bram_idx == PDNUMi_idx) begin //abuse PDNUMi_idx for ready signal in phys addr lookup
+        if (l_rd_cmd_q.bram_idx == PDNUMi_idx) begin //abuse PDNUMi_idx for ready signal in phys addr lookup, case PD address lookup
           find_pd_rd_ready = 1'b1;
           find_pd_wr_ready = 1'b1;
         end
@@ -1596,7 +1604,6 @@ always_comb begin
         PD_WR_REG_AXIS = l_wr_cmd_q.data;
         PD_REG_ENB_AXIS[l_wr_cmd_q.bram_idx] = 1'b1;
       end else if (l_wr_cmd_q.region == 'd2) begin
-        //in case of QP writeback from hardware, read all qp regs to select correct mac address for transaction
         QPidx_d = l_wr_cmd_q.address;
         QP_ADDR_AXIS = l_wr_cmd_q.address;
         QP_REG_WEB_AXIS[l_wr_cmd_q.bram_idx] = l_wr_cmd_q.wstrb;
@@ -1604,7 +1611,7 @@ always_comb begin
         QP_REG_ENB_AXIS = ~0;
         QP_RD_REG_AXIS_D = QP_RD_REG_AXIS;
       end
-      if(hold_axis_q == RD_LAT) begin //at writeback also hold as long as rd lat to select current qp
+      if(hold_axis_q == RD_LAT) begin 
         hold_axis_d = 'd0;
         l_reg_st_d = L_IDLE;
       end else begin
@@ -1619,7 +1626,7 @@ always_comb begin
 end
 
 
-
+//PD lookup read FSM
 
 always_comb begin
   rd_vtp_st_d = rd_vtp_st_q;
@@ -1696,7 +1703,7 @@ always_comb begin
   endcase
 end
 
-
+//PD lookup write FSM
 
 always_comb begin
   wr_vtp_st_d = wr_vtp_st_q;

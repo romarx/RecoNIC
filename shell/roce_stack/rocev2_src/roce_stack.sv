@@ -58,6 +58,8 @@ module roce_stack (
     metaIntf.s                  s_rdma_qp_interface,
     metaIntf.s                  s_rdma_conn_interface,
     input  logic [31:0]         local_ip_address,
+    output logic [47:0]         dest_mac_address,
+    output logic                dest_mac_address_valid,
 
     output logic                ibv_rx_pkg_count_valid,
     output logic [31:0]         ibv_rx_pkg_count_data,
@@ -501,6 +503,10 @@ rocev2_ip rocev2_inst(
     // IP
     .local_ip_address({local_ip_address,local_ip_address,local_ip_address,local_ip_address}), //Use IPv4 addr
 
+    //MAC
+    .dest_mac_address(dest_mac_address),
+    .dest_mac_address_ap_vld(dest_mac_address_valid),
+
     //DBG
     .regIbvCountRx(ibv_rx_pkg_count_data),
     .regIbvCountRx_ap_vld(ibv_rx_pkg_count_valid),
@@ -615,6 +621,10 @@ rocev2_ip rocev2_inst(
 
     // IP
     .local_ip_address_V({local_ip_address,local_ip_address,local_ip_address,local_ip_address}), //Use IPv4 addr
+    
+    //MAC
+    .dest_mac_address_V(dest_mac_address),
+    .dest_mac_address_V_ap_vld(dest_mac_address_valid),
 
     .regIbvCountRx_V(ibv_rx_pkg_count_data),
     .regIbvCountRx_V_ap_vld(ibv_rx_pkg_count_valid),

@@ -410,7 +410,7 @@ package roceTypes;
         logic [TAG_BITS-1:0] rkey;
     }dma_req_t;
 
-    typedef struct packed {
+    typedef struct packed { //TODO: might be possible to add syndrome to this output
         logic [RDMA_OPCODE_BITS-1:0] opcode;
         logic [STRM_BITS-1:0] strm;
         logic remote;
@@ -442,6 +442,7 @@ package roceTypes;
     } rdma_qp_ctx_t;
 
     typedef struct packed {
+        logic [47:0] dest_mac_addr;
         logic [15:0] remote_udp_port;
         logic [127:0] remote_ip_address;
         logic [23:0] remote_qpn;
