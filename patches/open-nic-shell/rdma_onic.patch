@@ -4162,7 +4162,7 @@ index 0000000..44933b7
 +  .AXIL_ADDR_WIDTH(32),
 +  .AXIL_DATA_WIDTH(32),
 +  .AXI4S_DATA_WIDTH(C_AXIS_DATA_WIDTH)
-+) remote_peer_rdma_inst (
++) rdma_inst (
 +  // AXIL interface for RDMA control register
 +  .s_axil_awvalid_i (s_axil_awvalid),
 +  .s_axil_awaddr_i  (s_axil_awaddr),
