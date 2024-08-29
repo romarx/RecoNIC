@@ -732,12 +732,12 @@ end
 
 initial begin
   axis_clk  = 1'b0;
-  forever #(CLK_PERIOD_125/2) axis_clk = ~axis_clk;
+  forever #(CLK_PERIOD/2) axis_clk = ~axis_clk;
 end
 
 initial begin
   axil_clk  = 1'b0;
-  forever #(CLK_PERIOD/2) axil_clk = ~axil_clk;
+  forever #(CLK_PERIOD_125/2) axil_clk = ~axil_clk;
 end
 
 always_comb

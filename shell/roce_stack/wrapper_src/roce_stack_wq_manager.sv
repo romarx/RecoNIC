@@ -701,7 +701,7 @@ always_comb begin
     end
     ACK_UPDATE_CQHEAD: begin
       WB_CQHEADi_valid_o = 1'b1;
-      if(sq_c_doutb_q.qp_conf[5] & 1'b0) begin //TODO: fix write completion, disabled atm
+      if(sq_c_doutb_q.qp_conf[5]) begin
         write_completion = 1'b1;
         cq_state_d = ACK_WRITE_COMPLETION;
       end else begin
