@@ -1,6 +1,33 @@
+/**
+  * Copyright (c) 2021, Systems Group, ETH Zurich
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+  * are permitted provided that the following conditions are met:
+  *
+  * 1. Redistributions of source code must retain the above copyright notice,
+  * this list of conditions and the following disclaimer.
+  * 2. Redistributions in binary form must reproduce the above copyright notice,
+  * this list of conditions and the following disclaimer in the documentation
+  * and/or other materials provided with the distribution.
+  * 3. Neither the name of the copyright holder nor the names of its contributors
+  * may be used to endorse or promote products derived from this software
+  * without specific prior written permission.
+  *
+  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+  * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+  * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+  * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+  * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  */
+
 import roceTypes::*;
 
-//TODO: better control logic for multiple QP's (except maybe for conn interface)
+
 module roce_stack_wq_manager #(
   parameter int NUM_QP = 256
 )(
@@ -93,8 +120,7 @@ module roce_stack_wq_manager #(
 logic fetch_wqe_d, fetch_wqe_q, fetch_wqe_ack;
 logic new_wqe_fetched_d, new_wqe_fetched_q, new_wqe_fetched_ack;
 logic qp_intf_done_d, qp_intf_done_q, qp_intf_done_ack;
-logic completion_written;
-
+logic write_completion,completion_written;
 
 
 rdma_qp_conn_t conn_ctx_d, conn_ctx_q;
@@ -246,6 +272,7 @@ assign rd_qp_o = rd_qp_q;
 
 SQdata_struct sq_fifo_input_d, sq_fifo_input_q, sq_fifo_output, sq_fifo_batch_output, sq_if_output_d, sq_if_output_q;
 logic sq_fifo_batch_ready_rd, sq_fifo_batch_rd, sq_fifo_batch_ready_wr, sq_fifo_batch_wr;
+
 logic sq_c_ena, sq_c_wea, cq_c_ena, cq_c_wea;
 SQdata_struct sq_c_douta, sq_c_douta_d, sq_c_douta_q;
 logic sq_c_enb, sq_c_web, cq_c_enb;
@@ -687,7 +714,7 @@ end
 typedef enum {ACK_IDLE, ACK_GET_CACHES, ACK_READ_CACHES, ACK_UPDATE_CQHEAD, ACK_WRITE_COMPLETION, ACK_WB_FIFO_CACHE, ACK_FINISH} cq_state;
 ack_t curr_ack_d, curr_ack_q;
 cq_state cq_state_d, cq_state_q;
-logic write_completion;
+
 
 always_comb begin
   WB_CQHEADi_valid_o = 1'b0;
@@ -864,7 +891,7 @@ always_comb begin
       end
     end
     RD_READING: begin
-      //TODO: implement fifo for burst transactions
+      //TODO: implement with fifo for burst transactions
       m_axi_qp_get_wqe_rready_o = 1'b1;
       if(m_axi_qp_get_wqe_rvalid_i) begin
         WQEReg_d = m_axi_qp_get_wqe_rdata_i;
